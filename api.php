@@ -263,7 +263,7 @@ function getPub($conn, bool $adminView = false): array {
     ];
     $out['features'] = ['tickets' => (bool)$p['feature_tickets'], 'bookings' => (bool)$p['feature_bookings'], 'bidding' => (bool)$p['feature_bidding'], 'autoschedule' => (bool)$p['feature_autoschedule'], 'reminders' => (bool)$p['feature_reminders'],
         'payments' => (bool)$p['feature_payments'], 'guests' => (bool)$p['feature_guests'],
-        'hub_events' => (bool)$p['feature_hub_events'], 'hub_gigs' => (bool)$p['feature_hub_gigs']];
+        'hub_events' => (bool)$p['feature_hub_events'], 'hub_gigs' => (bool)$p['feature_hub_gigs'], 'hub_feed' => (bool)$p['feature_hub_feed']];
     $hc = $GLOBALS['cfg']['hub'] ?? null; $out['hub_connected'] = hubConfigured($GLOBALS['cfg'] ?? []);
     $out['hub_info'] = $out['hub_connected'] ? ['url' => $hc['url'], 'slug' => $hc['pub_slug'], 'source' => $hc['source'] ?? 'config'] : null;
     $hs = []; foreach (($GLOBALS['conn']->query("SELECT k, v FROM system_status WHERE k IN ('hub_last_sync', 'hub_last_error')") ?: []) as $r) $hs[$r['k']] = $r['v'];
@@ -620,9 +620,10 @@ function hubSyncAfterResponse($conn, array $cfg, array $vapid, bool $pull = fals
     register_shutdown_function(function () use ($conn, $cfg, $vapid, $pull) {
         if (function_exists('fastcgi_finish_request')) @fastcgi_finish_request();
         try {
-            $prow = fetchOne(prepareQuery($conn, "SELECT feature_hub_events, feature_hub_gigs FROM pubs ORDER BY id LIMIT 1"));
-            if (!$prow || (!$prow['feature_hub_events'] && !$prow['feature_hub_gigs'])) return;
-            [$sent, $errs] = hubSync($conn, $cfg, $prow); if ($pull) hubPullApplications($conn, $cfg, $prow, $vapid); bsHubRecord($conn, $errs === 0, $errs ? hubLastError() : '');
+            $prow = fetchOne(prepareQuery($conn, "SELECT feature_hub_events, feature_hub_gigs, feature_hub_feed FROM pubs ORDER BY id LIMIT 1"));
+            if (!$prow || (!$prow['feature_hub_events'] && !$prow['feature_hub_gigs'] && !$prow['feature_hub_feed'])) return;
+            [$sent, $errs] = hubSync($conn, $cfg, $prow);
+            if ($pull) { hubPullApplications($conn, $cfg, $prow, $vapid); hubFeedPull($conn, $cfg, $prow, $vapid); hubOutgoingPull($conn, $cfg, $prow, $vapid); } bsHubRecord($conn, $errs === 0, $errs ? hubLastError() : '');
         } catch (Throwable $e) { error_log('hub sync: ' . $e->getMessage()); }
     });
 }
@@ -1403,7 +1404,7 @@ function completeLogin($conn, int $uid, string $key, bool $mfa = false): void {
         $dh = hash('sha256', $dev); $ds->bind_param("isss", $uid, $dh, $ipd, $ua); run($ds);
     } catch (Throwable $e) { unset($_SESSION['dev']); }
     $me = currentUser($conn);
-    $full = prepareQuery($conn, "SELECT id, name, username, role, color, phone, hourly_wage, ical_token, target_hours, has_hygiene, has_alcohol, expiry_jv, start_date, employment_type, email, notify_email, totp_enabled FROM users WHERE id = ?");
+    $full = prepareQuery($conn, "SELECT id, name, username, role, color, phone, hourly_wage, ical_token, target_hours, has_hygiene, has_alcohol, expiry_jv, start_date, employment_type, email, notify_email, notify_gigs, totp_enabled FROM users WHERE id = ?");
     $full->bind_param("i", $me['id']);
     $user = fetchOne($full);
     jsonResponse(["success" => true, "user" => $user]);
@@ -1444,7 +1445,7 @@ if (true) {
 // ===================== LUKU =====================
 if ($method === 'GET') {
     if ($action === 'me') {
-        $full = prepareQuery($conn, "SELECT id, name, username, role, color, phone, hourly_wage, ical_token, target_hours, has_hygiene, has_alcohol, expiry_jv, start_date, employment_type, email, notify_email, totp_enabled FROM users WHERE id = ?");
+        $full = prepareQuery($conn, "SELECT id, name, username, role, color, phone, hourly_wage, ical_token, target_hours, has_hygiene, has_alcohol, expiry_jv, start_date, employment_type, email, notify_email, notify_gigs, totp_enabled FROM users WHERE id = ?");
         $full->bind_param("i", $myId);
         $user = fetchOne($full);
         jsonResponse(["success" => true, "user" => $user]);
@@ -1813,11 +1814,11 @@ if ($method === 'GET') {
     $admin = isAdmin($me);
     $canShifts = can($me, 'shifts.manage'); $canAbs = can($me, 'absences.approve'); $canContent = can($me, 'content.manage'); $canEvents = can($me, 'events.manage'); $canSales = can($me, 'sales.view'); $canPay = can($me, 'payroll.view');
 
-    $u_stmt = prepareQuery($conn, "SELECT id, name, username, role, access_role, color, phone, hourly_wage, ical_token, target_hours, has_hygiene, has_alcohol, expiry_jv, start_date, employment_type, email, notify_email, totp_enabled, employee_number, anonymized_at FROM users");
+    $u_stmt = prepareQuery($conn, "SELECT id, name, username, role, access_role, color, phone, hourly_wage, ical_token, target_hours, has_hygiene, has_alcohol, expiry_jv, start_date, employment_type, email, notify_email, notify_gigs, totp_enabled, employee_number, anonymized_at FROM users");
     $users = fetchAllRows($u_stmt);
     if (!$admin) { // työntekijä ei näe kollegoiden palkkaa, iCal-tokenia tai puhelinta
         foreach ($users as &$usr) {
-            if ((int)$usr['id'] !== $myId) { if (!$canPay) { $usr['hourly_wage'] = null; $usr['target_hours'] = null; $usr['employment_type'] = null; } $usr['ical_token'] = null; $usr['phone'] = null; $usr['start_date'] = null; $usr['email'] = null; $usr['employee_number'] = null; $usr['notify_email'] = null; $usr['totp_enabled'] = null; }
+            if ((int)$usr['id'] !== $myId) { if (!$canPay) { $usr['hourly_wage'] = null; $usr['target_hours'] = null; $usr['employment_type'] = null; } $usr['ical_token'] = null; $usr['phone'] = null; $usr['start_date'] = null; $usr['email'] = null; $usr['employee_number'] = null; $usr['notify_email'] = null; $usr['notify_gigs'] = null; $usr['totp_enabled'] = null; }
         }
         unset($usr);
     }
@@ -1919,7 +1920,7 @@ if ($method === 'GET') {
         if ($tr['status'] === 'open' && (int)$tr['offered_by_id'] !== $myId && !$canShifts) $tr['my_warnings'] = shiftWarnings($conn, $pubForTrades, $myId, $sh['date'], $sh['start'], $sh['end'], 0, $sh['role'] ?? null);
     }
     unset($tr);
-    if ($admin) hubSyncAfterResponse($conn, $cfg, $vapid_auth, true, 120);   // ei vaadi croniakaan: ylläpitäjän sivulataus hakee hakemukset ja lähettää viivästyneet muutokset
+    if ($admin || !empty($pubForTrades['features']['hub_feed'])) hubSyncAfterResponse($conn, $cfg, $vapid_auth, true, 120);   // ei vaadi croniakaan: ylläpitäjän sivulataus hakee hakemukset ja lähettää viivästyneet muutokset
     jsonResponse(["users" => $users, "shifts" => $shifts, "events" => $events, "trades" => $trades, "absences" => $absences, "notices" => $notices, "time_entries" => $time_entries, "availability" => $availability, "tasks" => $tasks, "event_guests" => fetchAllRows(prepareQuery($conn, "SELECT g.id, g.event_id, g.name, g.note, g.added_by FROM event_guests g JOIN events e ON g.event_id = e.id WHERE e.date >= CURDATE() - INTERVAL 30 DAY ORDER BY g.id")), "system_alerts" => $admin ? systemStatus($conn, $cfg)['alerts'] : [], "skills" => fetchAllRows(prepareQuery($conn, "SELECT id, name, for_role FROM skills ORDER BY name")), "user_skills" => $canShifts ? fetchAllRows(prepareQuery($conn, "SELECT us.user_id, us.skill_id, us.valid_until FROM user_skills us JOIN skills s ON us.skill_id = s.id")) : fetchAllRows(prepareQuery($conn, "SELECT us.user_id, us.skill_id, us.valid_until FROM user_skills us WHERE us.user_id = " . $myId)), "hour_conf" => fetchAllRows(prepareQuery($conn, "SELECT month, hours, status, note, admin_note FROM hour_confirmations WHERE user_id = " . $myId . " AND month >= '" . date('Y-m', strtotime('-5 months')) . "' ORDER BY month DESC")), "shift_bids" => $canShifts ? fetchAllRows(prepareQuery($conn, "SELECT b.shift_id, b.user_id FROM shift_bids b JOIN shifts s ON b.shift_id = s.id")) : fetchAllRows(prepareQuery($conn, "SELECT shift_id, user_id FROM shift_bids WHERE user_id = " . $myId)), "perms" => $me['perms'], "access_roles" => $admin ? accessRolesOf(fetchOne(prepareQuery($conn, "SELECT access_roles FROM pubs"))['access_roles'] ?? null) : [], "task_completions" => $task_completions, "cash_recent" => $cash_recent, "shift_logs" => $shift_logs, "shopping_list" => $shopping_list, "private_messages" => $private_messages, "bookings" => $bookings, "event_regs" => (object)$eventRegs, "checklists" => $checklists, "checklist_progress" => $checklist_progress, "documents" => $documents, "kudos" => $kudos, "surveys" => $surveys, "staffing_rules" => $canShifts ? fetchAllRows(prepareQuery($conn, "SELECT id, dow, start, end, role, min_staff FROM staffing_rules ORDER BY dow, start")) : [], "coverage" => $canShifts ? computeCoverage($conn, date('Y-m-d'), date('Y-m-d', strtotime('+13 days'))) : [], "availability_rules" => $availability_rules, "pub" => getPub($conn, $admin), "week_templates" => $canShifts ? fetchAllRows(prepareQuery($conn, "SELECT id, name, (LENGTH(data) - LENGTH(REPLACE(data, '\"dow\"', ''))) / 5 AS n FROM week_templates ORDER BY name")) : [], "shift_templates" => $canShifts ? fetchAllRows(prepareQuery($conn, "SELECT id, name, start, end, role FROM shift_templates ORDER BY start, name")) : []]);
 }
 
@@ -2120,9 +2121,9 @@ if ($method === 'POST') {
 
     } elseif ($action === 'hub_disconnect') {
         requireAdmin($me);
-        $stF = prepareQuery($conn, "UPDATE pubs SET feature_hub_events = 0, feature_hub_gigs = 0"); run($stF);
+        $stF = prepareQuery($conn, "UPDATE pubs SET feature_hub_events = 0, feature_hub_gigs = 0, feature_hub_feed = 0"); run($stF);
         if (hubConfigured($cfg)) { hubSync($conn, $cfg, ['feature_hub_events' => 0, 'feature_hub_gigs' => 0]); }   // poistaa julkaistut tapahtumat ja vuorot keskuksesta (parhaansa mukaan)
-        $conn->query("DELETE FROM hub_connection WHERE id = 1"); $conn->query("DELETE FROM hub_sync");
+        $conn->query("DELETE FROM hub_connection WHERE id = 1"); $conn->query("DELETE FROM hub_sync"); $conn->query("DELETE FROM hub_feed"); $conn->query("DELETE FROM hub_outgoing");
         audit($conn, $me, 'Keskuspalvelin irrotettu', null);
         jsonResponse(["success" => true, "note" => isset($cfg['hub']['source']) && $cfg['hub']['source'] === 'config' ? 'Yhteys on määritelty myös config.php:ssä: poista hub-lohko sieltä' : null]);
 
@@ -2131,15 +2132,60 @@ if ($method === 'POST') {
         if (!hubConfigured($cfg)) fail('Baaria ei ole liitetty keskukseen: liitä se ensin liitoskoodilla', 409);
         [$pc] = hubRequest($cfg, 'GET', '/v1/applications?since_id=999999999');
         if ($pc !== 200) { bsHubRecord($conn, false, hubLastError()); fail(hubLastError() ?: 'Keskus ei vastannut', 502); }
-        $prow = fetchOne(prepareQuery($conn, "SELECT feature_hub_events, feature_hub_gigs FROM pubs ORDER BY id LIMIT 1"));
+        $prow = fetchOne(prepareQuery($conn, "SELECT feature_hub_events, feature_hub_gigs, feature_hub_feed FROM pubs ORDER BY id LIMIT 1"));
         [$sent, $errs] = hubSync($conn, $cfg, $prow); $new = hubPullApplications($conn, $cfg, $prow, $vapid_auth);
+        [$feedNew] = hubFeedPull($conn, $cfg, $prow, $vapid_auth); hubOutgoingPull($conn, $cfg, $prow, $vapid_auth);
         bsHubRecord($conn, $errs === 0, $errs ? hubLastError() : '');
-        jsonResponse(["success" => $errs === 0, "sent" => $sent, "errors" => $errs, "new_applications" => $new, "error" => $errs ? hubLastError() : null,
-            "note" => (empty($prow['feature_hub_events']) && empty($prow['feature_hub_gigs'])) ? 'Yhteys toimii, mutta kumpikaan keskusominaisuus ei ole päällä (Baari → Asetukset → Keskuspalvelin).' : null]);
+        jsonResponse(["success" => $errs === 0, "sent" => $sent, "errors" => $errs, "new_applications" => $new, "feed_new" => $feedNew, "error" => $errs ? hubLastError() : null,
+            "note" => (empty($prow['feature_hub_events']) && empty($prow['feature_hub_gigs']) && empty($prow['feature_hub_feed'])) ? 'Yhteys toimii, mutta mikään keskusominaisuus ei ole päällä (Baari → Asetukset → Keskuspalvelin).' : null]);
+
+    } elseif ($action === 'hub_feed') {   // muiden baarien vapaat vuorot ja omat hakemukset (kaikki kirjautuneet)
+        $pf = getPub($conn);
+        if (empty($pf['features']['hub_feed']) || !hubConfigured($cfg)) jsonResponse(["success" => true, "enabled" => false, "shifts" => [], "applications" => []]);
+        $shifts = fetchAllRows(prepareQuery($conn, "SELECT f.hub_shift_id AS id, f.bar_name, f.city, f.date, f.time_start, f.time_end, f.role, f.pay_text, f.note,
+                (SELECT o.status FROM hub_outgoing o WHERE o.hub_shift_id = f.hub_shift_id AND o.user_id = " . (int)$myId . ") AS my_status
+            FROM hub_feed f WHERE f.gone = 0 AND f.date >= CURDATE() ORDER BY f.date, f.time_start LIMIT 200"));
+        $apps = fetchAllRows(prepareQuery($conn, "SELECT id, status, bar_name, city, date, time_start, time_end, role, address FROM hub_outgoing WHERE user_id = " . (int)$myId . " AND date >= CURDATE() - INTERVAL 14 DAY ORDER BY date DESC, id DESC LIMIT 50"));
+        $me2 = fetchOne(prepareQuery($conn, "SELECT phone, email FROM users WHERE id = " . (int)$myId));
+        jsonResponse(["success" => true, "enabled" => true, "shifts" => $shifts, "applications" => $apps, "profile" => ["phone" => $me2['phone'] ?? '', "email" => $me2['email'] ?? '', "name" => $me['name']]]);
+
+    } elseif ($action === 'hub_apply') {   // oma työntekijä hakee toisen baarin vuoroa: tiedot lähtevät keskuksen kautta vain vuoron tarjonneelle baarille
+        $pf = getPub($conn);
+        if (empty($pf['features']['hub_feed']) || !hubConfigured($cfg)) fail('Toiminto ei ole käytössä', 409);
+        if (rateLimited($conn, 'hubapply:' . $myId, 20)) fail('Liian monta hakemusta. Yritä myöhemmin uudelleen.', 429);
+        $sid = (int)($data['shiftId'] ?? 0);
+        $phone = limitStr($data['phone'] ?? '', 40, 'phone'); $email = limitStr($data['email'] ?? '', 190, 'email'); $msg = limitStr($data['message'] ?? '', 500, 'message');
+        if ($email !== '' && !filter_var($email, FILTER_VALIDATE_EMAIL)) fail('Sähköpostiosoite on virheellinen');
+        if ($phone === '' && $email === '') fail('Anna puhelinnumero tai sähköposti, jotta baari voi ottaa yhteyttä');
+        $f = fetchOne(prepareQuery($conn, "SELECT * FROM hub_feed WHERE hub_shift_id = " . $sid . " AND gone = 0 AND date >= CURDATE()"));
+        if (!$f) fail('Vuoro ei ole enää haettavissa', 404);
+        if (fetchOne(prepareQuery($conn, "SELECT id FROM hub_outgoing WHERE user_id = " . (int)$myId . " AND hub_shift_id = " . $sid))) fail('Olet jo hakenut tätä vuoroa', 409);
+        rateHit($conn, 'hubapply:' . $myId);
+        $payload = array_filter(['ref' => 'u' . $myId, 'name' => $me['name'], 'phone' => $phone ?: null, 'email' => $email ?: null, 'message' => $msg ?: null], fn($v) => $v !== null);
+        [$code, $res] = hubRequest($cfg, 'POST', '/v1/feed/' . $sid . '/apply', $payload);
+        if ($code !== 201 && $code !== 200) fail($res['error'] ?? 'Keskuspalvelin ei vastannut', $code === 0 ? 502 : ($code === 404 ? 404 : 409));
+        $hid = (int)($res['id'] ?? 0); if ($hid <= 0) fail('Keskuspalvelin antoi virheellisen vastauksen', 502);
+        $ins = prepareQuery($conn, "INSERT INTO hub_outgoing (hub_application_id, hub_shift_id, user_id, status, bar_name, city, date, time_start, time_end, role) VALUES (?,?,?,?,?,?,?,?,?,?)");
+        $stt = in_array($res['status'] ?? '', ['pending', 'accepted', 'declined'], true) ? $res['status'] : 'pending';
+        $ins->bind_param("iiisssssss", $hid, $sid, $myId, $stt, $f['bar_name'], $f['city'], $f['date'], $f['time_start'], $f['time_end'], $f['role']); run($ins);
+        audit($conn, $me, 'Haettu vuoroa toisesta baarista', $f['bar_name'] . ' ' . $f['date']);
+        jsonResponse(["success" => true]);
+
+    } elseif ($action === 'hub_withdraw') {
+        if (!hubConfigured($cfg)) fail('Toiminto ei ole käytössä', 409);
+        $oid = (int)($data['id'] ?? 0);
+        $o = fetchOne(prepareQuery($conn, "SELECT id, hub_application_id, status FROM hub_outgoing WHERE id = " . $oid . " AND user_id = " . (int)$myId));
+        if (!$o) fail('Ei löydy', 404);
+        if ($o['status'] !== 'pending') fail('Vain odottavan hakemuksen voi perua', 409);
+        [$code, $res] = hubRequest($cfg, 'POST', '/v1/outgoing_applications/' . (int)$o['hub_application_id'] . '/withdraw', []);
+        if ($code !== 200) fail($res['error'] ?? 'Keskuspalvelin ei vastannut', $code === 0 ? 502 : 409);
+        if (empty($res['changed'])) fail('Hakemus on jo käsitelty', 409);
+        $conn->query("DELETE FROM hub_outgoing WHERE id = " . $oid);
+        jsonResponse(["success" => true]);
 
     } elseif ($action === 'hub_applications') {   // keikkahakemukset keskuspalvelimen kautta (vain ylläpito)
         requireAdmin($me);
-        if (hubConfigured($cfg)) { $prow = fetchOne(prepareQuery($conn, "SELECT feature_hub_events, feature_hub_gigs FROM pubs ORDER BY id LIMIT 1")); if ($prow) hubPullApplications($conn, $cfg, $prow, $vapid_auth); }
+        if (hubConfigured($cfg)) { $prow = fetchOne(prepareQuery($conn, "SELECT feature_hub_events, feature_hub_gigs, feature_hub_feed FROM pubs ORDER BY id LIMIT 1")); if ($prow) hubPullApplications($conn, $cfg, $prow, $vapid_auth); }
         $rows = fetchAllRows(prepareQuery($conn, "SELECT a.id, a.shift_id, a.name, a.skills, a.city, a.message, a.status, a.email, a.phone, a.created_at, s.date, s.start, s.end, s.role
             FROM hub_applications a JOIN shifts s ON s.id = a.shift_id ORDER BY a.status = 'pending' DESC, a.id DESC LIMIT 100"));
         jsonResponse(["success" => true, "applications" => $rows, "hub_connected" => hubConfigured($cfg)]);
@@ -2748,8 +2794,9 @@ if ($method === 'POST') {
         if ($email !== '' && !filter_var($email, FILTER_VALIDATE_EMAIL)) fail('Sähköpostiosoite on virheellinen');
         $emailDb = $email === '' ? null : $email;
         $notifyEmail = !empty($data['notify_email']) ? 1 : 0;
-        $stmt = prepareQuery($conn, "UPDATE users SET phone = ?, email = ?, notify_email = ? WHERE id = ?");
-        $stmt->bind_param("ssii", $phone, $emailDb, $notifyEmail, $myId);
+        $notifyGigs = !empty($data['notify_gigs']) ? 1 : 0;
+        $stmt = prepareQuery($conn, "UPDATE users SET phone = ?, email = ?, notify_email = ?, notify_gigs = ? WHERE id = ?");
+        $stmt->bind_param("ssiii", $phone, $emailDb, $notifyEmail, $notifyGigs, $myId);
         run($stmt);
         if (!empty($data['new_password'])) {
             $hashed = password_hash(validPassword($data['new_password']), PASSWORD_DEFAULT);
@@ -3085,10 +3132,10 @@ if ($method === 'POST') {
         if (is_array($data['features_ext'] ?? null)) {   // valinnaiset ominaisuudet (vuorohaku, automaattinen suunnittelu, muistutukset, maksut, vieraskortisto)
             $fx = $data['features_ext']; $flag = fn($k) => !empty($fx[$k]) && !in_array((string)$fx[$k], ['0', 'false'], true) ? 1 : 0;
             $grh = max(2, min(72, (int)($fx['guest_reminder_hours'] ?? 24)));
-            $fe = prepareQuery($conn, "UPDATE pubs SET feature_bidding = ?, feature_autoschedule = ?, feature_reminders = ?, feature_payments = ?, feature_guests = ?, guest_reminder_hours = ?, reminder_sms = ?, feature_hub_events = ?, feature_hub_gigs = ?");
+            $fe = prepareQuery($conn, "UPDATE pubs SET feature_bidding = ?, feature_autoschedule = ?, feature_reminders = ?, feature_payments = ?, feature_guests = ?, guest_reminder_hours = ?, reminder_sms = ?, feature_hub_events = ?, feature_hub_gigs = ?, feature_hub_feed = ?");
             $f1 = $flag('bidding'); $f2 = $flag('autoschedule'); $f3 = $flag('reminders'); $f4 = $flag('payments'); $f5 = $flag('guests'); $f6 = $flag('reminder_sms');
-            $f7 = hubConfigured($cfg) ? $flag('hub_events') : 0; $f8 = hubConfigured($cfg) ? $flag('hub_gigs') : 0;
-            $fe->bind_param("iiiiiiiii", $f1, $f2, $f3, $f4, $f5, $grh, $f6, $f7, $f8); run($fe);
+            $f7 = hubConfigured($cfg) ? $flag('hub_events') : 0; $f8 = hubConfigured($cfg) ? $flag('hub_gigs') : 0; $f9 = hubConfigured($cfg) ? $flag('hub_feed') : 0;
+            $fe->bind_param("iiiiiiiiii", $f1, $f2, $f3, $f4, $f5, $grh, $f6, $f7, $f8, $f9); run($fe);
         }
         jsonResponse(["success" => true, "pub" => getPub($conn, true)]);
 

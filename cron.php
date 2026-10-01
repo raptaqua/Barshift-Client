@@ -123,9 +123,10 @@ $conn->query("UPDATE event_registrations SET status = 'cancelled', expires_at = 
 // Keskuspalvelin (BarShift Hub): julkiset tapahtumat ja keikkavuorot ulos, hakemukset sisään (vain jos config['hub'] on asetettu ja baari on ottanut ominaisuuden käyttöön)
 require_once __DIR__ . '/lib/hub.php'; hubLoadConfig($conn, $cfg);
 if (hubConfigured($cfg)) {
-    foreach (fetchRows($conn, "SELECT feature_hub_events, feature_hub_gigs FROM pubs ORDER BY id LIMIT 1") as $hp) {
+    foreach (fetchRows($conn, "SELECT feature_hub_events, feature_hub_gigs, feature_hub_feed FROM pubs ORDER BY id LIMIT 1") as $hp) {
         [$sent, $errs] = hubSync($conn, $cfg, $hp); $newApps = hubPullApplications($conn, $cfg, $hp, $vapid_auth);
-        if ($sent || $errs || $newApps) out("hub: lähetetty $sent, virheitä $errs, uusia hakemuksia $newApps");
+        [$feedNew, $feedSent] = hubFeedPull($conn, $cfg, $hp, $vapid_auth); $outCh = hubOutgoingPull($conn, $cfg, $hp, $vapid_auth);
+        if ($sent || $errs || $newApps || $feedNew || $outCh) out("hub: lähetetty $sent, virheitä $errs, uusia hakemuksia $newApps, uusia vapaita vuoroja $feedNew (ilmoituksia $feedSent), hakemusten muutoksia $outCh");
         if ($errs) { $st = $conn->prepare("INSERT INTO system_status (k, v) VALUES ('hub_last_error', ?) ON DUPLICATE KEY UPDATE v = VALUES(v)"); $v = date('c'); if ($st) { $st->bind_param('s', $v); $st->execute(); } }
     }
 }
@@ -190,6 +191,7 @@ if (in_array('--cleanup', $argv ?? [], true) || (int)date('G') === 3 && (int)dat
     // --- Yleiset, baarista riippumattomat säilytysajat ---
     del($conn, 'tekstiviestiloki > 12 kk', "DELETE FROM sms_log WHERE created_at < NOW() - INTERVAL 12 MONTH");
     del($conn, 'keikkahakemukset > 12 kk', "DELETE FROM hub_applications WHERE created_at < NOW() - INTERVAL 12 MONTH");
+    del($conn, 'omat keikkahakemukset > 3 kk', "DELETE FROM hub_outgoing WHERE date < CURDATE() - INTERVAL 3 MONTH");
     del($conn, 'laiterekisteri > 90 pv', "DELETE FROM user_sessions WHERE last_seen < NOW() - INTERVAL 90 DAY");
     del($conn, 'kirjautumisyritykset > 30 pv', "DELETE FROM login_attempts WHERE attempted_at < NOW() - INTERVAL 30 DAY");
     del($conn, 'auditloki > 24 kk', "DELETE FROM audit_log WHERE created_at < NOW() - INTERVAL 24 MONTH");
