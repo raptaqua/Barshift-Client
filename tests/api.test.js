@@ -1277,6 +1277,11 @@ const future = (days) => { const d = new Date(Date.now() + days * 864e5); return
       assert.strictEqual((await mik.post('hub_withdraw', { id: pend.id })).status, 404, 'toinen käyttäjä perui');
       assert.ok((await emp.post('hub_withdraw', { id: pend.id })).json.success);
       assert.strictEqual((await emp.post('hub_feed', {})).json.applications.length, 1);
+      // Keikat-välilehden avaus hakee uudet vuorot heti (enintään kerran 15 s välein)
+      hub.feed.push(shift(503, 'Vahtimestari')); await sqlCli("DELETE FROM system_status WHERE k = 'hub_feed_pull'");
+      f = (await emp.post('hub_feed', {})).json; assert.strictEqual(f.refreshed, true); assert.ok(f.shifts.some(x => x.id === 503), 'välilehden avaus ei hakenut uutta vuoroa');
+      assert.ok(await waitMail(mailbox, m => m.to === 'sari@example.test' && /Vapaa vuoro toisessa baarissa/.test(m.subject) && /Vahtimestari/.test(m.body)), 'avaus ei laukaissut ilmoitusta uudesta vuorosta');
+      hub.feed.push(shift(504, 'Kokki')); f = (await emp.post('hub_feed', {})).json; assert.strictEqual(f.refreshed, false); assert.ok(!f.shifts.some(x => x.id === 504), 'haku ohitti 15 s rajan');
       // vuoro poistuu keskuksesta -> poistuu listalta
       hub.gone[501] = hub.feed.find(x => x.id === 501); hub.feed = hub.feed.filter(x => x.id !== 501);
       await admin.post('hub_sync_now', {}); assert.ok(!(await emp.post('hub_feed', {})).json.shifts.some(x => x.id === 501), 'poistunut vuoro näkyy yhä');
