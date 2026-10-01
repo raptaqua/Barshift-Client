@@ -16,8 +16,8 @@ ALTER TABLE `pubs` ADD COLUMN `overtime_week_hours` decimal(5,1) NOT NULL DEFAUL
 ALTER TABLE `pubs` ADD COLUMN `weekly_budget` decimal(10,2) DEFAULT NULL;
 
 CREATE TABLE IF NOT EXISTS `daily_sales` (
-  `pub_name` varchar(100) NOT NULL,
+  `bar_name` varchar(100) NOT NULL,
   `date` date NOT NULL,
   `amount` decimal(10,2) NOT NULL,
-  PRIMARY KEY (`pub_name`,`date`)
+  PRIMARY KEY (`bar_name`,`date`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;

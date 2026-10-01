@@ -890,6 +890,16 @@
   "Kirjautumiset ja laitteet": "Inloggningar och enheter",
   "Kirjaa ulos": "Logga ut",
   "Asenna sovellus": "Installera appen",
-  "tämä laite": "den här enheten"
+  "tämä laite": "den här enheten",
+  "Keikat": "Extrajobb",
+  "Keikat muissa baareissa": "Extrajobb på andra barer",
+  "Omat hakemukseni": "Mina ansökningar",
+  "Odottaa vastausta": "Väntar på svar",
+  "Ei valittu": "Ej vald",
+  "Lähetä hakemus": "Skicka ansökan",
+  "Hakemus lähetetty": "Ansökan skickad",
+  "Hakemus peruttu": "Ansökan återkallad",
+  "Ilmoita, kun muissa baareissa on vapaita vuoroja": "Meddela mig när andra barer har lediga pass",
+  "Muiden baarien vapaat vuorot": "Lediga pass på andra barer"
  }
 }

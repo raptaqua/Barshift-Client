@@ -47,7 +47,7 @@ CREATE TABLE IF NOT EXISTS `event_registrations` (
 
 CREATE TABLE IF NOT EXISTS `bookings` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
-  `pub_name` varchar(100) NOT NULL,
+  `bar_name` varchar(100) NOT NULL,
   `name` varchar(100) NOT NULL,
   `email` varchar(150) DEFAULT NULL,
   `phone` varchar(30) DEFAULT NULL,
@@ -62,5 +62,5 @@ CREATE TABLE IF NOT EXISTS `bookings` (
   `reminded_at` datetime DEFAULT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `cancel_hash` (`cancel_hash`),
-  KEY `pub_time` (`pub_name`,`starts_at`)
+  KEY `pub_time` (`bar_name`,`starts_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;

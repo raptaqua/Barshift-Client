@@ -11,11 +11,11 @@ ALTER TABLE `users` ADD COLUMN `cert_alert_for` date DEFAULT NULL;
 
 CREATE TABLE IF NOT EXISTS `checklists` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
-  `pub_name` varchar(100) NOT NULL,
+  `bar_name` varchar(100) NOT NULL,
   `name` varchar(100) NOT NULL,
   `items` text NOT NULL,                            -- JSON: [tehtävätekstit]
   PRIMARY KEY (`id`),
-  KEY `pub_name` (`pub_name`)
+  KEY `bar_name` (`bar_name`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 CREATE TABLE IF NOT EXISTS `checklist_progress` (
@@ -34,7 +34,7 @@ CREATE TABLE IF NOT EXISTS `checklist_progress` (
 
 CREATE TABLE IF NOT EXISTS `documents` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
-  `pub_name` varchar(100) NOT NULL,
+  `bar_name` varchar(100) NOT NULL,
   `title` varchar(150) NOT NULL,
   `description` varchar(500) DEFAULT NULL,
   `file_path` varchar(255) NOT NULL,                -- suhteellinen polku uploads/docs/ alla; ladataan vain API:n kautta
@@ -43,7 +43,7 @@ CREATE TABLE IF NOT EXISTS `documents` (
   `requires_ack` tinyint(1) NOT NULL DEFAULT 0,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   PRIMARY KEY (`id`),
-  KEY `pub_name` (`pub_name`)
+  KEY `bar_name` (`bar_name`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 CREATE TABLE IF NOT EXISTS `document_acks` (
@@ -57,23 +57,23 @@ CREATE TABLE IF NOT EXISTS `document_acks` (
 
 CREATE TABLE IF NOT EXISTS `kudos` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
-  `pub_name` varchar(100) NOT NULL,
+  `bar_name` varchar(100) NOT NULL,
   `from_user` int(11) NOT NULL,
   `to_user` int(11) NOT NULL,
   `message` varchar(300) NOT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   PRIMARY KEY (`id`),
-  KEY `pub_created` (`pub_name`,`created_at`)
+  KEY `pub_created` (`bar_name`,`created_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 CREATE TABLE IF NOT EXISTS `surveys` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
-  `pub_name` varchar(100) NOT NULL,
+  `bar_name` varchar(100) NOT NULL,
   `question` varchar(300) NOT NULL,
   `status` enum('open','closed') NOT NULL DEFAULT 'open',
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   PRIMARY KEY (`id`),
-  KEY `pub_name` (`pub_name`)
+  KEY `bar_name` (`bar_name`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 CREATE TABLE IF NOT EXISTS `survey_answers` (             -- ei käyttäjätunnusta: vastaukset ovat nimettömiä

@@ -356,6 +356,7 @@ function renderProfile() {
             <label class="form-label">Sähköposti</label>
             <input id="p-email" type="email" class="form-input" maxlength="150" value="${esc(u.email || '')}" placeholder="nimi@example.fi">
             <label style="display:flex; gap:8px; align-items:center; margin-top:8px; font-size:13px; color:var(--text2);"><input id="p-notify" type="checkbox" ${u.notify_email != 0 ? 'checked' : ''}> Lähetä ilmoitukset sähköpostina, jos push-ilmoitukset eivät ole käytössä</label>
+            ${pubFeature('hub_feed') ? `<label style="display:flex; gap:8px; align-items:center; margin-top:8px; font-size:13px; color:var(--text2);"><input id="p-notifygigs" type="checkbox" ${u.notify_gigs == 1 ? 'checked' : ''}> Ilmoita, kun muissa baareissa on vapaita vuoroja</label>` : ''}
         </div>
         <div class="form-group" style="margin-bottom:24px;">
             <label class="form-label">Vaihda salasana (jätä tyhjäksi jos et halua vaihtaa)</label>
@@ -505,8 +506,8 @@ function setProfileTab(id) {
 async function saveProfile() {
     const phone = document.getElementById('p-phone').value;
     const new_password = document.getElementById('p-pass').value;
-    const email = document.getElementById('p-email').value.trim(), notify_email = document.getElementById('p-notify').checked ? 1 : 0;
-    const pr = await (await fetch('api.php?action=update_profile', { method: 'POST', body: JSON.stringify({ phone, new_password, email, notify_email }) })).json();
+    const email = document.getElementById('p-email').value.trim(), notify_email = document.getElementById('p-notify').checked ? 1 : 0, notify_gigs = document.getElementById('p-notifygigs') ? (document.getElementById('p-notifygigs').checked ? 1 : 0) : undefined;
+    const pr = await (await fetch('api.php?action=update_profile', { method: 'POST', body: JSON.stringify({ phone, new_password, email, notify_email, notify_gigs }) })).json();
     if (pr.error) return showToast(pr.error, 'error');
     showToast('Profiili päivitetty!'); document.getElementById('p-pass').value = ''; load();
 }
