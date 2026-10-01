@@ -36,6 +36,9 @@ check('INSERT IGNORE: ohitettu rivi, insert_id 0, affected_rows 0', $c->insert_i
 $c->query("INSERT INTO extra (k) VALUES ('c')"); check('insert_id', $c->insert_id > 0);
 check('merkkikoosta riippumaton vertailu (kuten MySQL)', $c->query("SELECT 1 FROM extra WHERE k = 'A'")->num_rows === 1);
 check('ä/ö LIKE ja LOWER', $c->query("SELECT 'ÄITI' LIKE 'äiti' x")->fetch_assoc()['x'] == 1 && $c->query("SELECT LOWER('ÄÖ') x")->fetch_assoc()['x'] === 'äö');
+check('ON CONFLICT saa kohteen myös kun avain puuttuu mutta sillä on oletusarvo (vanhat SQLite-versiot)', str_contains(bsSqliteTranslate("INSERT INTO pub_profiles (display_name, city) VALUES (?, ?) ON DUPLICATE KEY UPDATE city = VALUES(city)", $c), 'ON CONFLICT (`id`) DO UPDATE'));
+$st = $c->prepare("INSERT INTO pub_profiles (display_name, city) VALUES (?, ?) ON DUPLICATE KEY UPDATE city = VALUES(city)"); $a = 'x'; $b = 'Helsinki'; $st->bind_param('ss', $a, $b); $b2 = 'Turku';
+check('yhden rivin taulu: toinen tallennus päivittää rivin', $st->execute() && ($b = $b2) && $st->execute() && $c->query("SELECT COUNT(*) c FROM pub_profiles")->fetch_assoc()['c'] == 1 && $c->query("SELECT city FROM pub_profiles")->fetch_assoc()['city'] === 'Turku');
 $c->query("UPDATE extra SET v = 3 WHERE k = 'a'");
 $a = $c->query("SELECT created_at, updated_at FROM extra WHERE k='a'")->fetch_assoc();
 check('DEFAULT-aika (NOW())', preg_match('/^\d{4}-\d\d-\d\d \d\d:\d\d:\d\d$/', $a['created_at']) === 1);

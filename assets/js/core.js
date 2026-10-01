@@ -52,7 +52,7 @@ window.currentChatPartnerId = null;
 
 const state = {
     user: JSON.parse(localStorage.getItem('barshift_user')) || null,
-    view: (() => { const q = new URLSearchParams(location.search).get('view'); return ['dashboard', 'calendar', 'list', 'events', 'messages', 'stats', 'absences', 'team'].includes(q) ? q : (localStorage.getItem('barshift_view') || 'dashboard'); })(), 
+    view: (() => { const q = new URLSearchParams(location.search).get('view'); return ['dashboard', 'calendar', 'list', 'events', 'messages', 'stats', 'absences', 'team', 'gigs'].includes(q) ? q : (localStorage.getItem('barshift_view') || 'dashboard'); })(), 
     onlyMine: false, currentDate: new Date(),
     shiftGridDate: new Date(),
     startDate: getLocalDateString(new Date(new Date().setMonth(new Date().getMonth() - 1))),
@@ -227,6 +227,7 @@ function render() {
             <button class="nav-btn ${state.view==='stats'?'active':''}" onclick="nav('stats')"><i class="bi bi-graph-up"></i><span>Tilastot</span></button>
             <button class="nav-btn ${state.view==='absences'?'active':''}" onclick="nav('absences')"><i class="bi bi-calendar-x"></i><span>Poissaolot</span></button>
             <button class="nav-btn ${state.view==='team'?'active':''}" onclick="nav('team')"><i class="bi bi-people-fill"></i><span>Tiimi</span></button>
+            ${pubFeature('hub_feed') ? `<button class="nav-btn ${state.view==='gigs'?'active':''}" onclick="nav('gigs')"><i class="bi bi-briefcase"></i><span>Keikat</span></button>` : ''}
 			${isAdmin || ADMIN_TABS.some(canAdminTab) ? `<button class="nav-btn ${state.view==='admin'?'active':''}" onclick="nav('admin')"><i class="bi bi-people"></i><span>Hallinta</span></button>` : ''}
         `;
     }
@@ -272,6 +273,7 @@ function nav(v) {
     closeModal();
     state.eventsUpcomingLimit = 5; state.eventsPastLimit = 5;
     state.availabilityMode = false;
+    if (v === 'gigs') state.gigFeed = undefined;   // haetaan tuoreet vuorot aina välilehden avautuessa
     render(); 
 }
 
@@ -300,6 +302,7 @@ function renderView() {
         case 'stats': return renderStats();
         case 'absences': return renderAbsences();
         case 'team': return renderTeam();
+        case 'gigs': return pubFeature('hub_feed') ? renderGigs() : renderDashboard();
         case 'admin': return renderAdmin();
         case 'profile': return renderProfile();
         default: return renderDashboard();

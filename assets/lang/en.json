@@ -1214,6 +1214,23 @@
   "Kirjattu ulos": "Signed out",
   "Asenna sovellus": "Install app",
   "Näet viimeisimmät kirjautumisesi. Jos tunnistamaton laite ilmestyy listaan, kirjaa se ulos ja vaihda salasana.": "Here are your latest sign-ins. If you see a device you do not recognise, sign it out and change your password.",
-  "Asennettuna BarShift avautuu omassa ikkunassaan, vuorolista on luettavissa ilman verkkoa ja ilmoitukset toimivat myös iPhonella.": "Installed, BarShift opens in its own window, your shift list is readable offline and notifications also work on iPhone."
+  "Asennettuna BarShift avautuu omassa ikkunassaan, vuorolista on luettavissa ilman verkkoa ja ilmoitukset toimivat myös iPhonella.": "Installed, BarShift opens in its own window, your shift list is readable offline and notifications also work on iPhone.",
+  "Keikat": "Gigs",
+  "Keikat muissa baareissa": "Gigs at other bars",
+  "Muiden baarien avoimet vuorot yhteisen keskuksen kautta. Kun haet vuoroa, nimesi, yhteystietosi ja viestisi lähetetään vain sille baarille, jonka vuoroa haet.": "Open shifts at other bars via the shared hub. When you apply, your name, contact details and message are sent only to the bar whose shift you apply for.",
+  "Omat hakemukseni": "My applications",
+  "Odottaa vastausta": "Awaiting reply",
+  "Ei valittu": "Not selected",
+  "Hae vuoroa toisesta baarista": "Apply for a shift at another bar",
+  "Lähetä hakemus": "Send application",
+  "Viesti baarille (valinnainen)": "Message to the bar (optional)",
+  "Hakemus lähetetty": "Application sent",
+  "Hakemus peruttu": "Application withdrawn",
+  "Perutaanko hakemus?": "Withdraw the application?",
+  "Anna puhelinnumero tai sähköposti, jotta baari voi ottaa yhteyttä": "Enter a phone number or email so the bar can contact you",
+  "Ei avoimia vuoroja muissa baareissa juuri nyt. Voit ottaa ilmoitukset käyttöön omassa profiilissasi.": "No open shifts at other bars right now. You can turn on notifications in your profile.",
+  "Toiminto ei ole käytössä tässä baarissa.": "This feature is not enabled at this bar.",
+  "Ilmoita, kun muissa baareissa on vapaita vuoroja": "Notify me when other bars have open shifts",
+  "Muiden baarien vapaat vuorot": "Open shifts at other bars"
  }
 }

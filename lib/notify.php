@@ -53,6 +53,7 @@ function bsFlushMailQueue($conn, array $cfg, int $limit = 5): int {
 // Ilmoituksen napautus avaa sovelluksen oikeaan näkymään (vain tunnetut näkymät)
 function pushViewFor(string $title): string {
     $t = mb_strtolower($title);
+    if (str_contains($t, 'toisessa baarissa') || str_contains($t, 'toisiin baareihin') || str_contains($t, 'toiseen baariin') || str_contains($t, 'toisissa baareissa')) return 'gigs';
     if (str_contains($t, 'viesti')) return 'messages';
     if (str_contains($t, 'poissaolo')) return 'absences';
     if (str_contains($t, 'tapahtum')) return 'events';

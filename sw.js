@@ -50,7 +50,7 @@ async function staleWhileRevalidate(req) {
 }
 
 // Syvälinkki vain sovelluksen omiin tunnettuihin näkymiin
-const VIEWS = ['dashboard', 'calendar', 'list', 'events', 'messages', 'stats', 'absences', 'team'];
+const VIEWS = ['dashboard', 'calendar', 'list', 'events', 'messages', 'stats', 'absences', 'team', 'gigs'];
 function deepLink(view) { return VIEWS.includes(view) && view !== 'dashboard' ? new URL('index.php?view=' + view, self.registration.scope).href : self.registration.scope; }
 
 self.addEventListener('push', event => {

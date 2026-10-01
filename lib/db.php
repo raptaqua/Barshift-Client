@@ -265,9 +265,10 @@ class BsSqliteConn {
         $found = null;
         try {
             $lc = array_map('strtolower', $cols);
-            $pk = [];
+            $pk = []; $defaults = [];
             foreach ($this->pdo->query('PRAGMA table_info(`' . str_replace('`', '', $table) . '`)')->fetchAll(PDO::FETCH_ASSOC) as $r) {
                 if ((int)$r['pk'] > 0) $pk[(int)$r['pk']] = $r['name'];
+                if ($r['dflt_value'] !== null) $defaults[strtolower($r['name'])] = true;
             }
             ksort($pk);
             $cands = $pk ? [array_values($pk)] : [];
@@ -276,8 +277,9 @@ class BsSqliteConn {
                 $names = array_map(fn($r) => $r['name'], $this->pdo->query('PRAGMA index_info(' . $this->pdo->quote($ix['name']) . ')')->fetchAll(PDO::FETCH_ASSOC));
                 if ($names) $cands[] = $names;
             }
+            // Avain voi puuttua INSERT-listasta, jos sarakkeella on oletusarvo (esim. yhden rivin taulun id DEFAULT 1)
             foreach ($cands as $names) {
-                if (!array_diff(array_map('strtolower', $names), $lc)) { $found = '(' . implode(', ', array_map(fn($n) => '`' . $n . '`', $names)) . ')'; break; }
+                if (!array_diff(array_map('strtolower', $names), array_merge($lc, array_keys($defaults)))) { $found = '(' . implode(', ', array_map(fn($n) => '`' . $n . '`', $names)) . ')'; break; }
             }
         } catch (PDOException $e) {}
         return $this->conflictCache[$key] = $found;

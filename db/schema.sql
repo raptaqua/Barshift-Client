@@ -23,6 +23,7 @@ CREATE TABLE IF NOT EXISTS `users` (
   `anonymized_at` timestamp NULL DEFAULT NULL,       -- GDPR: tunnus anonymisoitu
   `email` varchar(150) DEFAULT NULL,                 -- ilmoitusten varakanava, kutsut ja salasanan palautus
   `notify_email` tinyint(1) NOT NULL DEFAULT 1,      -- saako ilmoitukset sähköpostina, kun pushia ei ole käytössä
+  `notify_gigs` tinyint(1) NOT NULL DEFAULT 0,       -- ilmoitus muiden baarien vapaista vuoroista (keskuspalvelin)
   `has_hygiene` int(11) NOT NULL DEFAULT 0,
   `has_alcohol` int(11) NOT NULL DEFAULT 0,
   `totp_enabled` tinyint(1) NOT NULL DEFAULT 0,      -- kaksivaiheinen tunnistautuminen (TOTP)
@@ -192,6 +193,7 @@ CREATE TABLE IF NOT EXISTS `pubs` (
   `reminder_sms` tinyint(1) NOT NULL DEFAULT 0,
   `feature_hub_events` tinyint(1) NOT NULL DEFAULT 0,
   `feature_hub_gigs` tinyint(1) NOT NULL DEFAULT 0,
+  `feature_hub_feed` tinyint(1) NOT NULL DEFAULT 0,
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
@@ -655,6 +657,22 @@ CREATE TABLE IF NOT EXISTS `hub_connection` (
   `id` tinyint(4) NOT NULL DEFAULT 1, `url` varchar(300) NOT NULL, `pub_slug` varchar(64) NOT NULL, `private_key_enc` text NOT NULL,
   `hub_name` varchar(120) DEFAULT NULL, `connected_at` datetime NOT NULL DEFAULT current_timestamp(),
   PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+CREATE TABLE IF NOT EXISTS `hub_feed` (
+  `hub_shift_id` int(11) NOT NULL, `bar_name` varchar(120) NOT NULL, `city` varchar(80) NOT NULL DEFAULT '', `date` date NOT NULL,
+  `time_start` time NOT NULL, `time_end` time NOT NULL, `role` varchar(60) DEFAULT NULL, `pay_text` varchar(80) DEFAULT NULL, `note` varchar(300) DEFAULT NULL,
+  `first_seen` datetime NOT NULL DEFAULT current_timestamp(), `gone` tinyint(1) NOT NULL DEFAULT 0,
+  PRIMARY KEY (`hub_shift_id`), KEY `idx_date` (`date`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+CREATE TABLE IF NOT EXISTS `hub_outgoing` (
+  `id` int(11) NOT NULL AUTO_INCREMENT, `hub_application_id` int(11) NOT NULL, `hub_shift_id` int(11) NOT NULL, `user_id` int(11) NOT NULL,
+  `status` enum('pending','accepted','declined') NOT NULL DEFAULT 'pending', `bar_name` varchar(120) NOT NULL, `city` varchar(80) NOT NULL DEFAULT '', `date` date NOT NULL,
+  `time_start` time NOT NULL, `time_end` time NOT NULL, `role` varchar(60) DEFAULT NULL, `address` varchar(200) DEFAULT NULL,
+  `created_at` datetime NOT NULL DEFAULT current_timestamp(), `decided_at` datetime DEFAULT NULL,
+  PRIMARY KEY (`id`), UNIQUE KEY `uq_hub_app` (`hub_application_id`), UNIQUE KEY `uq_user_shift` (`user_id`,`hub_shift_id`),
+  CONSTRAINT `hub_outgoing_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 SET FOREIGN_KEY_CHECKS = 1;

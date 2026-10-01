@@ -166,3 +166,74 @@ function hubPullApplications($conn, array $cfg, array $pub, array $vapid): int {
     }
     return $new;
 }
+
+
+// ===================== MUIDEN BAARIEN VAPAAT VUOROT (feed) =====================
+// Keskus välittää toisten baarien avoimet vuorot (julkista tietoa). Omat työntekijät saavat ilmoituksen ja voivat hakea vuoroa tästä
+// sovelluksesta; hakijan tiedot (nimi, yhteystieto, viesti) lähtevät keskuksen kautta vain vuoron tarjonneelle baarille.
+function hubFmtTime(?string $t): string {
+    $t = substr((string)$t, 0, 5); if ($t === '') return '';
+    return substr($t, 3, 2) === '00' ? (string)(int)substr($t, 0, 2) : (string)(int)substr($t, 0, 2) . ':' . substr($t, 3, 2);
+}
+function hubFmtShift(array $s): string {
+    $d = date('j.n.', strtotime((string)$s['date']));
+    $role = trim((string)($s['role'] ?? ''));
+    return 'Baarissa ' . $s['bar_name'] . ' haetaan työntekijää' . ($role !== '' ? " ($role)" : '') . " päivälle $d ajalle " . hubFmtTime($s['time_start']) . '–' . hubFmtTime($s['time_end']);
+}
+
+// Hakee muiden baarien avoimet vuorot ja ilmoittaa uusista niille, jotka ovat ottaneet ilmoitukset käyttöön. Palauttaa [uusia, ilmoitettuja].
+function hubFeedPull($conn, array $cfg, array $pub, array $vapid): array {
+    if (!hubConfigured($cfg) || empty($pub['feature_hub_feed'])) return [0, 0];
+    [$code, $j] = hubRequest($cfg, 'GET', '/v1/feed');
+    if ($code !== 200 || !is_array($j['shifts'] ?? null)) return [0, 0];
+    $first = (int)(hubRows($conn, "SELECT COUNT(*) c FROM hub_feed")[0]['c'] ?? 0) === 0;   // ensimmäisellä haulla vanhoista ei ilmoiteta
+    $seen = []; $fresh = [];
+    foreach ($j['shifts'] as $x) {
+        if (!is_array($x) || !isset($x['id']) || !preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)($x['date'] ?? '')) || empty($x['time_start']) || empty($x['time_end'])) continue;
+        $id = (int)$x['id']; $seen[$id] = true;
+        $row = ['bar_name' => mb_substr((string)($x['pub'] ?? ''), 0, 120), 'city' => mb_substr((string)($x['city'] ?? ''), 0, 80), 'date' => (string)$x['date'],
+                'time_start' => substr((string)$x['time_start'], 0, 8), 'time_end' => substr((string)$x['time_end'], 0, 8), 'role' => isset($x['role']) ? mb_substr((string)$x['role'], 0, 60) : null,
+                'pay_text' => isset($x['pay_text']) ? mb_substr((string)$x['pay_text'], 0, 80) : null, 'note' => isset($x['note']) ? mb_substr((string)$x['note'], 0, 300) : null];
+        $st = $conn->prepare("INSERT IGNORE INTO hub_feed (hub_shift_id, bar_name, city, date, time_start, time_end, role, pay_text, note) VALUES (?,?,?,?,?,?,?,?,?)");
+        $st->bind_param("issssssss", $id, $row['bar_name'], $row['city'], $row['date'], $row['time_start'], $row['time_end'], $row['role'], $row['pay_text'], $row['note']); $st->execute();
+        if ($st->affected_rows > 0) { $fresh[] = $row; continue; }
+        $up = $conn->prepare("UPDATE hub_feed SET bar_name = ?, city = ?, date = ?, time_start = ?, time_end = ?, role = ?, pay_text = ?, note = ?, gone = 0 WHERE hub_shift_id = ?");
+        $up->bind_param("ssssssssi", $row['bar_name'], $row['city'], $row['date'], $row['time_start'], $row['time_end'], $row['role'], $row['pay_text'], $row['note'], $id); $up->execute();
+    }
+    foreach (hubRows($conn, "SELECT hub_shift_id FROM hub_feed WHERE gone = 0") as $r) if (empty($seen[(int)$r['hub_shift_id']])) $conn->query("UPDATE hub_feed SET gone = 1 WHERE hub_shift_id = " . (int)$r['hub_shift_id']);
+    $conn->query("DELETE FROM hub_feed WHERE date < CURDATE() - INTERVAL 7 DAY");
+    if ($first || !$fresh) return [count($fresh), 0];
+
+    $users = hubRows($conn, "SELECT id FROM users WHERE notify_gigs = 1 AND anonymized_at IS NULL AND status <> 'frozen'");
+    if (!$users || !function_exists('sendPushToUser')) return [count($fresh), 0];
+    $msgs = count($fresh) > 3 ? [['Vapaita vuoroja toisissa baareissa', count($fresh) . ' uutta vapaata vuoroa muissa baareissa. Katso Keikat-välilehti ja hae suoraan sovelluksesta.']]
+                              : array_map(fn($f) => ['Vapaa vuoro toisessa baarissa', hubFmtShift($f) . '. Hae Keikat-välilehdeltä.'], $fresh);
+    $n = 0;
+    foreach ($users as $u) foreach ($msgs as [$title, $body]) { sendPushToUser($conn, (int)$u['id'], $title, $body, $vapid); $n++; }
+    return [count($fresh), $n];
+}
+
+// Päivittää omien työntekijöiden hakemusten tilan ja ilmoittaa päätöksistä. Palauttaa muuttuneiden määrän.
+function hubOutgoingPull($conn, array $cfg, array $pub, array $vapid): int {
+    if (!hubConfigured($cfg) || empty($pub['feature_hub_feed'])) return 0;
+    $local = hubRows($conn, "SELECT id, hub_application_id, user_id, status FROM hub_outgoing");
+    if (!$local) return 0;
+    [$code, $j] = hubRequest($cfg, 'GET', '/v1/outgoing_applications');
+    if ($code !== 200 || !is_array($j['applications'] ?? null)) return 0;
+    $byHub = []; foreach ($j['applications'] as $a) $byHub[(int)$a['id']] = $a;
+    $changed = 0;
+    foreach ($local as $l) {
+        $a = $byHub[(int)$l['hub_application_id']] ?? null;
+        if ($a === null) { if ($l['status'] === 'pending') { $conn->query("DELETE FROM hub_outgoing WHERE id = " . (int)$l['id']); $changed++; } continue; }   // peruttu tai poistettu keskuksesta
+        $stt = in_array($a['status'] ?? '', ['pending', 'accepted', 'declined'], true) ? $a['status'] : 'pending';
+        if ($stt === $l['status']) continue;
+        $addr = isset($a['address']) ? mb_substr((string)$a['address'], 0, 200) : null;
+        $up = $conn->prepare("UPDATE hub_outgoing SET status = ?, address = ?, decided_at = NOW() WHERE id = ?"); $lid = (int)$l['id']; $up->bind_param("ssi", $stt, $addr, $lid); $up->execute();
+        $changed++;
+        if ($stt === 'pending' || !function_exists('sendPushToUser')) continue;
+        $when = date('j.n.', strtotime((string)$a['date'])) . ' ' . hubFmtTime($a['time_start']) . '–' . hubFmtTime($a['time_end']);
+        if ($stt === 'accepted') sendPushToUser($conn, (int)$l['user_id'], 'Hakemus toiseen baariin hyväksytty', "Hakemuksesi hyväksyttiin: {$a['pub']}, $when. Baari ottaa sinuun yhteyttä antamillasi yhteystiedoilla.", $vapid);
+        else sendPushToUser($conn, (int)$l['user_id'], 'Hakemus toiseen baariin', "Hakemustasi ei tällä kertaa valittu: {$a['pub']}, $when.", $vapid);
+    }
+    return $changed;
+}

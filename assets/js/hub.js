@@ -47,3 +47,61 @@ async function hubDisconnect() {
     if (r.error) return showToast(r.error, 'error');
     showToast(r.note || 'Yhteys katkaistu'); load();
 }
+
+// ===================== MUIDEN BAARIEN VAPAAT VUOROT (Keikat) =====================
+// Keskus välittää toisten baarien avoimet vuorot. Hakemus lähtee keskuksen kautta vain vuoron tarjonneelle baarille.
+async function loadGigFeed() {
+    state.gigFeed = state.gigFeed || { loading: true, shifts: [], applications: [] };
+    try {
+        const r = await (await fetch('api.php?action=hub_feed', { method: 'POST', body: '{}' })).json();
+        state.gigFeed = r.error ? { shifts: [], applications: [], error: r.error } : r;
+    } catch (e) { state.gigFeed = { shifts: [], applications: [], error: 'Yhteysvirhe' }; }
+    if (state.view === 'gigs') render();
+}
+function gigTime(s) { return String(s.time_start).slice(0, 5) + '–' + String(s.time_end).slice(0, 5); }
+function renderGigs() {
+    if (!state.gigFeed) loadGigFeed();
+    const f = state.gigFeed || { loading: true, shifts: [], applications: [] };
+    const head = `<div class="page-header"><h2>Keikat muissa baareissa</h2></div><p style="color:var(--text2); font-size:13px; max-width:720px;">Muiden baarien avoimet vuorot yhteisen keskuksen kautta. Kun haet vuoroa, nimesi, yhteystietosi ja viestisi lähetetään vain sille baarille, jonka vuoroa haet.</p>`;
+    if (f.loading) return head + `<div class="card card-sm"><p style="margin:0; color:var(--text2);">Ladataan…</p></div>`;
+    if (f.error) return head + `<div class="card card-sm"><p style="margin:0; color:var(--red);">${esc(f.error)}</p></div>`;
+    if (f.enabled === false) return head + `<div class="card card-sm"><p style="margin:0; color:var(--text2);">Toiminto ei ole käytössä tässä baarissa.</p></div>`;
+    const mine = (f.applications || []);
+    const stat = { pending: 'Odottaa vastausta', accepted: 'Hyväksytty', declined: 'Ei valittu' };
+    const myHtml = mine.length ? `<div class="card card-sm" style="max-width:760px; margin-bottom:14px;"><h3 style="margin:0 0 8px; font-size:15px;">Omat hakemukseni</h3>${mine.map(a => `<div class="att-row" style="flex-wrap:wrap; gap:8px;">
+        <div style="flex:1; min-width:200px;"><b>${esc(a.bar_name)}</b> <small>${esc(a.city || '')}</small><br><small>${formatDate(a.date)} ${esc(gigTime(a))} ${esc(a.role || '')}</small>
+        ${a.status === 'accepted' ? `<br><small><b>Hyväksytty.</b> Baari ottaa sinuun yhteyttä antamillasi yhteystiedoilla.${a.address ? ' Osoite: ' + esc(a.address) : ''}</small>` : ''}</div>
+        <span class="badge ${a.status === 'accepted' ? 'badge-green' : ''}">${stat[a.status] || ''}</span>
+        ${a.status === 'pending' ? `<button class="btn btn-ghost btn-sm" onclick="gigWithdraw(${a.id})">Peru</button>` : ''}</div>`).join('')}</div>` : '';
+    const list = f.shifts || [];
+    const body = list.length ? `<div class="card card-sm" style="max-width:760px;">${list.map(s => `<div class="att-row" style="flex-wrap:wrap; gap:8px; align-items:flex-start;">
+        <div style="flex:1; min-width:220px;"><b>${esc(s.bar_name)}</b> <small>${esc(s.city || '')}</small><br>
+        <span>Haetaan työntekijää${s.role ? ' (' + esc(s.role) + ')' : ''}</span><br>
+        <small>${formatDate(s.date)} klo ${esc(gigTime(s))}${s.pay_text ? ' · ' + esc(s.pay_text) : ''}</small>${s.note ? `<br><small>${esc(s.note)}</small>` : ''}</div>
+        ${s.my_status ? `<span class="badge">${stat[s.my_status] || 'Haettu'}</span>` : `<button class="btn btn-primary btn-sm" onclick="gigApplyModal(${s.id})">Hae vuoroa</button>`}
+    </div>`).join('')}</div>` : `<div class="card card-sm" style="max-width:760px;"><p style="margin:0; color:var(--text2);">Ei avoimia vuoroja muissa baareissa juuri nyt. Voit ottaa ilmoitukset käyttöön omassa profiilissasi.</p></div>`;
+    return head + myHtml + body;
+}
+function gigApplyModal(id) {
+    const f = state.gigFeed || {}; const s = (f.shifts || []).find(x => x.id === id); if (!s) return;
+    const pr = f.profile || {};
+    const body = `<p style="margin:0 0 10px; font-size:14px;"><b>${esc(s.bar_name)}</b>, ${formatDate(s.date)} klo ${esc(gigTime(s))}${s.role ? ' (' + esc(s.role) + ')' : ''}</p>
+        <div class="form-group"><label class="form-label">Puhelinnumero</label><input id="gig-phone" class="form-input" maxlength="40" value="${esc(pr.phone || '')}"></div>
+        <div class="form-group"><label class="form-label">Sähköposti</label><input id="gig-email" type="email" class="form-input" maxlength="190" value="${esc(pr.email || '')}"></div>
+        <div class="form-group"><label class="form-label">Viesti baarille (valinnainen)</label><textarea id="gig-msg" class="form-input" maxlength="500" rows="3" placeholder="Esim. kokemus ja milloin pääset paikalle"></textarea></div>
+        <p style="font-size:12px; color:var(--text3); margin:0;">Nimesi (${esc(pr.name || '')}), yhteystietosi ja viestisi lähetetään vain baarille ${esc(s.bar_name)}. Oma baarisi ei näe, mitä lähetät.</p>`;
+    openModal('Hae vuoroa toisesta baarista', 'bi-send', body, `<button class="btn btn-ghost" onclick="closeModal()">Peruuta</button><button class="btn btn-primary" onclick="gigApply(${id})">Lähetä hakemus</button>`);
+}
+async function gigApply(id) {
+    const phone = document.getElementById('gig-phone').value.trim(), email = document.getElementById('gig-email').value.trim(), message = document.getElementById('gig-msg').value.trim();
+    if (!phone && !email) return showToast('Anna puhelinnumero tai sähköposti, jotta baari voi ottaa yhteyttä', 'error');
+    const r = await (await fetch('api.php?action=hub_apply', { method: 'POST', body: JSON.stringify({ shiftId: id, phone, email, message }) })).json();
+    if (r.error) return showToast(r.error, 'error');
+    closeModal(); showToast('Hakemus lähetetty'); state.gigFeed = undefined; loadGigFeed();
+}
+async function gigWithdraw(id) {
+    if (!confirm('Perutaanko hakemus?')) return;
+    const r = await (await fetch('api.php?action=hub_withdraw', { method: 'POST', body: JSON.stringify({ id }) })).json();
+    if (r.error) return showToast(r.error, 'error');
+    showToast('Hakemus peruttu'); state.gigFeed = undefined; loadGigFeed();
+}
