@@ -19,10 +19,22 @@ async function loadGigApps() {
     render();
 }
 async function hubDecide(id, decision) {
-    if (decision === 'accepted' && !confirm('Hyväksytäänkö hakija? Muut tämän vuoron hakijat hylätään ja hakijan yhteystiedot tulevat näkyviin.')) return;
+    if (decision === 'accepted' && !confirm('Hyväksytäänkö hakija? Hänelle luodaan keikkalaistunnus ja hänet asetetaan vuoroon, muut tämän vuoron hakijat hylätään ja hakijan yhteystiedot tulevat näkyviin.')) return;
     const r = await (await fetch('api.php?action=hub_decide', { method: 'POST', body: JSON.stringify({ id, decision }) })).json();
     if (r.error) return showToast(r.error, 'error');
-    showToast('Päätös tallennettu'); state.gigApps = undefined; load();
+    state.gigApps = undefined; await load();
+    if (r.worker) return hubWorkerModal(r.worker);
+    showToast('Päätös tallennettu');
+}
+// Hyväksytyn keikkalaisen tunnus ja kutsulinkki (linkki näytetään vain tässä; uuden saa Ylläpito → Työntekijät)
+function hubWorkerModal(w) {
+    const body = w.existing
+        ? `<p style="margin:0 0 8px;"><b>${esc(w.name)}</b> on jo baarin käyttäjä (tunnus <b>${esc(w.username)}</b>). Hänet asetettiin vuoroon${w.assigned ? '' : ' (vuoro oli jo varattu, joten asetusta ei tehty)'}.</p>`
+        : `<p style="margin:0 0 8px;">Keikkalaiselle <b>${esc(w.name)}</b> luotiin tunnus <b>${esc(w.username)}</b> (keikkalainen) ja hänet asetettiin vuoroon.</p>
+           ${w.emailed ? `<p style="margin:0 0 8px;">Kutsulinkki lähetettiin osoitteeseen <b>${esc(w.email)}</b>. Linkistä hän asettaa salasanansa (voimassa 7 päivää).</p>` : `<p style="margin:0 0 8px;">Anna tämä linkki hakijalle (voimassa 7 päivää), jolloin hän asettaa itse salasanansa:</p>
+           <input class="form-input" readonly value="${esc(w.link || '')}" onclick="this.select()" style="font-size:12px;">`}
+           ${w.phone || w.email ? `<p style="margin:8px 0 0; font-size:13px; color:var(--text2);">Yhteystiedot: ${w.phone ? '☎ ' + esc(w.phone) : ''} ${w.email ? '✉ ' + esc(w.email) : ''}</p>` : ''}`;
+    openModal('Keikkalainen lisätty', 'bi-person-check', body, `<button class="btn btn-primary" onclick="closeModal()">Valmis</button>`);
 }
 async function hubSyncNow() {
     const box = document.getElementById('hub-status'); if (box) box.textContent = 'Synkronoidaan…';

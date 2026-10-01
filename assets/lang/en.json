@@ -1231,6 +1231,9 @@
   "Ei avoimia vuoroja muissa baareissa juuri nyt. Voit ottaa ilmoitukset käyttöön omassa profiilissasi.": "No open shifts at other bars right now. You can turn on notifications in your profile.",
   "Toiminto ei ole käytössä tässä baarissa.": "This feature is not enabled at this bar.",
   "Ilmoita, kun muissa baareissa on vapaita vuoroja": "Notify me when other bars have open shifts",
-  "Muiden baarien vapaat vuorot": "Open shifts at other bars"
+  "Muiden baarien vapaat vuorot": "Open shifts at other bars",
+  "Keikkahakemukset": "Gig applications",
+  "Käsittele hakemukset →": "Handle applications →",
+  "Keikkalainen lisätty": "Gig worker added"
  }
 }

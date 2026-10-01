@@ -609,6 +609,32 @@ function bsHubRecord($conn, bool $ok, string $err): void {
     $now = date('c');
     foreach ([['hub_last_sync', $now], ['hub_last_error', $ok ? '' : $err]] as [$k, $v]) { $st = $conn->prepare("INSERT INTO system_status (k, v) VALUES (?, ?) ON DUPLICATE KEY UPDATE v = VALUES(v)"); if ($st) { $st->bind_param('ss', $k, $v); $st->execute(); } }
 }
+// Hyväksytylle keikkahakemukselle luodaan keikkalaistunnus (työsuhdetyyppi casual) ja hakija asetetaan vuoroon.
+// Jos hakijan sähköposti vastaa jo olemassa olevaa tunnusta, käytetään sitä. Palauttaa tiedot ylläpitäjälle tai null.
+function hubCreateGigWorker($conn, $cfg, int $appId, int $shiftId): ?array {
+    $app = fetchOne(prepareQuery($conn, "SELECT name, email, phone FROM hub_applications WHERE id = " . $appId));
+    if (!$app) return null;
+    $name = mb_substr(trim((string)$app['name']), 0, 100); $email = trim((string)($app['email'] ?? '')); $email = ($email !== '' && filter_var($email, FILTER_VALIDATE_EMAIL)) ? $email : null;
+    $phone = mb_substr((string)($app['phone'] ?? ''), 0, 20);
+    $existing = null;
+    if ($email !== null) { $q = prepareQuery($conn, "SELECT id, name, username FROM users WHERE LOWER(email) = LOWER(?) AND anonymized_at IS NULL AND status <> 'frozen' LIMIT 1"); $q->bind_param("s", $email); $existing = fetchOne($q); }
+    $link = null; $emailed = false;
+    if ($existing) { $uid = (int)$existing['id']; $username = $existing['username']; $name = $existing['name']; }
+    else {
+        $base = strtolower(strtr($name, ['ä' => 'a', 'ö' => 'o', 'å' => 'a', 'Ä' => 'a', 'Ö' => 'o', 'Å' => 'a', 'é' => 'e', 'ü' => 'u']));
+        $base = trim(preg_replace('/[^a-z0-9]+/', '.', $base), '.'); $base = $base === '' ? 'keikkalainen' : substr($base, 0, 40);
+        $username = $base;
+        for ($i = 2; fetchOne(prepareQuery($conn, "SELECT id FROM users WHERE username = '" . $conn->real_escape_string($username) . "'")); $i++) $username = $base . $i;
+        $pw = password_hash(bin2hex(random_bytes(24)), PASSWORD_DEFAULT);   // hakija asettaa salasanan itse kutsulinkistä
+        $color = sprintf('#%02X%02X%02X', random_int(60, 200), random_int(60, 200), random_int(60, 200));
+        $ins = prepareQuery($conn, "INSERT INTO users (name, username, password, role, color, hourly_wage, employment_type, email, phone) VALUES (?, ?, ?, 'employee', ?, 0, 'casual', ?, ?)");
+        $ins->bind_param("ssssss", $name, $username, $pw, $color, $email, $phone); run($ins);
+        $uid = (int)$conn->insert_id;
+        [$link, $emailed] = issueAuthLink($conn, $cfg, ['id' => $uid, 'name' => $name, 'username' => $username, 'email' => $email], 'invite');
+    }
+    $as = prepareQuery($conn, "UPDATE shifts SET userId = ? WHERE id = ? AND userId IS NULL"); $as->bind_param("ii", $uid, $shiftId); run($as);
+    return ['id' => $uid, 'name' => $name, 'username' => $username, 'existing' => (bool)$existing, 'link' => $link, 'emailed' => $emailed, 'email' => $email, 'phone' => $phone !== '' ? $phone : null, 'assigned' => $as->affected_rows > 0];
+}
 // Muutoksen jälkeen synkronoidaan keskukseen heti vastauksen jälkeen (ei hidasta käyttäjää; cron on varmistus)
 function hubSyncAfterResponse($conn, array $cfg, array $vapid, bool $pull = false, int $throttleSecs = 0): void {
     if (!hubConfigured($cfg)) return;
@@ -1921,7 +1947,11 @@ if ($method === 'GET') {
     }
     unset($tr);
     if ($admin || !empty($pubForTrades['features']['hub_feed'])) hubSyncAfterResponse($conn, $cfg, $vapid_auth, true, 120);   // ei vaadi croniakaan: ylläpitäjän sivulataus hakee hakemukset ja lähettää viivästyneet muutokset
-    jsonResponse(["users" => $users, "shifts" => $shifts, "events" => $events, "trades" => $trades, "absences" => $absences, "notices" => $notices, "time_entries" => $time_entries, "availability" => $availability, "tasks" => $tasks, "event_guests" => fetchAllRows(prepareQuery($conn, "SELECT g.id, g.event_id, g.name, g.note, g.added_by FROM event_guests g JOIN events e ON g.event_id = e.id WHERE e.date >= CURDATE() - INTERVAL 30 DAY ORDER BY g.id")), "system_alerts" => $admin ? systemStatus($conn, $cfg)['alerts'] : [], "skills" => fetchAllRows(prepareQuery($conn, "SELECT id, name, for_role FROM skills ORDER BY name")), "user_skills" => $canShifts ? fetchAllRows(prepareQuery($conn, "SELECT us.user_id, us.skill_id, us.valid_until FROM user_skills us JOIN skills s ON us.skill_id = s.id")) : fetchAllRows(prepareQuery($conn, "SELECT us.user_id, us.skill_id, us.valid_until FROM user_skills us WHERE us.user_id = " . $myId)), "hour_conf" => fetchAllRows(prepareQuery($conn, "SELECT month, hours, status, note, admin_note FROM hour_confirmations WHERE user_id = " . $myId . " AND month >= '" . date('Y-m', strtotime('-5 months')) . "' ORDER BY month DESC")), "shift_bids" => $canShifts ? fetchAllRows(prepareQuery($conn, "SELECT b.shift_id, b.user_id FROM shift_bids b JOIN shifts s ON b.shift_id = s.id")) : fetchAllRows(prepareQuery($conn, "SELECT shift_id, user_id FROM shift_bids WHERE user_id = " . $myId)), "perms" => $me['perms'], "access_roles" => $admin ? accessRolesOf(fetchOne(prepareQuery($conn, "SELECT access_roles FROM pubs"))['access_roles'] ?? null) : [], "task_completions" => $task_completions, "cash_recent" => $cash_recent, "shift_logs" => $shift_logs, "shopping_list" => $shopping_list, "private_messages" => $private_messages, "bookings" => $bookings, "event_regs" => (object)$eventRegs, "checklists" => $checklists, "checklist_progress" => $checklist_progress, "documents" => $documents, "kudos" => $kudos, "surveys" => $surveys, "staffing_rules" => $canShifts ? fetchAllRows(prepareQuery($conn, "SELECT id, dow, start, end, role, min_staff FROM staffing_rules ORDER BY dow, start")) : [], "coverage" => $canShifts ? computeCoverage($conn, date('Y-m-d'), date('Y-m-d', strtotime('+13 days'))) : [], "availability_rules" => $availability_rules, "pub" => getPub($conn, $admin), "week_templates" => $canShifts ? fetchAllRows(prepareQuery($conn, "SELECT id, name, (LENGTH(data) - LENGTH(REPLACE(data, '\"dow\"', ''))) / 5 AS n FROM week_templates ORDER BY name")) : [], "shift_templates" => $canShifts ? fetchAllRows(prepareQuery($conn, "SELECT id, name, start, end, role FROM shift_templates ORDER BY start, name")) : []]);
+    $hubPend = [];   // etusivun Huomio-lista: käsittelemättömät keikkahakemukset (vain vuorojen hallitsijoille)
+    if ($canShifts && !empty($pubForTrades['features']['hub_gigs'])) {
+        $hubPend = fetchAllRows(prepareQuery($conn, "SELECT a.id, a.name, s.date, s.start, s.end, s.role FROM hub_applications a JOIN shifts s ON s.id = a.shift_id WHERE a.status = 'pending' AND s.date >= CURDATE() ORDER BY s.date, a.id LIMIT 20"));
+    }
+    jsonResponse(["hub_pending_apps" => $hubPend, "users" => $users, "shifts" => $shifts, "events" => $events, "trades" => $trades, "absences" => $absences, "notices" => $notices, "time_entries" => $time_entries, "availability" => $availability, "tasks" => $tasks, "event_guests" => fetchAllRows(prepareQuery($conn, "SELECT g.id, g.event_id, g.name, g.note, g.added_by FROM event_guests g JOIN events e ON g.event_id = e.id WHERE e.date >= CURDATE() - INTERVAL 30 DAY ORDER BY g.id")), "system_alerts" => $admin ? systemStatus($conn, $cfg)['alerts'] : [], "skills" => fetchAllRows(prepareQuery($conn, "SELECT id, name, for_role FROM skills ORDER BY name")), "user_skills" => $canShifts ? fetchAllRows(prepareQuery($conn, "SELECT us.user_id, us.skill_id, us.valid_until FROM user_skills us JOIN skills s ON us.skill_id = s.id")) : fetchAllRows(prepareQuery($conn, "SELECT us.user_id, us.skill_id, us.valid_until FROM user_skills us WHERE us.user_id = " . $myId)), "hour_conf" => fetchAllRows(prepareQuery($conn, "SELECT month, hours, status, note, admin_note FROM hour_confirmations WHERE user_id = " . $myId . " AND month >= '" . date('Y-m', strtotime('-5 months')) . "' ORDER BY month DESC")), "shift_bids" => $canShifts ? fetchAllRows(prepareQuery($conn, "SELECT b.shift_id, b.user_id FROM shift_bids b JOIN shifts s ON b.shift_id = s.id")) : fetchAllRows(prepareQuery($conn, "SELECT shift_id, user_id FROM shift_bids WHERE user_id = " . $myId)), "perms" => $me['perms'], "access_roles" => $admin ? accessRolesOf(fetchOne(prepareQuery($conn, "SELECT access_roles FROM pubs"))['access_roles'] ?? null) : [], "task_completions" => $task_completions, "cash_recent" => $cash_recent, "shift_logs" => $shift_logs, "shopping_list" => $shopping_list, "private_messages" => $private_messages, "bookings" => $bookings, "event_regs" => (object)$eventRegs, "checklists" => $checklists, "checklist_progress" => $checklist_progress, "documents" => $documents, "kudos" => $kudos, "surveys" => $surveys, "staffing_rules" => $canShifts ? fetchAllRows(prepareQuery($conn, "SELECT id, dow, start, end, role, min_staff FROM staffing_rules ORDER BY dow, start")) : [], "coverage" => $canShifts ? computeCoverage($conn, date('Y-m-d'), date('Y-m-d', strtotime('+13 days'))) : [], "availability_rules" => $availability_rules, "pub" => getPub($conn, $admin), "week_templates" => $canShifts ? fetchAllRows(prepareQuery($conn, "SELECT id, name, (LENGTH(data) - LENGTH(REPLACE(data, '\"dow\"', ''))) / 5 AS n FROM week_templates ORDER BY name")) : [], "shift_templates" => $canShifts ? fetchAllRows(prepareQuery($conn, "SELECT id, name, start, end, role FROM shift_templates ORDER BY start, name")) : []]);
 }
 
 // ===================== KIRJOITUS =====================
@@ -2209,6 +2239,9 @@ if ($method === 'POST') {
                 $em = isset($x['email']) ? mb_substr((string)$x['email'], 0, 190) : null; $ph = isset($x['phone']) ? mb_substr((string)$x['phone'], 0, 40) : null;
                 $cu = prepareQuery($conn, "UPDATE hub_applications SET email = ?, phone = ? WHERE id = ?"); $cu->bind_param("ssi", $em, $ph, $aid); run($cu);
             }
+            $worker = hubCreateGigWorker($conn, $cfg, $aid, (int)$a['shift_id']);   // keikkalaiselle tunnus ja vuoro
+            if ($worker) audit($conn, $me, 'Keikkahakemus hyväksytty', $worker['name'] . ' (' . $worker['username'] . ')' . (!empty($worker['existing']) ? ', olemassa oleva tunnus' : ', uusi keikkalaistunnus'));
+            jsonResponse(["success" => true, "worker" => $worker]);
         }
         jsonResponse(["success" => true]);
 

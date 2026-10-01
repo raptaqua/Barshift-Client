@@ -1176,10 +1176,17 @@ const future = (days) => { const d = new Date(Date.now() + days * 864e5); return
         const localId = +sext.slice(1);
         hub.apps.push({ id: 1, shift: sext, status: 'pending', name: 'Aino Keikka', skills: 'baarimestari', city: 'Turku', message: 'Voin tulla', email: 'aino@example.test', phone: '0401234567' });
         hub.apps.push({ id: 2, shift: 's99999', status: 'pending', name: 'Vieras', skills: '', city: '', message: null, email: null, phone: null });
-        const apps = (await admin.post('hub_applications', {})).json.applications; assert.strictEqual(apps.length, 1, 'toisen baarin/tuntemattoman vuoron hakemus tuli sisään'); assert.strictEqual(apps[0].email, null);
+        assert.ok((await admin.post('update_profile', { phone: '', email: 'admin@example.test', notify_email: 1 })).json.success);
+        const apps = (await admin.post('hub_applications', {})).json.applications; assert.strictEqual(apps.length, 1, 'toisen baarin/tuntemattoman vuoron hakemus tuli sisään');
+        assert.ok(await waitMail(mailbox, m => m.to === 'admin@example.test' && /Uusi keikkahakemus/.test(m.subject)), 'ylläpitäjä ei saanut ilmoitusta uudesta hakemuksesta'); assert.strictEqual(apps[0].email, null);
         assert.strictEqual((await emp.post('hub_applications', {})).status, 403);
         assert.strictEqual((await emp.post('hub_decide', { id: apps[0].id, decision: 'accepted' })).status, 403);
-        assert.ok((await admin.post('hub_decide', { id: apps[0].id, decision: 'accepted' })).json.success); assert.deepStrictEqual(hub.decisions, ['accepted']);
+        const pendDash = (await admin.get('')).json.hub_pending_apps; assert.strictEqual(pendDash.length, 1, 'hakemus ei näy etusivun Huomio-listassa'); assert.strictEqual(pendDash[0].name, 'Aino Keikka');
+        assert.deepStrictEqual((await emp.get('')).json.hub_pending_apps, [], 'hakemukset näkyvät työntekijälle');
+        const dec = await admin.post('hub_decide', { id: apps[0].id, decision: 'accepted' }); assert.ok(dec.json.success); assert.deepStrictEqual(hub.decisions, ['accepted']);
+        const wk = dec.json.worker; assert.ok(wk && wk.username === 'aino.keikka' && wk.assigned && /setpassword\.html#t=[0-9a-f]{64}$/.test(wk.link), JSON.stringify(wk));
+        const pay2 = (await admin.get('')).json; const au = pay2.users.find(u => u.username === 'aino.keikka'); assert.ok(au, 'keikkalaistunnusta ei luotu'); assert.strictEqual(au.employment_type, 'casual'); assert.strictEqual(au.role, 'employee'); assert.strictEqual(au.phone, '0401234567');
+        assert.strictEqual(pay2.shifts.find(x => x.id === localId).userId, au.id, 'hakija ei päätynyt vuoroon'); assert.strictEqual(pay2.hub_pending_apps.length, 0, 'käsitelty hakemus jäi Huomio-listaan');
         const after = (await admin.post('hub_applications', {})).json.applications[0]; assert.strictEqual(after.status, 'accepted'); assert.strictEqual(after.email, 'aino@example.test'); assert.strictEqual(after.phone, '0401234567');
         assert.strictEqual((await admin.post('hub_decide', { id: apps[0].id, decision: 'declined' })).status, 409, 'käsitelty hakemus muuttui');
         // täytetty vuoro merkitään keskuksessa täytetyksi (ei poisteta); ylläpitäjän sivulataus synkronoi ilman croniakin
