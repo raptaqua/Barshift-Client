@@ -1115,6 +1115,7 @@ const future = (days) => { const d = new Date(Date.now() + days * 864e5); return
   });
   console.log('Keskuspalvelin (BarShift Hub)');
   await t('hub: julkiset tapahtumat ja keikkavuorot lähtevät allekirjoitettuina, hakemukset tulevat takaisin', async () => {
+    const sql = (q) => execFileP('mysql', ['-h', process.env.DB_HOST, '-u', process.env.DB_USER, ...(process.env.DB_PASS ? ['-p' + process.env.DB_PASS] : []), process.env.DB_NAME, '-e', q]);
     const hub = { events: {}, shifts: {}, apps: [], badSig: 0, calls: [], decisions: [] };
     const spki = (raw) => crypto.createPublicKey({ key: Buffer.concat([Buffer.from('302a300506032b6570032100', 'hex'), Buffer.from(raw, 'base64')]), format: 'der', type: 'spki' });
     const hubKey = spki(process.env.HUB_PUBKEY), seen = new Set();
@@ -1161,15 +1162,15 @@ const future = (days) => { const d = new Date(Date.now() + days * 864e5); return
         const localId = +sext.slice(1);
         hub.apps.push({ id: 1, shift: sext, status: 'pending', name: 'Aino Keikka', skills: 'baarimestari', city: 'Turku', message: 'Voin tulla', email: 'aino@example.test', phone: '0401234567' });
         hub.apps.push({ id: 2, shift: 's99999', status: 'pending', name: 'Vieras', skills: '', city: '', message: null, email: null, phone: null });
-        await runCron();
         const apps = (await admin.post('hub_applications', {})).json.applications; assert.strictEqual(apps.length, 1, 'toisen baarin/tuntemattoman vuoron hakemus tuli sisään'); assert.strictEqual(apps[0].email, null);
         assert.strictEqual((await emp.post('hub_applications', {})).status, 403);
         assert.strictEqual((await emp.post('hub_decide', { id: apps[0].id, decision: 'accepted' })).status, 403);
         assert.ok((await admin.post('hub_decide', { id: apps[0].id, decision: 'accepted' })).json.success); assert.deepStrictEqual(hub.decisions, ['accepted']);
         const after = (await admin.post('hub_applications', {})).json.applications[0]; assert.strictEqual(after.status, 'accepted'); assert.strictEqual(after.email, 'aino@example.test'); assert.strictEqual(after.phone, '0401234567');
         assert.strictEqual((await admin.post('hub_decide', { id: apps[0].id, decision: 'declined' })).status, 409, 'käsitelty hakemus muuttui');
-        // täytetty vuoro merkitään keskuksessa täytetyksi (ei poisteta)
-        await runCron(); assert.strictEqual(hub.shifts[sext].status, 'filled');
+        // täytetty vuoro merkitään keskuksessa täytetyksi (ei poisteta); ylläpitäjän sivulataus synkronoi ilman croniakin
+        await sql("DELETE FROM system_status WHERE k = 'hub_last_attempt'"); await admin.get('');
+        for (let i = 0; i < 20 && hub.shifts[sext].status !== 'filled'; i++) await sleep(100); assert.strictEqual(hub.shifts[sext].status, 'filled');
         // tapahtuman poisto ja ominaisuuden sammutus poistaa keskuksesta
         assert.ok((await admin.post('save_pub_settings', { ...base, features_ext: { hub_events: false, hub_gigs: false } })).json.success);
         await runCron(); assert.strictEqual(Object.keys(hub.events).length, 0, 'tapahtuma jäi keskukseen'); assert.strictEqual(Object.keys(hub.shifts).length, 0, 'vuoro jäi keskukseen');

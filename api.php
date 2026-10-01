@@ -632,14 +632,19 @@ function bsHubRecord($conn, bool $ok, string $err): void {
     foreach ([['hub_last_sync', $now], ['hub_last_error', $ok ? '' : $err]] as [$k, $v]) { $st = $conn->prepare("INSERT INTO system_status (k, v) VALUES (?, ?) ON DUPLICATE KEY UPDATE v = VALUES(v)"); if ($st) { $st->bind_param('ss', $k, $v); $st->execute(); } }
 }
 // Muutoksen jälkeen synkronoidaan keskukseen heti vastauksen jälkeen (ei hidasta käyttäjää; cron on varmistus)
-function hubSyncAfterResponse($conn, array $cfg, string $pubSlug, array $vapid): void {
+function hubSyncAfterResponse($conn, array $cfg, string $pubSlug, array $vapid, bool $pull = false, int $throttleSecs = 0): void {
     if (!hubConfigured($cfg)) return;
-    register_shutdown_function(function () use ($conn, $cfg, $pubSlug, $vapid) {
+    if ($throttleSecs > 0) {   // ylläpitäjän sivulatauksista: enintään kerran $throttleSecs sekunnissa (ei tarvitse croniakaan)
+        $la = fetchOne(prepareQuery($conn, "SELECT v FROM system_status WHERE k = 'hub_last_attempt'"));
+        if ($la && time() - (int)$la['v'] < $throttleSecs) return;
+        $now = (string)time(); $st = $conn->prepare("INSERT INTO system_status (k, v) VALUES ('hub_last_attempt', ?) ON DUPLICATE KEY UPDATE v = VALUES(v)"); if ($st) { $st->bind_param('s', $now); $st->execute(); }
+    }
+    register_shutdown_function(function () use ($conn, $cfg, $pubSlug, $vapid, $pull) {
         if (function_exists('fastcgi_finish_request')) @fastcgi_finish_request();
         try {
             $prow = fetchOne(prepareQuery2($conn, "SELECT slug, feature_hub_events, feature_hub_gigs FROM pubs WHERE slug = ?", $pubSlug));
             if (!$prow || (!$prow['feature_hub_events'] && !$prow['feature_hub_gigs'])) return;
-            [$sent, $errs] = hubSync($conn, $cfg, $prow); bsHubRecord($conn, $errs === 0, $errs ? hubLastError() : '');
+            [$sent, $errs] = hubSync($conn, $cfg, $prow); if ($pull) hubPullApplications($conn, $cfg, $prow, $vapid); bsHubRecord($conn, $errs === 0, $errs ? hubLastError() : '');
         } catch (Throwable $e) { error_log('hub sync: ' . $e->getMessage()); }
     });
 }
@@ -1991,6 +1996,7 @@ if ($method === 'GET') {
         if ($tr['status'] === 'open' && (int)$tr['offered_by_id'] !== $myId && !$canShifts) $tr['my_warnings'] = shiftWarnings($conn, $pubForTrades, $myId, $sh['date'], $sh['start'], $sh['end'], 0, $sh['role'] ?? null);
     }
     unset($tr);
+    if ($admin) hubSyncAfterResponse($conn, $cfg, $myPub, $vapid_auth, true, 120);   // ei vaadi croniakaan: ylläpitäjän sivulataus hakee hakemukset ja lähettää viivästyneet muutokset
     jsonResponse(["users" => $users, "shifts" => $shifts, "events" => $events, "trades" => $trades, "absences" => $absences, "notices" => $notices, "time_entries" => $time_entries, "availability" => $availability, "tasks" => $tasks, "event_guests" => fetchAllRows(prepareQuery2($conn, "SELECT g.id, g.event_id, g.name, g.note, g.added_by FROM event_guests g JOIN events e ON g.event_id = e.id WHERE e.pub_name = ? AND e.date >= CURDATE() - INTERVAL 30 DAY ORDER BY g.id", $pub_name)), "system_alerts" => $admin ? systemStatus($conn, $cfg)['alerts'] : [], "skills" => fetchAllRows(prepareQuery2($conn, "SELECT id, name, for_role FROM skills WHERE pub_name = ? ORDER BY name", $pub_name)), "user_skills" => $canShifts ? fetchAllRows(prepareQuery2($conn, "SELECT us.user_id, us.skill_id, us.valid_until FROM user_skills us JOIN skills s ON us.skill_id = s.id WHERE s.pub_name = ?", $pub_name)) : fetchAllRows(prepareQuery($conn, "SELECT us.user_id, us.skill_id, us.valid_until FROM user_skills us WHERE us.user_id = " . $myId)), "hour_conf" => fetchAllRows(prepareQuery($conn, "SELECT month, hours, status, note, admin_note FROM hour_confirmations WHERE user_id = " . $myId . " AND month >= '" . date('Y-m', strtotime('-5 months')) . "' ORDER BY month DESC")), "shift_bids" => $canShifts ? fetchAllRows(prepareQuery2($conn, "SELECT b.shift_id, b.user_id FROM shift_bids b JOIN shifts s ON b.shift_id = s.id WHERE s.pub_name = ?", $pub_name)) : fetchAllRows(prepareQuery($conn, "SELECT shift_id, user_id FROM shift_bids WHERE user_id = " . $myId)), "perms" => $me['perms'], "access_roles" => $admin ? accessRolesOf(fetchOne(prepareQuery2($conn, "SELECT access_roles FROM pubs WHERE slug = ?", $pub_name))['access_roles'] ?? null) : [], "task_completions" => $task_completions, "cash_recent" => $cash_recent, "shift_logs" => $shift_logs, "shopping_list" => $shopping_list, "private_messages" => $private_messages, "bookings" => $bookings, "event_regs" => (object)$eventRegs, "checklists" => $checklists, "checklist_progress" => $checklist_progress, "documents" => $documents, "kudos" => $kudos, "surveys" => $surveys, "staffing_rules" => $canShifts ? fetchAllRows(prepareQuery2($conn, "SELECT id, dow, start, end, role, min_staff FROM staffing_rules WHERE pub_name = ? ORDER BY dow, start", $pub_name)) : [], "coverage" => $canShifts ? computeCoverage($conn, $pub_name, date('Y-m-d'), date('Y-m-d', strtotime('+13 days'))) : [], "availability_rules" => $availability_rules, "pub" => getPub($conn, $pub_name, $admin), "week_templates" => $canShifts ? fetchAllRows(prepareQuery2($conn, "SELECT id, name, (LENGTH(data) - LENGTH(REPLACE(data, '\"dow\"', ''))) / 5 AS n FROM week_templates WHERE pub_name = ? ORDER BY name", $pub_name)) : [], "shift_templates" => $canShifts ? fetchAllRows(prepareQuery2($conn, "SELECT id, name, start, end, role FROM shift_templates WHERE pub_name = ? ORDER BY start, name", $pub_name)) : []]);
 }
 
@@ -2188,6 +2194,7 @@ if ($method === 'POST') {
 
     } elseif ($action === 'hub_applications') {   // keikkahakemukset keskuspalvelimen kautta (vain ylläpito)
         requireAdmin($me);
+        if (hubConfigured($cfg)) { $prow = fetchOne(prepareQuery2($conn, "SELECT slug, feature_hub_events, feature_hub_gigs FROM pubs WHERE slug = ?", $myPub)); if ($prow) hubPullApplications($conn, $cfg, $prow, $vapid_auth); }
         $rows = fetchAllRows(prepareQuery2($conn, "SELECT a.id, a.shift_id, a.name, a.skills, a.city, a.message, a.status, a.email, a.phone, a.created_at, s.date, s.start, s.end, s.role
             FROM hub_applications a JOIN shifts s ON s.id = a.shift_id WHERE s.pub_name = ? ORDER BY a.status = 'pending' DESC, a.id DESC LIMIT 100", $myPub));
         jsonResponse(["success" => true, "applications" => $rows, "hub_available" => hubConfigured($cfg)]);
