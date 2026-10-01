@@ -47,6 +47,8 @@ jobs:
         run: node tests/js_handlers.test.js
       - name: Määrittelemättömät PHP-funktiot
         run: php tests/php_undefined.test.php
+      - name: Keskuksen osoitteen tarkistus
+        run: php tests/hub_url.test.php
       - name: Kielitiedostot
         run: node tests/i18n.test.js
       - name: API-integraatiotestit

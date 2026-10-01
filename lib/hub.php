@@ -28,7 +28,7 @@ function hubNormalizeUrl(string $url): ?string {
     $scheme = strtolower($p['scheme'] ?? ''); $host = strtolower($p['host']);
     $loop = in_array($host, ['localhost', '127.0.0.1', '::1'], true);
     if ($scheme !== 'https' && !($scheme === 'http' && $loop)) return null;
-    if (!$loop) { $ip = gethostbyname($host); if ($ip !== $host && !filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RES | FILTER_FLAG_NO_RES_RANGE)) return null; }
+    if (!$loop) { $ip = filter_var(trim($host, '[]'), FILTER_VALIDATE_IP) ? trim($host, '[]') : gethostbyname($host); if (filter_var($ip, FILTER_VALIDATE_IP) && !filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE)) return null; }
     return $url;
 }
 // Liittäminen: luo oma Ed25519-avainpari, rekisteröi julkinen avain keskuksessa liitoskoodilla. Palauttaa [ok, virhe|tiedot]
