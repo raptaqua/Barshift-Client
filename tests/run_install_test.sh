@@ -1,13 +1,17 @@
 #!/usr/bin/env bash
-# Asennusohjelman testi SQLite-kantaan: kopioi sovelluksen väliaikaiseen kansioon, ajaa install.php:n curlilla,
+# Asennusohjelman testi (APP_SRC=kansio testaa valmiin julkaisupaketin) SQLite-kantaan: kopioi sovelluksen väliaikaiseen kansioon, ajaa install.php:n curlilla,
 # kirjautuu uudella ylläpitäjällä ja tarkistaa, ettei data/-kansion tiedosto lataudu selaimella.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 TMP="$(mktemp -d)"; PORT="${TEST_PORT:-8497}"
 trap '[ -n "${PHP_PID:-}" ] && kill $PHP_PID 2>/dev/null; rm -rf "$TMP"' EXIT
 APP="$TMP/app"; mkdir -p "$APP"
-cp -r api.php index.php install.php migrate.php lib db vendor assets "$APP"/ 2>/dev/null
-cp *.html *.json *.js "$APP"/ 2>/dev/null || true
+if [ -n "${APP_SRC:-}" ]; then   # valmis julkaisupaketti (tools/build_release.sh) puretussa kansiossa
+  cp -r "$APP_SRC"/. "$APP"/
+else
+  cp -r api.php index.php install.php migrate.php lib db vendor assets "$APP"/ 2>/dev/null
+  cp *.html *.json *.js "$APP"/ 2>/dev/null || true
+fi
 mkdir -p "$APP/uploads"
 # Palvelimeksi PHP:n sisäänrakennettu palvelin; se ei lue .htaccess-tiedostoja, joten data/-suojaus testataan reitittimellä
 cat > "$TMP/router.php" <<'PHP'

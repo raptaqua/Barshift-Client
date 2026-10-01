@@ -10,7 +10,7 @@ Salasanan tai 2FA:n palautus palvelimelta: `php bin/admin.php reset-password <tu
 
 ## Käyttöönotto (asennusohjelma)
 
-1. Lataa tiedostot palvelimelle ja aja siellä `composer install --no-dev` (luo `vendor/`-kansion).
+1. Lataa **valmis julkaisupaketti** `barshift-client.zip` (GitHub: *Releases*, tai *Actions → Julkaisupaketti → Artifacts*), pura se palvelimelle (File Manager/FTP) ja jatka kohtaan 2. Paketissa on `vendor/` valmiina, joten SSH:ta ja composeria ei tarvita. (Kehittäjä: kloonattuun repoon `vendor/` luodaan komennolla `composer install --no-dev`, ja paketin saa itse komennolla `tools/build_release.sh`.)
 2. Tietokantaa ei tarvitse luoda: oletuksena käytetään **SQLitea**, jolloin kaikki tallentuu yhteen tiedostoon kansiossa `data/` (kansion on oltava PHP:lle kirjoitettava; PHP:n `pdo_sqlite` on lähes aina valmiina). Haluatko MariaDB/MySQL:n, luo tyhjä tietokanta ja käyttäjä (cPanel: *MySQL Databases*) ja valitse asennuksessa MariaDB.
 3. Avaa selaimessa `https://SIVUSI/install.php`. Sivu tarkistaa vaatimukset ja pyytää **asennustunnisteen**:
    avaa palvelimella tiedosto `install_token.php` (File Manager/FTP) ja kopioi `TOKEN:`-sanan jälkeinen teksti.

@@ -103,7 +103,7 @@ function requirements(string $root, string $driver = 'sqlite'): array {
         $r[] = ["PHP-laajennus: $label", extension_loaded($ext), extension_loaded($ext) ? 'ok' : 'puuttuu', true];
     }
     $r[] = ['Riippuvuudet asennettu (vendor/)', is_file($root . '/vendor/autoload.php'),
-            is_file($root . '/vendor/autoload.php') ? 'ok' : 'aja: composer install --no-dev', true];
+            is_file($root . '/vendor/autoload.php') ? 'ok' : 'puuttuu: lataa valmis julkaisupaketti (barshift-client.zip, GitHub Releases) tai aja: composer install --no-dev', true];
     if ($driver === 'sqlite') {
         $d = $root . '/data';
         $okd = is_dir($d) ? is_writable($d) : is_writable($root);

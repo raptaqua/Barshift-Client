@@ -1,0 +1,39 @@
+name: Julkaisupaketti
+
+# Rakentaa asennusvalmiin zip-paketin (vendor/ mukana), jotta palvelimella ei tarvita SSH:ta eikä composeria.
+#  - versiotunniste (esim. v1.2.0): paketti liitetään GitHub Releaseen
+#  - push main-haaraan tai käsin ajo: paketti ladattavissa ajon Artifacts-kohdasta
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: mysqli, pdo_sqlite, curl, mbstring, gmp, sodium
+          tools: composer
+      - name: Rakenna paketti
+        run: tools/build_release.sh dist/barshift-client.zip
+      - name: Asennusohjelma toimii paketilla
+        run: |
+          rm -rf /tmp/pkg && mkdir /tmp/pkg && unzip -q dist/barshift-client.zip -d /tmp/pkg
+          APP_SRC=/tmp/pkg/barshift tests/run_install_test.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: barshift-client
+          path: dist/barshift-client.zip
+      - name: Liitä Releaseen
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/barshift-client.zip
