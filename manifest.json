@@ -1,0 +1,72 @@
+{
+  "name": "BarShift Pro",
+  "short_name": "BarShift",
+  "description": "Työvuorojen hallinta",
+  "id": "./index.php",
+  "start_url": "./index.php",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#F4F7F9",
+  "theme_color": "#E14D2A",
+  "lang": "fi",
+  "icons": [
+    {
+      "src": "assets/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "assets/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    },
+    {
+      "src": "assets/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "assets/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ],
+  "categories": [
+    "business",
+    "productivity"
+  ],
+  "orientation": "portrait",
+  "shortcuts": [
+    {
+      "name": "Viestit",
+      "url": "./index.php?view=messages",
+      "icons": [
+        {
+          "src": "assets/icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
+    },
+    {
+      "name": "Vuorot",
+      "url": "./index.php?view=list",
+      "icons": [
+        {
+          "src": "assets/icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
+    },
+    {
+      "name": "Poissaolot",
+      "url": "./index.php?view=absences",
+      "icons": [
+        {
+          "src": "assets/icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
+    }
+  ]
+}

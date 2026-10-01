@@ -1,0 +1,59 @@
+name: CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      mariadb:
+        image: mariadb:10.11
+        env:
+          MARIADB_ROOT_PASSWORD: rootpw
+        ports: ['3306:3306']
+        options: >-
+          --health-cmd="healthcheck.sh --connect --innodb_initialized"
+          --health-interval=5s --health-timeout=5s --health-retries=20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: mysqli, curl, mbstring, gmp
+          tools: composer
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: PHP-syntaksi
+        run: |
+          set -e
+          for f in $(git ls-files '*.php'); do php -l "$f" > /dev/null; done
+      - name: JavaScript-syntaksi
+        run: |
+          set -e
+          for f in assets/js/*.js assets/*.js leave.js sw.js tests/*.js; do node --check "$f"; done
+      - name: Salaisuuksien tarkistus
+        run: |
+          if git ls-files | grep -E '(^|/)(config\.php|install_token\.php|install\.lock)$'; then echo "Salaisuustiedosto versionhallinnassa"; exit 1; fi
+          if git grep -nE "BEGIN (RSA |EC )?PRIVATE KEY|AKIA[0-9A-Z]{16}" -- . ':!vendor'; then echo "Mahdollinen salaisuus koodissa"; exit 1; fi
+      - name: Riippuvuudet
+        run: composer install --no-dev --no-progress --prefer-dist
+      - name: Lomalaskennan testit
+        run: node tests/leave.test.js
+      - name: Käyttöliittymän käsittelijöiden tarkistus
+        run: node tests/js_handlers.test.js
+      - name: Määrittelemättömät PHP-funktiot
+        run: php tests/php_undefined.test.php
+      - name: Kielitiedostot
+        run: node tests/i18n.test.js
+      - name: API-integraatiotestit
+        env:
+          TEST_DB_HOST: 127.0.0.1
+          TEST_DB_USER: root
+          TEST_DB_PASS: rootpw
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq mariadb-client
+          tests/run_api_tests.sh

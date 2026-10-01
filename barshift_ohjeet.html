@@ -1,0 +1,1476 @@
+<!DOCTYPE html>
+<html lang="fi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>BarShift Pro – Käyttöohjeet</title>
+    <link rel="stylesheet" href="assets/vendor/bootstrap-icons/bootstrap-icons.min.css">
+    <style>
+        :root {
+            --accent: #E14D2A;
+            --accent-hover: #C2410C;
+            --teal: #0D9488;
+            --bg: #F4F7F9;
+            --surface: #FFFFFF;
+            --surface2: #F8FAFC;
+            --border: #E2E8F0;
+            --border2: #CBD5E1;
+            --text: #0F172A;
+            --text2: #475569;
+            --text3: #64748B;
+            --radius: 16px;
+            --radius-sm: 8px;
+            --shadow: 0 4px 20px rgba(0,0,0,0.06);
+            --shadow-sm: 0 2px 8px rgba(0,0,0,0.03);
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: 'DM Sans', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* ── LAYOUT ── */
+        .layout { display: flex; min-height: 100vh; }
+
+        /* ── SIDEBAR ── */
+        .sidebar {
+            width: 280px;
+            flex-shrink: 0;
+            background: var(--surface);
+            border-right: 1px solid var(--border);
+            position: sticky;
+            top: 0;
+            height: 100vh;
+            overflow-y: auto;
+            padding: 32px 0 40px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .sidebar-logo {
+            font-family: 'Syne', sans-serif;
+            font-size: 24px;
+            font-weight: 800;
+            padding: 0 28px 8px;
+        }
+        .sidebar-logo span { color: var(--accent); }
+
+        .sidebar-subtitle {
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 0.8px;
+            text-transform: uppercase;
+            color: var(--text3);
+            padding: 0 28px 24px;
+            border-bottom: 1px solid var(--border);
+            margin-bottom: 16px;
+        }
+
+        .nav-section-label {
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            color: var(--text3);
+            padding: 16px 28px 6px;
+        }
+
+        .nav-link {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 9px 28px;
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text2);
+            cursor: pointer;
+            border-right: 3px solid transparent;
+            transition: all 0.18s;
+            text-decoration: none;
+        }
+        .nav-link i { font-size: 16px; opacity: 0.7; }
+        .nav-link:hover { color: var(--text); background: var(--surface2); }
+        .nav-link.active {
+            color: var(--accent);
+            background: rgba(225,77,42,0.06);
+            border-right-color: var(--accent);
+        }
+        .nav-link.active i { opacity: 1; }
+
+        /* ── MAIN ── */
+        .main {
+            flex: 1;
+            padding: 48px 56px;
+            max-width: 860px;
+        }
+
+        /* ── HERO ── */
+        .hero {
+            margin-bottom: 48px;
+        }
+        .hero-eyebrow {
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+            color: var(--accent);
+            margin-bottom: 12px;
+        }
+        .hero-title {
+            font-family: 'Syne', sans-serif;
+            font-size: 42px;
+            font-weight: 800;
+            line-height: 1.1;
+            letter-spacing: -1px;
+            color: var(--text);
+            margin-bottom: 16px;
+        }
+        .hero-title span { color: var(--accent); }
+        .hero-desc {
+            font-size: 16px;
+            color: var(--text2);
+            line-height: 1.6;
+            max-width: 560px;
+        }
+
+        /* ── SECTIONS ── */
+        .section { margin-bottom: 64px; scroll-margin-top: 32px; }
+
+        .section-header {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            margin-bottom: 28px;
+            padding-bottom: 20px;
+            border-bottom: 2px solid var(--border);
+        }
+        .section-icon {
+            width: 44px;
+            height: 44px;
+            border-radius: 12px;
+            background: rgba(225,77,42,0.1);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+        .section-icon i { font-size: 20px; color: var(--accent); }
+        .section-icon.teal { background: rgba(13,148,136,0.1); }
+        .section-icon.teal i { color: var(--teal); }
+        .section-icon.blue { background: rgba(59,130,246,0.1); }
+        .section-icon.blue i { color: #3B82F6; }
+        .section-icon.amber { background: rgba(245,158,11,0.1); }
+        .section-icon.amber i { color: #F59E0B; }
+        .section-icon.violet { background: rgba(139,92,246,0.1); }
+        .section-icon.violet i { color: #8B5CF6; }
+
+        .section-title {
+            font-family: 'Syne', sans-serif;
+            font-size: 22px;
+            font-weight: 800;
+            color: var(--text);
+        }
+
+        /* ── CARDS ── */
+        .card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 24px;
+            margin-bottom: 16px;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .card-title {
+            font-size: 14px;
+            font-weight: 700;
+            color: var(--text);
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .card-title i { color: var(--accent); }
+
+        /* ── ROLE PILLS ── */
+        .role-pills {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-bottom: 16px;
+        }
+        .role-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            padding: 5px 12px;
+            border-radius: 100px;
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 0.3px;
+        }
+        .role-pill.all { background: rgba(225,77,42,0.1); color: #C2410C; }
+        .role-pill.admin { background: rgba(245,158,11,0.12); color: #B45309; }
+
+        /* ── FEATURE LIST ── */
+        .feature-list { list-style: none; display: flex; flex-direction: column; gap: 10px; }
+        .feature-list li {
+            display: block;
+            position: relative;
+            padding-left: 18px;
+            font-size: 14px;
+            color: var(--text2);
+            line-height: 1.55;
+        }
+        .feature-list li::before {
+            content: '';
+            position: absolute;
+            left: 2px;
+            top: 0.62em;
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: var(--accent);
+        }
+        .feature-list li strong { color: var(--text); }
+
+        /* ── INFO TABLE ── */
+        .info-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+            margin-top: 4px;
+        }
+        .info-table th {
+            text-align: left;
+            padding: 10px 14px;
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text3);
+            background: var(--surface2);
+            border-bottom: 1px solid var(--border);
+        }
+        .info-table td {
+            padding: 12px 14px;
+            color: var(--text2);
+            border-bottom: 1px solid var(--border);
+            vertical-align: middle;
+        }
+        .info-table tr:last-child td { border-bottom: none; }
+        .info-table td:first-child { font-weight: 600; color: var(--text); }
+
+        /* ── BADGE ── */
+        .badge {
+            display: inline-block;
+            padding: 3px 10px;
+            border-radius: 100px;
+            font-size: 11px;
+            font-weight: 700;
+        }
+        .badge-teal { background: rgba(13,148,136,0.12); color: #0F766E; }
+        .badge-amber { background: rgba(245,158,11,0.12); color: #B45309; }
+        .badge-red { background: rgba(225,29,72,0.12); color: #BE123C; }
+        .badge-blue { background: rgba(59,130,246,0.12); color: #1D4ED8; }
+
+        /* ── NOTE ── */
+        .note {
+            background: rgba(13,148,136,0.06);
+            border-left: 3px solid var(--teal);
+            border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+            padding: 12px 16px;
+            font-size: 13px;
+            color: #0F766E;
+            margin-top: 16px;
+            line-height: 1.5;
+        }
+        .note i { margin-right: 6px; }
+
+        .warn {
+            background: rgba(245,158,11,0.08);
+            border-left: 3px solid #F59E0B;
+            border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+            padding: 12px 16px;
+            font-size: 13px;
+            color: #B45309;
+            margin-top: 16px;
+        }
+
+        /* ── EXAMPLE STEPS ── */
+        .steps { display: flex; flex-direction: column; gap: 0; }
+        .step {
+            display: flex;
+            gap: 16px;
+            padding: 14px 0;
+            border-bottom: 1px solid var(--border);
+        }
+        .step:last-child { border-bottom: none; }
+        .step-num {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            background: var(--accent);
+            color: #fff;
+            font-size: 12px;
+            font-weight: 800;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            margin-top: 2px;
+        }
+        .step-text {
+            font-size: 14px;
+            color: var(--text2);
+            line-height: 1.5;
+            padding-top: 3px;
+        }
+        .step-text strong { color: var(--text); }
+
+        /* ── EXAMPLE ACCORDION ── */
+        .example-list { display: flex; flex-direction: column; gap: 12px; }
+        .example {
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            overflow: hidden;
+            background: var(--surface);
+        }
+        .example-header {
+            padding: 16px 20px;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            user-select: none;
+            transition: background 0.15s;
+        }
+        .example-header:hover { background: var(--surface2); }
+        .example-label {
+            font-size: 14px;
+            font-weight: 700;
+            color: var(--text);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .example-label .num {
+            width: 22px; height: 22px;
+            background: var(--accent);
+            color: #fff;
+            border-radius: 50%;
+            font-size: 11px;
+            font-weight: 800;
+            display: flex; align-items: center; justify-content: center;
+            flex-shrink: 0;
+        }
+        .example-chevron { color: var(--text3); transition: transform 0.2s; font-size: 14px; }
+        .example.open .example-chevron { transform: rotate(180deg); }
+        .example-body {
+            display: none;
+            padding: 0 20px 20px;
+            border-top: 1px solid var(--border);
+        }
+        .example.open .example-body { display: block; }
+        .example-who {
+            font-size: 12px;
+            color: var(--text3);
+            padding: 12px 0 16px;
+            font-style: italic;
+        }
+
+        /* ── LOGIN INFO ── */
+        .login-demo {
+            background: var(--surface2);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            padding: 16px 20px;
+            font-size: 13px;
+            color: var(--text2);
+            margin-top: 12px;
+        }
+        .login-demo code {
+            font-family: 'DM Mono', 'Courier New', monospace;
+            background: rgba(225,77,42,0.1);
+            color: var(--accent);
+            padding: 2px 7px;
+            border-radius: 4px;
+            font-size: 13px;
+        }
+
+        /* ── MOBILE ── */
+        .mobile-header {
+            display: none;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            background: var(--surface);
+            border-bottom: 1px solid var(--border);
+            padding: 14px 20px;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .mobile-logo { font-family: 'Syne', sans-serif; font-size: 20px; font-weight: 800; }
+        .mobile-logo span { color: var(--accent); }
+        .mobile-menu-btn {
+            background: none;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 6px 10px;
+            cursor: pointer;
+            font-size: 18px;
+        }
+        .mobile-nav {
+            display: none;
+            background: var(--surface);
+            border-bottom: 1px solid var(--border);
+            padding: 12px 0;
+        }
+        .mobile-nav.open { display: block; }
+
+        @media (max-width: 900px) {
+            .sidebar { display: none; }
+            .mobile-header { display: flex; }
+            .main { padding: 28px 20px; max-width: 100%; }
+            .hero-title { font-size: 28px; }
+        }
+
+
+        /* ── KUVAKAAPPAUKSET ── */
+        figure.shot { margin: 18px 0 6px; }
+        figure.shot img { display: block; width: 100%; height: auto; border-radius: 12px; border: 1px solid var(--border); box-shadow: var(--shadow-sm); cursor: zoom-in; background: var(--surface2); }
+        figure.shot figcaption { font-size: 12px; color: var(--text3); margin-top: 8px; text-align: center; line-height: 1.4; }
+        figure.shot.small { max-width: 420px; margin-left: auto; margin-right: auto; }
+        figure.shot.phone { max-width: 260px; margin-left: 0; margin-right: 0; }
+        .shots { display: flex; gap: 18px; flex-wrap: wrap; align-items: flex-start; }
+        .shots > figure { flex: 1 1 260px; margin: 18px 0 6px; }
+        .shots > figure.phone { flex: 0 0 240px; }
+        .lightbox { position: fixed; inset: 0; background: rgba(15,20,30,0.82); display: none; align-items: center; justify-content: center; padding: 24px; z-index: 5000; cursor: zoom-out; }
+        .lightbox.open { display: flex; }
+        .lightbox img { max-width: 100%; max-height: 100%; border-radius: 10px; box-shadow: 0 20px 60px rgba(0,0,0,0.5); background: #fff; }
+        .new-tag { display: inline-block; font-size: 10px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; background: var(--accent); color: #fff; padding: 2px 8px; border-radius: 100px; margin-left: 8px; vertical-align: middle; }
+        .toc-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; }
+        .toc-grid a { display: flex; gap: 10px; align-items: center; padding: 10px 14px; border: 1px solid var(--border); border-radius: 10px; color: var(--text); text-decoration: none; font-size: 14px; font-weight: 600; background: var(--surface); }
+        .toc-grid a:hover { border-color: var(--accent); }
+        .toc-grid i { color: var(--accent); }
+
+        /* ── SCROLLBAR ── */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
+    </style>
+</head>
+<body>
+
+<!-- MOBILE HEADER -->
+<div class="mobile-header">
+    <div class="mobile-logo">Bar<span>Shift</span> – Ohjeet</div>
+    <button class="mobile-menu-btn" onclick="toggleMobileNav()"><i class="bi bi-list"></i></button>
+</div>
+<div class="mobile-nav" id="mobileNav">
+    <a class="nav-link" href="#kirjautuminen" onclick="closeMobileNav()"><i class="bi bi-door-open"></i> Kirjautuminen</a>
+    <a class="nav-link" href="#rakenne" onclick="closeMobileNav()"><i class="bi bi-layout-sidebar"></i> Käyttöliittymä</a>
+    <a class="nav-link" href="#etusivu" onclick="closeMobileNav()"><i class="bi bi-house-door"></i> Etusivu</a>
+    <a class="nav-link" href="#kalenteri" onclick="closeMobileNav()"><i class="bi bi-calendar-week"></i> Kalenteri</a>
+    <a class="nav-link" href="#vuorot" onclick="closeMobileNav()"><i class="bi bi-layout-text-sidebar"></i> Työvuorot</a>
+    <a class="nav-link" href="#tapahtumat" onclick="closeMobileNav()"><i class="bi bi-music-note-beamed"></i> Tapahtumat</a>
+    <a class="nav-link" href="#viestit" onclick="closeMobileNav()"><i class="bi bi-chat-dots"></i> Viestit</a>
+    <a class="nav-link" href="#tilastot" onclick="closeMobileNav()"><i class="bi bi-graph-up"></i> Tilastot</a>
+    <a class="nav-link" href="#poissaolot" onclick="closeMobileNav()"><i class="bi bi-calendar-x"></i> Poissaolot</a>
+    <a class="nav-link" href="#vuosiloma" onclick="closeMobileNav()"><i class="bi bi-umbrella"></i> Vuosiloma</a>
+    <a class="nav-link" href="#profiili" onclick="closeMobileNav()"><i class="bi bi-person-badge"></i> Profiili</a>
+    <a class="nav-link" href="#hallinta" onclick="closeMobileNav()"><i class="bi bi-people"></i> Hallinta</a>
+    <a class="nav-link" href="#julkinen" onclick="closeMobileNav()"><i class="bi bi-globe"></i> Julkinen kalenteri</a>
+    <a class="nav-link" href="#esimerkit" onclick="closeMobileNav()"><i class="bi bi-lightbulb"></i> Esimerkit</a>
+</div>
+
+<div class="layout">
+
+    <!-- SIDEBAR -->
+    <nav class="sidebar">
+        <div class="sidebar-logo">Bar<span>Shift</span></div>
+        <div class="sidebar-subtitle">Käyttöohjeet</div>
+
+        <div class="nav-section-label">Perusteet</div>
+        <a class="nav-link active" href="#kirjautuminen"><i class="bi bi-door-open"></i> Kirjautuminen</a>
+        <a class="nav-link" href="#rakenne"><i class="bi bi-layout-sidebar"></i> Käyttöliittymä</a>
+        <a class="nav-link" href="#etusivu"><i class="bi bi-house-door"></i> Etusivu</a>
+
+        <div class="nav-section-label">Osiot</div>
+        <a class="nav-link" href="#kalenteri"><i class="bi bi-calendar-week"></i> Kalenteri</a>
+        <a class="nav-link" href="#vuorot"><i class="bi bi-layout-text-sidebar"></i> Työvuorot</a>
+        <a class="nav-link" href="#tapahtumat"><i class="bi bi-music-note-beamed"></i> Tapahtumat</a>
+        <a class="nav-link" href="#viestit"><i class="bi bi-chat-dots"></i> Viestit</a>
+        <a class="nav-link" href="#tilastot"><i class="bi bi-graph-up"></i> Tilastot</a>
+        <a class="nav-link" href="#poissaolot"><i class="bi bi-calendar-x"></i> Poissaolot</a>
+        <a class="nav-link" href="#vuosiloma"><i class="bi bi-umbrella"></i> Vuosiloma</a>
+        <a class="nav-link" href="#profiili"><i class="bi bi-person-badge"></i> Oma profiili</a>
+        <a class="nav-link" href="#hallinta"><i class="bi bi-people"></i> Hallinta (admin)</a>
+        <a class="nav-link" href="#julkinen"><i class="bi bi-globe"></i> Julkinen kalenteri</a>
+
+        <div class="nav-section-label">Esimerkit</div>
+        <a class="nav-link" href="#esimerkit"><i class="bi bi-lightbulb"></i> Käytännön esimerkit</a>
+    </nav>
+
+    <!-- MAIN CONTENT -->
+    <main class="main">
+
+        <!-- HERO -->
+        <div class="hero">
+            <div class="hero-eyebrow">Käyttöohjeet</div>
+            <h1 class="hero-title">Bar<span>Shift</span> Pro</h1>
+            <p class="hero-desc">Työvuorojen hallintajärjestelmä baarien henkilökunnalle. Tästä oppaasta löydät ohjeet kaikkiin toimintoihin — niin työntekijälle kuin adminillekin, kuvakaappauksin.</p>
+        </div>
+
+        <!-- UUTTA -->
+        <div class="card" style="border-left:4px solid var(--accent);">
+            <div class="card-title"><i class="bi bi-stars"></i> Uutta tässä versiossa</div>
+            <div class="toc-grid">
+                <a href="#etusivu"><i class="bi bi-house-door"></i> Uusi etusivu: Huomio ja Työkalut</a>
+                <a href="#vuorot"><i class="bi bi-layout-text-sidebar"></i> Vuorot: viikkonäkymä ja lista</a>
+                <a href="#poissaolot"><i class="bi bi-calendar-check"></i> Selkeämpi poissaolojen käsittely</a>
+                <a href="#vuosiloma"><i class="bi bi-umbrella"></i> Vuosiloman kertymä</a>
+                <a href="#hallinta"><i class="bi bi-people"></i> Hallinta välilehdillä</a>
+                <a href="#julkinen"><i class="bi bi-globe"></i> Julkinen tapahtumakalenteri</a>
+            </div>
+            <p style="font-size:13px; color:var(--text3); margin-top:12px; line-height:1.5;">Ohjeen kuvat on otettu demobaarin esimerkkidatasta. Klikkaa kuvaa nähdäksesi sen suurempana.</p>
+        </div>
+
+        <!-- 1. KIRJAUTUMINEN -->
+        <section class="section" id="kirjautuminen">
+            <div class="section-header">
+                <div class="section-icon"><i class="bi bi-door-open"></i></div>
+                <h2 class="section-title">Kirjautuminen</h2>
+            </div>
+
+            <div class="card">
+                <div class="card-title"><i class="bi bi-person-badge"></i> Käyttäjätunnus</div>
+                <p style="font-size:14px; color:var(--text2); margin-bottom:12px; line-height:1.5;">
+                    Kirjaudu sisään käyttäjätunnuksella muodossa <strong>tunnus@baarinnimi</strong>. Baarin nimi on se tunniste, jonka admin on teille antanut.
+                </p>
+                <div class="login-demo">
+                    Esimerkki: <code>mikko@demobaari</code> &nbsp;tai&nbsp; <code>sari@demobaari</code>
+                </div>
+                <figure class="shot small"><img src="assets/ohjeet/kirjautuminen.jpg" alt="Kirjautumisnäkymä" loading="lazy"><figcaption>Kirjautuminen: käyttäjätunnus muodossa tunnus@baari</figcaption></figure>
+                <ul class="feature-list" style="margin-top:14px;">
+                    <li>Kirjautuminen pysyy voimassa, kunnes kirjaudut ulos (ylärivin uloskirjautumispainike).</li>
+                    <li>Väärillä tunnuksilla kirjautuminen on rajoitettu: usean virheyrityksen jälkeen kirjautuminen estetään hetkeksi.</li>
+                    <li>Salasanan on oltava vähintään <strong>8 merkkiä</strong>.</li>
+                </ul>
+                <div class="note"><i class="bi bi-info-circle"></i> <strong>Unohtuiko salasana?</strong> Paina kirjautumissivun linkkiä, anna tunnuksesi ja saat sähköpostiin linkin uuden salasanan asettamiseen (jos olet tallentanut sähköpostiosoitteen profiiliisi). Muuten admin voi lähettää sinulle linkin tai asettaa salasanan Hallinta → Työntekijät -sivulta.</div>
+                <div class="note"><i class="bi bi-shield-lock"></i> <strong>Kaksivaiheinen tunnistautuminen:</strong> jos olet ottanut sen käyttöön, salasanan jälkeen kysytään todennussovelluksen 6-numeroinen koodi (tai kertakäyttöinen palautuskoodi).</div>
+                <div class="note"><i class="bi bi-building"></i> <strong>Useassa baarissa töissä?</strong> Jos työskentelet usean baarin keikkalaisena, uuden baarin admin lähettää sinulle yhdistämislinkin. Kun liität baarin nykyiseen tunnukseesi, ylälaidan valikosta vaihdat baarien välillä ilman uutta kirjautumista. Kunkin baarin vuorot, palkka ja tiedot pysyvät erillään.</div>
+                <div class="note"><i class="bi bi-envelope"></i> <strong>Kutsulinkki:</strong> uusi työntekijä saa adminilta linkin, jolla hän asettaa salasanansa itse. Linkki on kertakäyttöinen ja vanhenee 7 päivässä.</div>
+                <figure class="shot small"><img src="assets/ohjeet/salasanan-asetus.jpg" alt="Salasanan asettaminen kutsulinkistä" loading="lazy"><figcaption>Salasanan asettaminen kutsulinkistä</figcaption></figure>
+            </div>
+
+            <div class="card">
+                <div class="card-title"><i class="bi bi-shield-check"></i> Käyttäjäroolit</div>
+                <table class="info-table">
+                    <thead><tr><th>Rooli</th><th>Mitä voi tehdä</th></tr></thead>
+                    <tbody>
+                        <tr><td><span class="badge badge-blue">Työntekijä</span></td><td>Näkee omat ja avoimet vuorot, ottaa avoimia vuoroja, tarjoaa vuoroja vaihtoon, ilmoittaa poissaoloja, seuraa omaa vuosilomaansa, viestittelee työkavereiden kanssa</td></tr>
+                        <tr><td><span class="badge badge-amber">Admin</span></td><td>Kaikki yllä mainittu + suunnittelee vuorot, hyväksyy poissaolot, hallitsee työntekijöitä, rutiineja ja ilmoituksia sekä julkaisee baarin tapahtumat julkiseen kalenteriin</td></tr>
+                    </tbody>
+                </table>
+                <div class="note"><i class="bi bi-info-circle"></i> Työsuhteen tyyppi on joko <strong>vakituinen</strong> tai <strong>keikkalainen</strong>. Se vaikuttaa vain vuosiloman laskentaan (ks. <a href="#vuosiloma" style="color:var(--accent)">Vuosiloma</a>).</div>
+            </div>
+        </section>
+
+        <!-- 2. RAKENNE -->
+        <section class="section" id="rakenne">
+            <div class="section-header">
+                <div class="section-icon blue"><i class="bi bi-layout-sidebar"></i></div>
+                <h2 class="section-title">Käyttöliittymän rakenne</h2>
+            </div>
+
+            <div class="card">
+                <p style="font-size:14px; color:var(--text2); margin-bottom:16px; line-height:1.5;">Osiot löytyvät vasemmasta valikosta (tietokoneella) tai alareunan palkista (puhelimella). Sivun <strong>yläreunassa</strong> ovat aina näkyvillä neljä pikakuvaketta:</p>
+                <table class="info-table">
+                    <thead><tr><th>Kuvake</th><th>Toiminto</th></tr></thead>
+                    <tbody>
+                        <tr><td><i class="bi bi-question-circle" style="color:var(--accent)"></i> Ohjeet</td><td>Avaa tämän ohjeen uuteen välilehteen</td></tr>
+                        <tr><td><i class="bi bi-person-badge" style="color:var(--accent)"></i> Profiili</td><td>Omat tiedot, salasana, ilmoitukset, vuosiloma ja leimatut tunnit</td></tr>
+                        <tr><td><i class="bi bi-moon" style="color:var(--accent)"></i> Teema</td><td>Vaihtaa vaalean ja tumman teeman välillä</td></tr>
+                        <tr><td><i class="bi bi-box-arrow-right" style="color:var(--accent)"></i> Kirjaudu ulos</td><td>Päättää istunnon</td></tr>
+                    </tbody>
+                </table>
+                <div style="height:14px"></div>
+                <table class="info-table">
+                    <thead><tr><th>Osio</th><th>Kuvaus</th></tr></thead>
+                    <tbody>
+                        <tr><td><i class="bi bi-house-door" style="color:var(--accent)"></i> Koti</td><td>Ilmoitukset, leimaus, huomioitavat asiat sekä rutiinit, puutelista ja vuorokirja</td></tr>
+                        <tr><td><i class="bi bi-calendar-week" style="color:var(--accent)"></i> Kalenteri</td><td>Viikkokalenteri vuoroista ja tapahtumista</td></tr>
+                        <tr><td><i class="bi bi-layout-text-sidebar" style="color:var(--accent)"></i> Vuorot</td><td>Viikkonäkymä ja lista vuoroista</td></tr>
+                        <tr><td><i class="bi bi-music-note-beamed" style="color:var(--accent)"></i> Tapahtumat</td><td>Baarin tapahtumat</td></tr>
+                        <tr><td><i class="bi bi-chat-dots" style="color:var(--accent)"></i> Viestit</td><td>Yksityisviestit työkavereille</td></tr>
+                        <tr><td><i class="bi bi-graph-up" style="color:var(--accent)"></i> Tilastot</td><td>Työtunnit ja niiden vahvistus; oikeuksien mukaan myynti, tilitykset, raportti ja palkka-ajo, tuntien hyväksyntä ja työaikapankki</td></tr>
+                        <tr><td><i class="bi bi-calendar-x" style="color:var(--accent)"></i> Poissaolot</td><td>Sairasloma-, loma- ja muut poissaolot</td></tr>
+                        <tr><td><i class="bi bi-people" style="color:var(--accent)"></i> Hallinta</td><td>Työntekijät, ilmoitukset, rutiinit, kassa, osaaminen, miehitys, varaukset, vieraskortisto, baarin asetukset (välilehdillä), oikeudet, järjestelmän tila, julkinen profiili ja työvoimapyynnöt. Ylläpitäjä näkee kaiken; muille näkyvät vain heidän oikeuksiinsa kuuluvat välilehdet</td></tr>
+                    </tbody>
+                </table>
+                <div class="shots">
+                    <figure class="shot "><img src="assets/ohjeet/koti-admin.jpg" alt="Työpöytänäkymä" loading="lazy"><figcaption>Työpöytänäkymä: valikko vasemmalla, pikakuvakkeet yläreunassa</figcaption></figure>
+                    <figure class="shot phone"><img src="assets/ohjeet/mobiili-koti.jpg" alt="Puhelinnäkymä" loading="lazy"><figcaption>Puhelin: valikko alareunassa</figcaption></figure>
+                </div>
+            </div>
+        </section>
+
+        <!-- 3. ETUSIVU -->
+        <section class="section" id="etusivu">
+            <div class="section-header">
+                <div class="section-icon"><i class="bi bi-house-door"></i></div>
+                <h2 class="section-title">Etusivu <span class="new-tag">Uusi</span></h2>
+            </div>
+
+            <div class="card">
+                <div class="role-pills"><span class="role-pill all"><i class="bi bi-people-fill"></i> Kaikki</span></div>
+                <div class="card-title"><i class="bi bi-house-door"></i> Etusivun rakenne</div>
+                <ul class="feature-list">
+                    <li><strong>Ilmoitustaulu:</strong> uusin ilmoitus näkyy aina. Aiemmat aukeavat painikkeesta "+ N aiempaa ilmoitusta".</li>
+                    <li><strong>Vuoron leimaus:</strong> paina <strong>Aloita vuoro</strong> kun tulet töihin ja <strong>Lopeta vuoro</strong> kun lähdet. Leimatut tunnit näkyvät profiilissa ja tilastoissa.</li>
+                    <li><strong>Huomio:</strong> kaikki huomiota vaativat asiat tiiviinä ryhminä (ks. alla).</li>
+                    <li><strong>Työkalut:</strong> Rutiinit, Puutelista ja Vuorokirja välilehtinä heti näkyvillä.</li>
+                    <li><strong>Seuraava vuorosi</strong>, <strong>Töissä juuri nyt</strong> ja <strong>Palkka-arvio</strong> (kuukauden tunnit ja tavoite) sivun alaosassa.</li>
+                </ul>
+                <figure class="shot "><img src="assets/ohjeet/koti-admin.jpg" alt="Etusivu adminin näkymässä" loading="lazy"><figcaption>Etusivu: vasemmalla Huomio-ryhmät, oikealla Työkalut</figcaption></figure>
+            </div>
+
+            <div class="card">
+                <div class="card-title"><i class="bi bi-bell"></i> Huomio-ryhmät</div>
+                <p style="font-size:14px; color:var(--text2); margin-bottom:12px; line-height:1.5;">Jokaisella ryhmällä on väri ja lukumäärä. Avaa ryhmä napsauttamalla otsikkoa – valinta muistetaan.</p>
+                <table class="info-table">
+                    <thead><tr><th>Ryhmä</th><th>Mitä siellä on</th></tr></thead>
+                    <tbody>
+                        <tr><td><span class="badge badge-red">Luvat vanhenemassa</span></td><td>JV-kortit, jotka vanhenevat 60 päivän sisällä (vain admin)</td></tr>
+                        <tr><td><span class="badge badge-amber">Poissaolopyynnöt</span></td><td>Käsittelyä odottavat poissaolot; "Käsittele pyynnöt" vie Poissaolot-sivulle (vain admin)</td></tr>
+                        <tr><td><span class="badge badge-red">Vuoronvaihdot</span></td><td>Kollegan tarjoama vuoro (Ota vuoro) tai pyyntö sinun vuorostasi (Hyväksy / Hylkää)</td></tr>
+                        <tr><td><span class="badge badge-amber">Työvoimapyynnöt</span></td><td>Toisen baarin työvoimapyyntö, jonka admin hyväksyy tai hylkää</td></tr>
+                        <tr><td><span class="badge badge-amber">Avoimet vuorot</span></td><td>Kolme seuraavaa avointa vuoroa "Ota vuoro" -painikkeella; "Näytä kaikki" avaa Vuorot-listan suodatettuna avoimiin</td></tr>
+                        <tr><td><span class="badge badge-teal">Vuoroja muissa baareissa</span></td><td>Yhteistyöbaarien avoimet vuorot yhteystietoineen</td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="card">
+                <div class="card-title"><i class="bi bi-tools"></i> Työkalut</div>
+                <ul class="feature-list">
+                    <li><strong>Rutiinit</strong> (esim. 3/7): päivän tehtävälista. Napauta tehtävää merkitäksesi sen tehdyksi – lista nollautuu joka päivä. Adminin muokattavissa Hallinta → Rutiinit.</li>
+                    <li><strong>Puutelista:</strong> kirjoita mitä puuttuu (esim. "Sitruunoita") ja paina Enter. Kuka tahansa voi merkitä tuotteen ostetuksi; lisääjä ja admin voivat muokata tai poistaa rivin.</li>
+                    <li><strong>Vuorokirja:</strong> terveisiä seuraavalle vuorolle. Näkyvissä ovat 3 viimeisintä päivää, "Näytä koko historia" avaa vanhemmat.</li>
+                </ul>
+                <div class="note"><i class="bi bi-info-circle"></i> Työkalut-kortin välilehdessä näkyy merkki (esim. 3/7 tai 2), jos jotain on tekemättä tai uutta. Oletuksena avautuu se välilehti, joka tarvitsee huomiota.</div>
+            </div>
+        </section>
+
+        <!-- 4. KALENTERI -->
+        <section class="section" id="kalenteri">
+            <div class="section-header">
+                <div class="section-icon teal"><i class="bi bi-calendar-week"></i></div>
+                <h2 class="section-title">Kalenteri</h2>
+            </div>
+
+            <div class="card">
+                <div class="card-title"><i class="bi bi-eye"></i> Mitä kalenterissa näkyy</div>
+                <ul class="feature-list">
+                    <li>Kuluvan viikon työvuorot aikajanamuodossa kellonajan mukaan</li>
+                    <li><strong>Oma vuoro</strong>, <strong>muiden vuorot</strong> ja <strong>tapahtumat</strong> erottuvat omilla väreillään</li>
+                    <li>Jos työntekijällä on hyväksytty poissaolo, vuoron lohko haalistuu ja näyttää ikonin (🤒 tai ✈️)</li>
+                </ul>
+                <figure class="shot "><img src="assets/ohjeet/kalenteri.jpg" alt="Viikkokalenteri" loading="lazy"><figcaption>Viikkokalenteri vuoroista ja tapahtumista</figcaption></figure>
+            </div>
+
+            <div class="card">
+                <div class="card-title"><i class="bi bi-sliders"></i> Navigointi ja suodatus</div>
+                <ul class="feature-list">
+                    <li>Selaa viikkoja <strong>&lt; ja &gt; -nuolilla</strong>, palaa tähän päivään <strong>Tänään</strong>-painikkeella</li>
+                    <li>Suodata: <strong>Kaikki</strong> tai <strong>Omat</strong> vuorot</li>
+                    <li><strong>Työtoiveet:</strong> kytke tila päälle ja napauta päiviä merkitäksesi, milloin voit työskennellä (vihreä) tai et (punainen). Napauta uudelleen vaihtaaksesi tai poistaaksesi merkinnän. Admin näkee toiveet vuorosuunnittelussa.</li>
+                </ul>
+            </div>
+        </section>
+
+        <!-- 5. VUOROT -->
+        <section class="section" id="vuorot">
+            <div class="section-header">
+                <div class="section-icon"><i class="bi bi-layout-text-sidebar"></i></div>
+                <h2 class="section-title">Työvuorot <span class="new-tag">Päivitetty</span></h2>
+            </div>
+
+            <div class="card">
+                <div class="role-pills"><span class="role-pill all"><i class="bi bi-people-fill"></i> Kaikki</span></div>
+                <div class="card-title"><i class="bi bi-calendar-week"></i> Viikkonäkymä</div>
+                <ul class="feature-list">
+                    <li>Taulukko: rivit ovat työntekijät (ylimpänä <strong>AVOIN VUORO</strong> -rivi) ja sarakkeet viikon päivät.</li>
+                    <li>Selaa viikkoja nuolilla tai palaa painikkeella <strong>Tämä viikko</strong>.</li>
+                    <li>Työntekijä näkee omat ja avoimet vuorot. <strong>Napauta avointa vuoroa</strong> ottaaksesi sen itsellesi.</li>
+                    <li>Vie vuorot puhelimen tai tietokoneen kalenteriin <strong>Vie kalenteriin</strong> -painikkeella.</li>
+                </ul>
+                <figure class="shot "><img src="assets/ohjeet/vuorot-viikko.jpg" alt="Vuorot: viikkonäkymä" loading="lazy"><figcaption>Viikkonäkymä: työntekijät riveinä, päivät sarakkeina</figcaption></figure>
+            </div>
+
+            <div class="card">
+                <div class="role-pills"><span class="role-pill all"><i class="bi bi-people-fill"></i> Kaikki</span></div>
+                <div class="card-title"><i class="bi bi-list-ul"></i> Lista</div>
+                <ul class="feature-list">
+                    <li>Vuorot viikoittain ja päivittäin ryhmiteltyinä; <strong>Tänään</strong> ja <strong>Huomenna</strong> on merkitty.</li>
+                    <li>Kortissa: aika ja tunnit, työntekijä, rooli sekä merkinnät <span class="badge badge-red">Oma</span> <span class="badge badge-amber">Avoin vuoro</span> <span class="badge badge-teal">Vaihdossa</span>.</li>
+                    <li><strong>Ajanjakso:</strong> Tulevat, Tämä kuukausi, Menneet, Kaikki tai Oma aikaväli.</li>
+                    <li><strong>Näytä:</strong> Kaikki (työntekijällä "Omat ja avoimet"), Vain omat tai Avoimet. Adminilla lisäksi työntekijävalinta.</li>
+                    <li>Yhteenvedossa vuorojen, avointen vuorojen ja tuntien määrä.</li>
+                </ul>
+                <div class="shots">
+                    <figure class="shot "><img src="assets/ohjeet/vuorot-lista.jpg" alt="Vuorot: lista" loading="lazy"><figcaption>Listanäkymä (admin)</figcaption></figure>
+                    <figure class="shot phone"><img src="assets/ohjeet/mobiili-vuorot.jpg" alt="Vuorot: lista puhelimella" loading="lazy"><figcaption>Lista puhelimella</figcaption></figure>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="role-pills"><span class="role-pill all"><i class="bi bi-people-fill"></i> Kaikki</span></div>
+                <div class="card-title"><i class="bi bi-arrow-left-right"></i> Vuoronvaihto ja avoimen vuoron ottaminen</div>
+                <ul class="feature-list">
+                    <li><strong>Ota vuoro:</strong> avoimen vuoron kohdalla painike <strong>Ota vuoro</strong> (myös etusivun Huomio-ryhmässä).</li>
+                    <li><strong>Vuoronvaihdon kohdistus:</strong> tarjotessasi vuoroa voit valita, saako sen kuka tahansa vai vain tietty työkaveri. Jos vaihdosta syntyisi ristiriita (päällekkäisyys, liian lyhyt lepo, poissaolo tai estepäivä), näet huomautuksen – <em>se ei estä vaihtoa</em>, ja työntekijä sekä admin päättävät itse.</li>
+                    <li>Klikkaa <strong>"Vaihda"</strong> oman vuorosi kohdalla tarjotaksesi sitä muille – kollegat näkevät tarjouksen etusivun Vuoronvaihdot-ryhmässä.</li>
+                    <li><strong>Vaihto kahden kesken:</strong> kun pyydät työkaverin vuoroa, voit tarjota tilalle oman vuorosi. Hyväksyttäessä vuorot vaihtavat omistajaa ilman ylläpitäjän käsittelyä; ylläpito saa vain tiedon.</li>
+                    <li>Kun kollega haluaa vuorosi, saat ilmoituksen ja voit <strong>hyväksyä tai hylätä</strong> pyynnön. Hyväksynnän jälkeen vuoro siirtyy automaattisesti.</li>
+                </ul>
+            </div>
+
+            <div class="card">
+                <div class="role-pills"><span class="role-pill admin"><i class="bi bi-shield-fill"></i> Vain admin</span></div>
+                <div class="card-title"><i class="bi bi-pencil-square"></i> Vuorojen hallinta</div>
+                <ul class="feature-list">
+                    <li><strong>Uusi vuoro:</strong> paina <strong>Uusi vuoro</strong> tai napauta tyhjää solua viikkonäkymässä. Valitse työntekijä (tai jätä avoimeksi), päivä, alku- ja loppuaika sekä rooli.</li>
+                    <li><strong>Muokkaa</strong> vuoroa kynäkuvakkeesta ja <strong>poista</strong> roskakorista.</li>
+                    <li><strong>Massakopiointi:</strong> viikkonäkymässä voit kopioida koko näkyvän viikon 1–4 viikon päähän.</li>
+                    <li><strong>Viikkopohjat:</strong> viikkonäkymän <em>Viikkopohjat</em>-painikkeella tallennat näkyvän viikon kaikki vuorot (viikonpäivittäin, työntekijöineen) nimettynä pohjana ja syötät pohjan mihin tahansa viikkoon (valitse viikon mikä tahansa päivä). Syötön voi tehdä <em>luonnoksina</em> ja halutessa <em>kaikki avoimiksi vuoroiksi</em>. Jo olemassa olevia identtisiä vuoroja ei lisätä uudelleen, ja poistuneen työntekijän vuoro tulee avoimeksi.</li>
+                    <li><strong>Tyhjennä…:</strong> poistaa vuorot päivältä, viikolta tai valitulta ajanjaksolta kerralla (rajattavissa yhteen työntekijään, vain avoimiin tai vain luonnoksiin). Ikkuna näyttää etukäteen, montako vuoroa poistuu; toiminto kirjataan auditlokiin eikä sitä voi perua.</li>
+                    <li>Roolit valitaan baarin omasta rooliluettelosta (Hallinta → Baari).</li>
+                    <li><strong>Miehitys ja vuoroehdotukset:</strong> <em>Hallinta → Miehitys</em> -välilehdellä määrität, montako tekijää tarvitaan milloinkin. Kattavuus näyttää seuraavien 14 päivän puutteet, ja <em>Ehdota vuorot puutteisiin</em> tekee luonnosehdotuksen (huomioi saatavuuden, poissaolot, lepoajan, viikkotuntirajan ja tavoitetunnit). Voit valita, mitkä ehdotukset lisätään.</li>
+                    <li><strong>Kustannusennuste:</strong> viikkonäkymän yläreunassa näkyy viikon suunniteltu henkilöstökulu, budjetin ylitys ja (jos kirjaat päivämyynnin) kulujen osuus myynnistä.</li>
+                    <li><strong>Ristiriitavaroitukset:</strong> lomake varoittaa päällekkäisestä vuorosta, liian lyhyestä lepoajasta (oletus 11 h), viikkotuntirajan ylityksestä, hyväksytystä poissaolosta ja estetyksi merkitystä päivästä. Varoitus ei estä tallennusta, mutta pyytää vahvistuksen.</li>
+                    <li><strong>Saatavuus:</strong> työntekijän nimen perässä näkyy <em>✓ vapaa</em> tai <em>✗ estetty</em>, kun hän on merkinnyt saatavuutensa kyseiselle päivälle.</li>
+                    <li><strong>Vuoropohjat:</strong> paina <em>Tallenna pohjaksi</em> tallentaaksesi kellonajat ja roolin; uutta vuoroa luodessa napauta pohjaa täyttääksesi ne. Pohjan voi poistaa ×-painikkeesta.</li>
+                    <li><strong>Viikoittainen toisto:</strong> uutta vuoroa luodessa voit luoda saman vuoron automaattisesti seuraaville viikoille.</li>
+                    <li><strong>Luonnos ja julkaisu:</strong> rastita <em>Luonnos</em>, jolloin vuoro näkyy vain adminille (harmaana, merkintä "Luonnos"). Paina <strong>Julkaise luonnokset</strong>, kun lista on valmis: vuorot tulevat näkyviin ja työntekijät saavat ilmoituksen.</li>
+                </ul>
+                <figure class="shot "><img src="assets/ohjeet/vuoro-lomake.jpg" alt="Vuorolomake varoituksin" loading="lazy"><figcaption>Vuorolomake: vuoropohjat, ristiriitavaroitus, luonnos ja toisto</figcaption></figure>
+                <figure class="shot "><img src="assets/ohjeet/hallinta-miehitys.jpg" alt="Miehitys ja kattavuus" loading="lazy"><figcaption>Miehityssäännöt ja kattavuus: puutteista ehdotetaan vuoroja</figcaption></figure>
+            </div>
+        </section>
+
+        <!-- 6. TAPAHTUMAT -->
+        <section class="section" id="tapahtumat">
+            <div class="section-header">
+                <div class="section-icon amber"><i class="bi bi-music-note-beamed"></i></div>
+                <h2 class="section-title">Tapahtumat <span class="new-tag">Päivitetty</span></h2>
+            </div>
+
+            <div class="card">
+                <div class="role-pills"><span class="role-pill all"><i class="bi bi-people-fill"></i> Kaikki</span></div>
+                <div class="card-title"><i class="bi bi-calendar-event"></i> Tapahtumalista</div>
+                <ul class="feature-list">
+                    <li>Näyttää baarin tulevat tapahtumat päivämäärällä, kellonajalla ja nimellä.</li>
+                    <li>Tapahtumat näkyvät myös <strong>Kalenteri</strong>-näkymässä, jotta henkilökunta osaa varautua erityisiin iltoihin.</li>
+                </ul>
+                <figure class="shot "><img src="assets/ohjeet/tapahtumat.jpg" alt="Tapahtumalista" loading="lazy"><figcaption>Tapahtumalista (admin näkee Julkinen / Sisäinen -merkinnät)</figcaption></figure>
+            </div>
+
+            <div class="card">
+                <div class="role-pills"><span class="role-pill admin"><i class="bi bi-shield-fill"></i> Vain admin</span></div>
+                <div class="card-title"><i class="bi bi-plus-circle"></i> Tapahtuman lisäys ja muokkaus</div>
+                <ul class="feature-list">
+                    <li>Valitse <strong>kuvake</strong> (emoji), kirjoita <strong>nimi tai artisti</strong>, päivä sekä alkamis- ja päättymisaika.</li>
+                    <li><strong>Tyyppi:</strong> Musiikki, Urheilu, Visa / peli, Teemailta tai Muu (suodatus julkisessa kalenterissa).</li>
+                    <li><strong>Kuvaus</strong> ja <strong>mainoskuva</strong> (JPG, PNG, WEBP tai GIF, enintään 5 Mt) ovat valinnaisia.</li>
+                    <li><strong>Näytä julkisessa tapahtumakalenterissa</strong> -valinta: vain merkityt tapahtumat julkaistaan (ja vain jos baarin <a href="#julkinen" style="color:var(--accent)">julkinen profiili</a> on julkaistu). Listassa tapahtuma on merkitty <span class="badge badge-teal">Julkinen</span> tai <span class="badge badge-blue">Sisäinen</span>.</li>
+                </ul>
+                <figure class="shot "><img src="assets/ohjeet/tapahtuma-lomake.jpg" alt="Tapahtuman lisäyslomake" loading="lazy"><figcaption>Uusi tapahtuma -lomake</figcaption></figure>
+            </div>
+        </section>
+
+        <!-- 7. VIESTIT -->
+        <section class="section" id="viestit">
+            <div class="section-header">
+                <div class="section-icon blue"><i class="bi bi-chat-dots"></i></div>
+                <h2 class="section-title">Viestit</h2>
+            </div>
+            <div class="card">
+                <div class="role-pills"><span class="role-pill all"><i class="bi bi-people-fill"></i> Kaikki</span></div>
+                <div class="card-title"><i class="bi bi-chat-dots"></i> Yksityisviestit</div>
+                <ul class="feature-list">
+                    <li>Valitse työkaveri listasta ja kirjoita viesti. Lukemattomista viesteistä näkyy punainen merkki valikossa ja työkaverin kohdalla.</li>
+                    <li>Viestit näkee vain lähettäjä ja vastaanottaja. Ne tallennetaan salattuna, mutta eivät ole päästä päähän salattuja – älä lähetä niissä salasanoja.</li>
+                    <li>Uusi viesti lähettää vastaanottajalle push-ilmoituksen, jos hän on sallinut ilmoitukset profiilissaan.</li>
+                </ul>
+                <figure class="shot "><img src="assets/ohjeet/viestit.jpg" alt="Viestit" loading="lazy"><figcaption>Viestit: työkaverit listana</figcaption></figure>
+            </div>
+        </section>
+
+        <!-- 8. TILASTOT -->
+        <section class="section" id="tilastot">
+            <div class="section-header">
+                <div class="section-icon blue"><i class="bi bi-graph-up"></i></div>
+                <h2 class="section-title">Tilastot</h2>
+            </div>
+
+            <div class="card">
+                <div class="role-pills"><span class="role-pill all"><i class="bi bi-people-fill"></i> Kaikki</span></div>
+                <div class="card-title"><i class="bi bi-clock-history"></i> Omat tunnit</div>
+                <ul class="feature-list">
+                    <li>Työtunnit esitetään kuukausittain avattavina lohkoina</li>
+                    <li>Jokainen kuukausi näyttää: <strong>menneet tunnit</strong>, <strong>tulevat tunnit</strong> ja <strong>yhteensä</strong></li>
+                    <li>Klikkaa kuukausilohkoa avataksesi yksityiskohtaisen taulukon</li>
+                    <li>Suodata haluamallesi aikavälille (alkaen / päättyen)</li>
+                </ul>
+            </div>
+
+            <div class="card">
+                <div class="role-pills"><span class="role-pill admin"><i class="bi bi-shield-fill"></i> Vain admin</span></div>
+                <div class="card-title"><i class="bi bi-table"></i> Koko tiimin tilastot</div>
+                <ul class="feature-list">
+                    <li>Näkee <strong>kaikkien työntekijöiden</strong> tunnit samassa näkymässä ja voi suodattaa yksittäisen työntekijän mukaan</li>
+                    <li>Taulukossa tunnit eriteltynä sekä perjantai-, lauantai- ja sunnuntaivuorojen määrä</li>
+                    <li>Hyödyllinen palkkojen laskentaan ja työvuorosuunnitteluun</li>
+                    <li><strong>Raportti ja palkka-ajo:</strong> valitse alku- ja loppukuukausi ja paina <em>Näytä</em>: taulukko näyttää kuukausittain työntekijöittäin tunnit (myös ilta-, yö-, la- ja su-tunnit), palkan lisineen ja työnantajakustannuksen (palkka + sivukulut). <em>CSV</em> lataa palkka-ajon Exceliin, <em>Tulosta / PDF</em> tekee tulostettavan raportin (valitse tulostimeksi "Tallenna PDF-tiedostona"). Lisät ja sivukulut asetetaan kohdassa Hallinta → Baari; ne ovat yhteiset koko baarille.</li>
+                    <li><strong>Tilastot-välilehdet:</strong> <em>Myynti</em> (viiva­graafi viikko/kk/vuosi, tavoitteet, myynti per työtunti), <em>Tilitykset</em> (päivä- ja viikkotaso, kassaerojen seuranta, kirjanpitovienti), <em>Tunnit</em> (omat tunnit ja kuukausivahvistus), <em>Tuntien hyväksyntä</em>, <em>Raportti ja palkka-ajo</em> ja <em>Työaikapankki</em>. Näet vain ne välilehdet, joihin roolillasi on oikeus.</li>
+                </ul>
+                <figure class="shot "><img src="assets/ohjeet/raportti.jpg" alt="Raportti ja palkka-ajo" loading="lazy"><figcaption>Raportti: tunnit ja kustannus kuukausittain työntekijöittäin</figcaption></figure>
+                <figure class="shot "><img src="assets/ohjeet/analytiikka.jpg" alt="Analytiikka" loading="lazy"><figcaption>Analytiikka: tunnit, kuormituskartta, täsmällisyys ja sairauspoissaolot</figcaption></figure>
+            </div>
+        </section>
+
+        <!-- 9. POISSAOLOT -->
+        <section class="section" id="poissaolot">
+            <div class="section-header">
+                <div class="section-icon violet"><i class="bi bi-calendar-x"></i></div>
+                <h2 class="section-title">Poissaolot <span class="new-tag">Päivitetty</span></h2>
+            </div>
+
+            <div class="card">
+                <div class="role-pills"><span class="role-pill all"><i class="bi bi-people-fill"></i> Kaikki</span></div>
+                <div class="card-title"><i class="bi bi-send"></i> Poissaolon ilmoittaminen</div>
+                <ul class="feature-list">
+                    <li>Paina <strong>Ilmoita uusi poissaolo</strong> ja valitse tyyppi: <strong>Sairasloma 🤒</strong>, <strong>Loma ✈️</strong> tai <strong>Muu ❓</strong>.</li>
+                    <li>Aseta alkamis- ja päättymispäivä ja kirjoita halutessasi selite. Hakemus menee adminille hyväksyttäväksi.</li>
+                    <li>Voit muokata omaa hakemustasi vain niin kauan kuin se on tilassa <span class="badge badge-amber">Odottaa käsittelyä</span>. Hylätyn hakemuksen voi poistaa.</li>
+                    <li>Oman vuosilomasi saldo näkyy sivun yläosassa (ks. <a href="#vuosiloma" style="color:var(--accent)">Vuosiloma</a>).</li>
+                </ul>
+                <figure class="shot "><img src="assets/ohjeet/poissaolot-tyontekija.jpg" alt="Poissaolot työntekijän näkymässä" loading="lazy"><figcaption>Työntekijän näkymä: oma lomasaldo ja omat hakemukset</figcaption></figure>
+            </div>
+
+            <div class="card">
+                <div class="card-title"><i class="bi bi-tag"></i> Hakemuksen tilat</div>
+                <table class="info-table">
+                    <thead><tr><th>Tila</th><th>Merkitys</th></tr></thead>
+                    <tbody>
+                        <tr><td><span class="badge badge-amber">Odottaa käsittelyä</span></td><td>Admin ei ole vielä päättänyt</td></tr>
+                        <tr><td><span class="badge badge-teal">Hyväksytty</span></td><td>Poissaolo näkyy kalenterissa; loma vähentää vuosilomasaldoa</td></tr>
+                        <tr><td><span class="badge badge-red">Hylätty</span></td><td>Hakemus on hylätty</td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="card">
+                <div class="role-pills"><span class="role-pill admin"><i class="bi bi-shield-fill"></i> Vain admin</span></div>
+                <div class="card-title"><i class="bi bi-check2-circle"></i> Hakemusten käsittely</div>
+                <ul class="feature-list">
+                    <li>Sivu avautuu <strong>Odottaa</strong>-suodattimella, lähin poissaolo ensin. Muut suodattimet: Hyväksytyt, Hylätyt ja Kaikki (lukumäärät näkyvät).</li>
+                    <li>Kortissa näet <strong>työntekijän, tyypin, aikavälin ja päivien määrän, poissaolon syyn</strong> sekä huomiot: montako vuoroa osuu jaksolle ja ketkä muut ovat samaan aikaan poissa.</li>
+                    <li>Muun kuin sairauspoissaolon kortissa näkyy <strong>työntekijän vuosilomasaldo</strong> ja se, paljonko hakemus kuluttaa lomapäiviä (varoitus, jos saldo ylittyy).</li>
+                    <li>Paina <strong>Hyväksy</strong> tai <strong>Hylkää</strong>. Jos työntekijällä on vuoroja jaksolla, päätösikkuna kysyy, <strong>vapautetaanko vuorot avoimiksi</strong> vai jätetäänkö ne ennalleen (sairaslomalle oletus on vapauta).</li>
+                    <li>Hyväksytyn voi perua (<strong>Peru hyväksyntä</strong>) ja vapautetut vuorot voi palauttaa työntekijälle. Hylätyn voi hyväksyä sittenkin.</li>
+                    <li><strong>Merkitse poissaolo työntekijälle:</strong> valitse "Ilmoita uusi poissaolo" -lomakkeessa työntekijä. Merkintä tallentuu suoraan hyväksyttynä (esim. jo pidetty loma).</li>
+                </ul>
+                <div class="shots">
+                    <figure class="shot "><img src="assets/ohjeet/poissaolot-admin.jpg" alt="Poissaolot adminin näkymässä" loading="lazy"><figcaption>Adminin näkymä: hakemukset korteissa</figcaption></figure>
+                    <figure class="shot "><img src="assets/ohjeet/poissaolo-hyvaksynta.jpg" alt="Hakemuksen hyväksyntäikkuna" loading="lazy"><figcaption>Hyväksyntäikkuna: lomasaldo ja vuorojen käsittely</figcaption></figure>
+                </div>
+            </div>
+        
+            <div class="card">
+                <div class="role-pills"><span class="role-pill all"><i class="bi bi-people-fill"></i> Kaikki</span></div>
+                <div class="card-title"><i class="bi bi-calendar3"></i> Poissaolokalenteri</div>
+                <ul class="feature-list">
+                    <li>Välilehti <strong>Poissaolokalenteri</strong> näyttää kuukausittain, kuka on pois ja milloin (rivit työntekijöitä, sarakkeet päiviä). Selaa kuukausia nuolilla.</li>
+                    <li>Värit: <strong>loma</strong> keltainen, <strong>sairasloma</strong> punainen (vain admin), muu harmaa; raidoitettu = odottaa hyväksyntää.</li>
+                    <li>Työntekijä näkee kollegoista vain hyväksytyt poissaolot ilman syytä; sairasloma näkyy hänelle vain merkinnällä "Poissa".</li>
+                </ul>
+                <figure class="shot "><img src="assets/ohjeet/poissaolokalenteri.jpg" alt="Poissaolokalenteri" loading="lazy"><figcaption>Poissaolokalenteri: kuka on pois ja milloin</figcaption></figure>
+            </div>
+        </section>
+
+        <!-- 10. VUOSILOMA -->
+        <section class="section" id="vuosiloma">
+            <div class="section-header">
+                <div class="section-icon teal"><i class="bi bi-umbrella"></i></div>
+                <h2 class="section-title">Vuosiloma <span class="new-tag">Uusi</span></h2>
+            </div>
+
+            <div class="card">
+                <div class="card-title"><i class="bi bi-calculator"></i> Näin loma kertyy</div>
+                <p style="font-size:14px; color:var(--text2); margin-bottom:12px; line-height:1.5;">Sovellus laskee vuosiloman kertymän Suomen vuosilomalain mukaan työntekijälle merkityn <strong>aloituspäivän</strong> ja <strong>työsuhteen tyypin</strong> perusteella.</p>
+                <table class="info-table">
+                    <thead><tr><th>Asia</th><th>Sääntö</th></tr></thead>
+                    <tbody>
+                        <tr><td>Lomanmääräytymisvuosi</td><td>1.4.–31.3. Siinä kertynyt loma pidetään seuraavana lomavuonna (2.5.–30.4.)</td></tr>
+                        <tr><td>Kertymä</td><td><strong>2 pv</strong> täydeltä kuukaudelta, jos työsuhde on 31.3. mennessä kestänyt alle vuoden – <strong>2,5 pv</strong>, jos vähintään vuoden. Enintään 30 pv/vuosi, murtoluvut pyöristetään ylös.</td></tr>
+                        <tr><td>Täysi kuukausi (vakituinen)</td><td>Työsuhdetta vähintään 14 päivää kuukauden aikana (eli 17. päivään mennessä alkanut kuukausi on täysi)</td></tr>
+                        <tr><td>Täysi kuukausi (keikkalainen)</td><td>Työtunteja vähintään <strong>35 h</strong> kuukaudessa (leimaukset, muuten toteutuneet vuorot)</td></tr>
+                        <tr><td>Lomapäivät</td><td>Arkipäivät ma–la; sunnuntait, juhlapäivät, vappu sekä joulu-, juhannus- ja pääsiäisaatto eivät kuluta lomaa</td></tr>
+                        <tr><td>Lomakorvaus (keikkalainen)</td><td>Loma voidaan korvata rahana: 9 % palkasta (työsuhde alle vuoden) tai 11,5 % (vähintään vuosi)</td></tr>
+                    </tbody>
+                </table>
+                <div class="warn"><i class="bi bi-exclamation-triangle"></i> Laskuri on apuväline. Työehtosopimus voi antaa enemmän lomaa, eikä sairauspoissaolojen "työssäolon veroista aikaa" huomioida keikkalaisen tuntilaskennassa. Tarkista tarvittaessa työehtosopimuksesta.</div>
+            </div>
+
+            <div class="card">
+                <div class="card-title"><i class="bi bi-eye"></i> Missä saldo näkyy</div>
+                <ul class="feature-list">
+                    <li><strong>Työntekijälle:</strong> Profiili-sivulla ja Poissaolot-sivun yläosassa: kertynyt, käytetty, odottava ja jäljellä oleva loma sekä kertymä seuraavaan lomavuoteen.</li>
+                    <li><strong>Adminille:</strong> Hallinta → Työntekijät -taulukon Loma-sarakkeessa sekä lomahakemuksen kortissa ja hyväksyntäikkunassa.</li>
+                    <li>Vain <strong>Loma</strong>-tyyppiset poissaolot kuluttavat vuosilomaa. Sairasloma ja muu poissaolo eivät.</li>
+                </ul>
+                <div class="note"><i class="bi bi-info-circle"></i> Jos aloituspäivää ei ole merkitty, saldoa ei voi laskea. Admin lisää sen Hallinta → Työntekijät → muokkaa.</div>
+                <figure class="shot "><img src="assets/ohjeet/profiili.jpg" alt="Oma vuosiloma profiilissa" loading="lazy"><figcaption>Työntekijän profiili: oma vuosilomasaldo</figcaption></figure>
+            </div>
+        </section>
+
+        <!-- 11. PROFIILI -->
+        <section class="section" id="profiili">
+            <div class="section-header">
+                <div class="section-icon"><i class="bi bi-person-badge"></i></div>
+                <h2 class="section-title">Oma profiili</h2>
+            </div>
+            <div class="card">
+                <div class="role-pills"><span class="role-pill all"><i class="bi bi-people-fill"></i> Kaikki</span></div>
+                <div class="card-title"><i class="bi bi-person-gear"></i> Omat asetukset</div>
+                <ul class="feature-list">
+                    <li>Avaa yläreunan <strong>Profiili</strong>-kuvakkeesta. Sivu on jaettu välilehtiin: <strong>Tiedot</strong> (puhelin, sähköposti, salasana), <strong>Vuosiloma</strong>, <strong>Ilmoitukset</strong> (push ja kalenterisynkronointi), <strong>Turvallisuus</strong> (kaksivaiheinen tunnistautuminen, tietosuoja ja tietojen lataus) ja <strong>Työtunnit</strong> (leimaukset). Valittu välilehti muistetaan.</li>
+                    <li>Päivitä <strong>puhelinnumero</strong> ja <strong>sähköposti</strong> ja vaihda <strong>salasana</strong> (vähintään 8 merkkiä; jätä tyhjäksi, jos et vaihda). Sähköpostia käytetään salasanan palautukseen ja ilmoitusten varakanavana (voit kytkeä sähköposti-ilmoitukset pois ruksista).</li>
+                    <li><strong>Kirjautumiset ja laitteet:</strong> Turvallisuus-välilehdellä näet viimeisimmät kirjautumisesi ja voit kirjata minkä tahansa laitteen (tai kaikki muut) ulos. Salasanan vaihto ja 2FA:n nollaus kirjaavat muut laitteet ulos automaattisesti.</li>
+                    <li><strong>Asenna sovellus:</strong> Android/Chrome: Ilmoitukset-välilehden <em>Asenna sovellus</em> -painike. iPhone: Safarissa Jaa → Lisää Koti-valikkoon, ja salli ilmoitukset asennetusta sovelluksesta. Vuorolista on luettavissa ilman verkkoa, mutta muutokset vaativat yhteyden.</li>
+                    <li><strong>Kaksivaiheinen tunnistautuminen:</strong> paina <em>Ota käyttöön</em>, lisää näytetty avain todennussovellukseen (Google/Microsoft Authenticator, Aegis…) ja kirjoita sovelluksen koodi. Tallenna näytettävät <strong>palautuskoodit</strong> – ne näytetään vain kerran. Suositeltu ylläpitäjille.</li>
+                    <li><strong>Saatavuus:</strong> merkitse toistuvat estepäivät (esim. maanantait). <strong>Työtunnit</strong>-välilehdellä näet myös <strong>työaikapankkisi</strong> (saldo tavoitteeseen nähden ja ylityö).</li>
+                    <li><strong>Testi-painike</strong> lähettää testi-ilmoituksen; jos push ei ole käytössä, ilmoitus tulee sähköpostina.</li>
+                    <li><strong>Salli ilmoitukset tähän laitteeseen</strong>: saat push-ilmoituksen mm. uusista avoimista vuoroista, vuoronvaihtopyynnöistä, poissaolojen päätöksistä ja viesteistä.</li>
+                    <li><strong>Kalenterisynkronointi:</strong> luo oma live-kalenterilinkki ja lisää se puhelimesi tai tietokoneesi kalenteriin. Linkki on henkilökohtainen – älä jaa sitä.</li>
+                    <li><strong>Leimatut työtunnit:</strong> lista omista leimauksista. Voit korjata unohtuneen leimauksen kynäkuvakkeesta.</li>
+                </ul>
+                <figure class="shot small"><img src="assets/ohjeet/profiili-2fa.jpg" alt="Kaksivaiheinen tunnistautuminen" loading="lazy"><figcaption>Kaksivaiheisen tunnistautumisen käyttöönotto profiilissa</figcaption></figure>
+            </div>
+        </section>
+
+        <!-- TIIMI -->
+        <section class="section" id="tiimi">
+            <div class="section-header">
+                <div class="section-icon violet"><i class="bi bi-people-fill"></i></div>
+                <h2 class="section-title">Tiimi <span class="new-tag">Uusi</span></h2>
+            </div>
+            <div class="card">
+                <div class="role-pills"><span class="role-pill all"><i class="bi bi-people-fill"></i> Kaikki</span></div>
+                <div class="card-title"><i class="bi bi-people-fill"></i> Kiitokset, dokumentit, perehdytys ja kyselyt</div>
+                <ul class="feature-list">
+                    <li><strong>Kiitokset:</strong> kiitä työkaveria lyhyellä viestillä; kiitokset näkyvät tiimin seinällä ja saaja saa ilmoituksen.</li>
+                    <li><strong>Dokumentit:</strong> ohjeet ja lomakkeet (PDF tai kuva). Ylläpito voi vaatia kuittauksen "luettu" ja näkee, ketkä puuttuvat. Tiedostot aukeavat vain kirjautuneille.</li>
+                    <li><strong>Perehdytys:</strong> ylläpito luo tehtävälistoja (esim. uuden työntekijän perehdytys) ja antaa ne työntekijöille; työntekijä ruksii kohdat, ylläpito seuraa etenemistä.</li>
+                    <li><strong>Kyselyt:</strong> nimettömät kyselyt (arvosana 1–5 ja kommentti). Tulokset näytetään ylläpidolle vasta, kun vastauksia on vähintään 3, eikä vastaajaa tallenneta.</li>
+                    <li>Etusivun <em>Huomio</em>-kohta muistuttaa kuittaamattomista dokumenteista, keskeneräisistä listoista ja avoimista kyselyistä.</li>
+                </ul>
+                <div class="shots">
+                    <figure class="shot "><img src="assets/ohjeet/tiimi-kiitokset.jpg" alt="Tiimi: kiitokset" loading="lazy"><figcaption>Kiitokset</figcaption></figure>
+                    <figure class="shot "><img src="assets/ohjeet/tiimi-perehdytys.jpg" alt="Tiimi: perehdytys" loading="lazy"><figcaption>Perehdytyslistat</figcaption></figure>
+                </div>
+            </div>
+            <div class="card">
+                <div class="role-pills"><span class="role-pill all"><i class="bi bi-people-fill"></i> Kaikki</span></div>
+                <div class="card-title"><i class="bi bi-briefcase"></i> Keikkalaiset useassa baarissa</div>
+                <ul class="feature-list">
+                    <li>Kohdassa <em>Oma profiili → Tiedot → Keikkatyö</em> voit ilmoittautua haettavaksi keikkatöihin. Muiden baarien ylläpito näkee vain nimesi lyhennettynä ja kuvauksesi.</li>
+                    <li>Kun saat kutsun (etusivun <em>Keikkakutsut</em>), voit hyväksyä tai hylätä sen. Hyväksyttäessä sinulle luodaan jäsenyys kutsuneeseen baariin samalla tunnuksella; vaihdat baaria ylälaidan valinnasta.</li>
+                    <li>Näet oman työhistoriasi (tunnit baareittain) samalla sivulla.</li>
+                </ul>
+            </div>
+        </section>
+
+        <!-- 12. HALLINTA -->
+        <section class="section" id="hallinta">
+            <div class="section-header">
+                <div class="section-icon amber"><i class="bi bi-people"></i></div>
+                <h2 class="section-title">Hallinta <span style="font-size:14px; color:var(--text3); font-family:'DM Sans',sans-serif; font-weight:600;">(vain admin)</span> <span class="new-tag">Päivitetty</span></h2>
+            </div>
+
+            <div class="card">
+                <div class="card-title"><i class="bi bi-ui-checks-grid"></i> Välilehdet</div>
+                <table class="info-table">
+                    <thead><tr><th>Välilehti</th><th>Sisältö</th></tr></thead>
+                    <tbody>
+                        <tr><td><i class="bi bi-people" style="color:var(--accent)"></i> Työntekijät</td><td>Työntekijätaulukko, uuden lisäys, muokkaus ja poisto</td></tr>
+                        <tr><td><i class="bi bi-megaphone" style="color:var(--accent)"></i> Ilmoitustaulu</td><td>Julkaise, muokkaa ja poista uutisia (lähtee myös push-ilmoituksena)</td></tr>
+                        <tr><td><i class="bi bi-check2-square" style="color:var(--accent)"></i> Rutiinit</td><td>Päivittäiset tehtävät: lisää, muokkaa, järjestä nuolilla, poista</td></tr>
+                        <tr><td><i class="bi bi-shop" style="color:var(--accent)"></i> Baari</td><td>Baarin nimi (kirjautumistunnus ei muutu), aikavyöhyke, vuororoolit, työaikasäännöt, vuoromuistutukset ja leimaushälytykset, palkkalisät, sivukulut, säilytysaika ja laskutustiedot</td></tr>
+                        <tr><td><i class="bi bi-globe" style="color:var(--accent)"></i> Julkinen profiili</td><td>Baarin tiedot julkiseen tapahtumakalenteriin (ks. <a href="#julkinen" style="color:var(--accent)">Julkinen kalenteri</a>)</td></tr>
+                        <tr><td><i class="bi bi-people" style="color:var(--accent)"></i> Miehitys</td><td>Miehityssäännöt, kattavuus 14 päivälle ja vuoroehdotukset puutteisiin</td></tr>
+                        <tr><td><i class="bi bi-calendar2-check" style="color:var(--accent)"></i> Varaukset</td><td>Pöytävaraukset (jos otettu käyttöön)</td></tr>
+                        <tr><td><i class="bi bi-person-lines-fill" style="color:var(--accent)"></i> Keikkalaiset</td><td>Muiden baarien haettavissa olevat keikkalaiset ja lähetetyt kutsut</td></tr>
+                        <tr><td><i class="bi bi-bar-chart-line" style="color:var(--accent)"></i> Analytiikka</td><td>Tunnit, kuormituskartta, täsmällisyys, sairauspoissaolot</td></tr>
+                        <tr><td><i class="bi bi-journal-text" style="color:var(--accent)"></i> Auditloki</td><td>Lista viimeisistä admin-toimista (kuka, mitä, milloin): työntekijöiden muutokset, asetukset, poissaolojen käsittely, palkka-ajon lataus</td></tr>
+                        <tr><td><i class="bi bi-briefcase" style="color:var(--accent)"></i> Työvoimapyynnöt</td><td>Hätähuuto muille baareille</td></tr>
+                    </tbody>
+                </table>
+                <p style="font-size:13px; color:var(--text3); margin-top:10px;">Numero välilehden nimen vieressä kertoo kohteiden määrän. Valittu välilehti muistetaan.</p>
+                <figure class="shot "><img src="assets/ohjeet/hallinta-baari.jpg" alt="Hallinta: Baari-välilehti" loading="lazy"><figcaption>Baari-välilehti: nimi, aikavyöhyke, roolit, säännöt, palkkalisät, muistutukset, sivukulut ja laskutus</figcaption></figure>
+                <figure class="shot "><img src="assets/ohjeet/hallinta-tyontekijat.jpg" alt="Hallinta: Työntekijät-välilehti" loading="lazy"><figcaption>Työntekijät: aloituspäivä, keikkamerkintä ja lomasaldo näkyvät taulukossa</figcaption></figure>
+            </div>
+
+            <div class="card">
+                <div class="card-title"><i class="bi bi-person-plus"></i> Työntekijän lisäys ja muokkaus</div>
+                <ul class="feature-list">
+                    <li>Paina <strong>Lisää uusi työntekijä</strong> tai kynäkuvaketta muokataksesi olemassa olevaa.</li>
+                    <li>Tiedot: nimi, käyttäjätunnus, salasana (muokattaessa tyhjä = ei muuteta), tuntipalkka, tavoitetunnit, rooli (Työntekijä / Admin).</li>
+                    <li><strong>Aloittanut työssä (aloituspäivä)</strong> ja <strong>Työsuhteen tyyppi</strong> (Vakituinen / Keikkalainen) – tarvitaan vuosiloman laskentaan.</li>
+                    <li>Luvat: <strong>JV-kortin</strong> vanhenemispäivä, hygieniapassi ja anniskelupassi. Etusivu varoittaa, kun JV-kortti on vanhenemassa.</li>
+                    <li>Uusi käyttäjä kirjautuu muodossa <code style="background:rgba(225,77,42,0.1);color:var(--accent);padding:2px 7px;border-radius:4px;font-size:12px;">tunnus@baarinnimi</code>. Kerro tunnus ja salasana henkilökohtaisesti.</li>
+                    <li><strong>Salasanan nollaus:</strong> muokkaa työntekijää ja kirjoita uusi salasana kenttään.</li>
+                    <li><strong>Kutsulinkki:</strong> uutta työntekijää lisätessä rastita <em>Lähetä kutsulinkki</em> (salasanaa ei tarvita). Linkki lähtee sähköpostilla, jos osoite on annettu; muuten saat linkin jaettavaksi itse. Rivin <i class="bi bi-envelope"></i>-painike luo uuden linkin myöhemmin (myös salasanan palautukseen).</li>
+                    <li><i class="bi bi-shield-x"></i>-painike (näkyy, kun työntekijällä on 2FA) nollaa kaksivaiheisen tunnistautumisen, jos puhelin on kadonnut.</li>
+                </ul>
+                <figure class="shot "><img src="assets/ohjeet/tyontekija-lomake.jpg" alt="Työntekijän muokkauslomake" loading="lazy"><figcaption>Työntekijän tiedot: aloituspäivä ja työsuhteen tyyppi</figcaption></figure>
+                <div class="note"><i class="bi bi-info-circle"></i> Tuntipalkka, aloituspäivä ja työsuhteen tyyppi näkyvät vain adminille ja työntekijälle itselleen.</div>
+            </div>
+
+            <div class="card">
+                <div class="card-title"><i class="bi bi-megaphone"></i> Ilmoitustaulu, rutiinit ja työvoimapyynnöt</div>
+                <ul class="feature-list">
+                    <li><strong>Ilmoitustaulu:</strong> uusin ilmoitus näkyy kaikille etusivulla ja lähtee push-ilmoituksena.</li>
+                    <li><strong>Rutiinit:</strong> lisää päivittäiset tehtävät (esim. "Hanojen pesu"). Järjestä nuolilla; työntekijät kuittaavat ne etusivulla.</li>
+                    <li><strong>Kassatilitys:</strong> valitse rutiinin muokkauksessa "Kassatilitys". Rutiinin kuittaus tehdään syöttämällä päivän loppusumma (valinnaisesti korttimaksut, kassapohja ja laskettu käteinen – ero lasketaan automaattisesti). Työntekijä voi kirjata tai korjata tilityksen 3 päivän ajalta; admin Hallinta → Kassa -välilehdellä mistä tahansa päivästä, sekä CSV-vienti. Loppusumma päivittää myös Tilastot-sivun myyntigraafin (viikko / kuukausi / vuosi edelliseen jaksoon verrattuna). Tilitykseen voi liittää kuvan (esim. kassaraportti). Tilastot → Tilitykset -välilehdellä näet tilitykset ja summat päivä- ja viikkotasolla ja voit selata aiempiin jaksoihin.</li>
+                    <li><strong>Oikeudet:</strong> Hallinta → Oikeudet -välilehdellä määrität, mitä kukin työntekijärooli saa nähdä ja tehdä. Voit luoda rooleja (esim. Vuoropäällikkö), antaa niille ylläpitäjän toimintoja osissa (vuorot, poissaolot, tapahtumat, sisällöt, myynti ja kassa, palkat) tai poistaa perusoikeuksia (kassatilitys, vuoronvaihdot, poissaolohakemukset). Rooli valitaan työntekijän tiedoissa. Ylläpitäjällä on aina kaikki oikeudet.</li>
+                    <li><strong>Valinnaiset ominaisuudet:</strong> Hallinta → Baari → "Muut valinnaiset ominaisuudet": vuorojen haku, automaattinen vuorosuunnitelma, muistutukset vieraille (sähköposti/teksti), verkkomaksu lippuihin ja vieraskortisto. Jokainen baari valitsee itse, mitä käyttää.</li>
+                    <li><strong>Vieraslista:</strong> tapahtuman lomakkeella "Vieraslista: paikkamäärä". Sen jälkeen jokainen työntekijä voi lisätä nimiä tapahtumalle (Tapahtumat-sivun Vieraslista-painike tai kalenterin tapahtuma). Lista näkyy vain baarin henkilökunnalle.</li>
+                    <li><strong>Osaamiset:</strong> Hallinta → Osaaminen. Sido osaaminen vuoron rooliin, niin vuoroon tulee varoitus, jos työntekijältä puuttuu se.</li>
+                    <li><strong>Tuntien vahvistus:</strong> kuun lopussa työntekijä vahvistaa tuntinsa (Tilastot → Tunnit tai etusivun huomio). Ylläpito hyväksyy ne Tilastot → Tuntien hyväksyntä -välilehdellä.</li>
+                    <li><strong>Haku:</strong> Ctrl+K tai yläpalkin suurennuslasi hakee työntekijöitä, vuoroja, tapahtumia, viestejä ja (oikeuksien mukaan) kassaa, varauksia ja vieraita.</li>
+                    <li><strong>Kieli:</strong> yläpalkin kielipainike (FI / EN / SV) tai kirjautumissivun linkit.</li>
+                    <li><strong>Työvoimapyynnöt:</strong> "Uusi hätähuuto muille baareille" lähettää kuvauksen ja yhteystiedon yhteistyöbaarien admineille. Kun heidän adminsa hyväksyy ilmoituksen, se näkyy heidän työntekijöilleen etusivulla. Kuittaa valmiiksi, kun apu on löytynyt.</li>
+                </ul>
+                <figure class="shot "><img src="assets/ohjeet/hallinta-ilmoitustaulu.jpg" alt="Hallinta: Ilmoitustaulu" loading="lazy"><figcaption>Ilmoitustaulu-välilehti</figcaption></figure>
+            </div>
+            <div class="card">
+                <div class="role-pills"><span class="role-pill admin"><i class="bi bi-shield-fill"></i> Vain admin</span></div>
+                <div class="card-title"><i class="bi bi-shield-check"></i> Tietosuoja (GDPR)</div>
+                <ul class="feature-list">
+                    <li><strong>Tietojen vienti:</strong> työntekijärivin <i class="bi bi-download"></i>-painike lataa kaikki työntekijästä tallennetut tiedot JSON-tiedostona (tarkastusoikeus).</li>
+                    <li><strong>Anonymisointi:</strong> <i class="bi bi-person-x"></i>-painike poistaa nimen, tunnuksen, puhelinnumeron, viestit ja saatavuudet ja lukitsee tunnuksen. Vuorot ja työtunnit jäävät nimettöminä (kirjanpito ja työaikalaki). Toimintoa ei voi perua.</li>
+                    <li><strong>Säilytysaika:</strong> Hallinta → Baari → <em>Tietosuoja</em>. Sitä vanhemmat leimaukset, vuorot, poissaolot ja viestit poistetaan ajastetusti (<code>php cron.php</code>, ks. README).</li>
+                    <li><strong>Tietosuojaseloste:</strong> <code>tietosuoseloste.html</code> on linkitetty kirjautumissivulle ja profiiliin. Täydennä sen korostetut kohdat (rekisterinpitäjä, yhteystiedot) ennen käyttöönottoa.</li>
+                    <li>Työntekijä voi itse ladata omat tietonsa: <em>Oma profiili → Lataa omat tietoni</em>.</li>
+                </ul>
+                <figure class="shot "><img src="assets/ohjeet/auditloki.jpg" alt="Auditloki" loading="lazy"><figcaption>Auditloki: admin-toimet aikajärjestyksessä</figcaption></figure>
+            </div>
+
+        </section>
+
+        <!-- 13. JULKINEN KALENTERI -->
+        <section class="section" id="julkinen">
+            <div class="section-header">
+                <div class="section-icon amber"><i class="bi bi-globe"></i></div>
+                <h2 class="section-title">Julkinen tapahtumakalenteri <span class="new-tag">Uusi</span></h2>
+            </div>
+
+            <div class="card">
+                <div class="card-title"><i class="bi bi-stars"></i> Mikä se on?</div>
+                <p style="font-size:14px; color:var(--text2); margin-bottom:12px; line-height:1.5;">Erillinen, kirjautumista vaatimaton sivu <code style="background:rgba(225,77,42,0.1);color:var(--accent);padding:2px 7px;border-radius:4px;font-size:12px;">tapahtumat.html</code>, joka näyttää usean baarin tapahtumat <strong>listana, kuukausikalenterina ja kartalla</strong>. Sivu on tarkoitettu asiakkaille. Oletusnäkymä on lista, jossa näkyvät tulevan viikon tapahtumat korteissa.</p>
+                <figure class="shot "><img src="assets/ohjeet/tapahtumakalenteri-lista.jpg" alt="Julkinen tapahtumakalenteri: lista" loading="lazy"><figcaption>Lista: tulevan viikon tapahtumat korteissa</figcaption></figure>
+                <div class="shots">
+                    <figure class="shot "><img src="assets/ohjeet/tapahtumakalenteri-kuukausi.jpg" alt="Julkinen tapahtumakalenteri: kuukausi" loading="lazy"><figcaption>Kuukausikalenteri: baarit omilla väreillään</figcaption></figure>
+                    <figure class="shot "><img src="assets/ohjeet/tapahtumakalenteri-kartta.jpg" alt="Julkinen tapahtumakalenteri: kartta" loading="lazy"><figcaption>Kartta: nastoissa tapahtumien määrä</figcaption></figure>
+                </div>
+                <div class="note"><i class="bi bi-info-circle"></i> Kartan tausta on ohjekuvissa yksinkertaistettu. Oikeassa sivussa kartta tulee OpenStreetMapista.</div>
+            </div>
+
+            <div class="card">
+                <div class="role-pills"><span class="role-pill admin"><i class="bi bi-shield-fill"></i> Vain admin</span></div>
+                <div class="card-title"><i class="bi bi-cloud-upload"></i> Näin julkaiset baarin tapahtumat</div>
+                <div class="steps">
+                    <div class="step"><div class="step-num">1</div><div class="step-text">Avaa <strong>Hallinta → Julkinen profiili</strong>.</div></div>
+                    <div class="step"><div class="step-num">2</div><div class="step-text">Täytä <strong>julkinen nimi</strong>, <strong>osoite</strong> ja <strong>kaupunki</strong>. Sijaintia kartalla ei tarvitse tietää: se <strong>haetaan osoitteesta</strong> tallennettaessa. Painikkeella "Tarkista sijainti nyt" näet löydetyn paikan etukäteen.</div></div>
+                    <div class="step"><div class="step-num">3</div><div class="step-text">Lisää halutessasi lyhyt esittely, verkkosivu ja väri (baarin väri kalenterissa ja kartalla).</div></div>
+                    <div class="step"><div class="step-num">4</div><div class="step-text">Rastita <strong>Julkaise baari ja sen julkiset tapahtumat</strong> ja tallenna.</div></div>
+                    <div class="step"><div class="step-num">5</div><div class="step-text">Merkitse jokainen julkaistava tapahtuma valinnalla <strong>Näytä julkisessa tapahtumakalenterissa</strong> (Tapahtumat-sivun lomake).</div></div>
+                    <div class="step"><div class="step-num">6</div><div class="step-text">Avaa julkinen kalenteri "Avaa julkinen kalenteri" -painikkeesta ja tarkista, että tapahtumat näkyvät.</div></div>
+                </div>
+                <figure class="shot "><img src="assets/ohjeet/julkinen-profiili.jpg" alt="Julkinen profiili" loading="lazy"><figcaption>Julkinen profiili -välilehti</figcaption></figure>
+                <div class="warn"><i class="bi bi-exclamation-triangle"></i> Jos osoite ei löydy kartalta, profiili tallentuu silti mutta baari ei näy kartalla. Tarkista silloin osoite ja kaupunki, tai avaa "Aseta sijainti käsin" ja liitä koordinaatit (esim. Google Mapsin oikea klikkaus kopioi ne).</div>
+            </div>
+
+            <div class="card">
+                <div class="card-title"><i class="bi bi-shield-lock"></i> Mitä julkaistaan – ja mitä ei</div>
+                <ul class="feature-list">
+                    <li>Baari näkyy vasta, kun <strong>itse julkaiset</strong> profiilin. Voit perua julkaisun milloin tahansa poistamalla rastin.</li>
+                    <li>Julkaistaan vain profiilin tiedot ja <strong>julkiseksi merkityt tapahtumat</strong> (nimi, aika, tyyppi, kuvaus, kuva). Vanhat tapahtumat pysyvät sisäisinä, kunnes merkitset ne julkisiksi.</li>
+                    <li><strong>Työntekijä-, vuoro- tai palkkatietoja ei koskaan julkaista.</strong> Baarin sisäistä tunnusta (kirjautumisessa käytettävä nimi) ei näytetä.</li>
+                </ul>
+            </div>
+
+            <div class="card">
+                <div class="card-title"><i class="bi bi-compass"></i> Kalenterin käyttö (asiakkaalle)</div>
+                <ul class="feature-list">
+                    <li>Vaihda näkymää yläpalkin painikkeista: <strong>Lista</strong>, <strong>Kalenteri</strong> tai <strong>Kartta</strong>. Listassa voit valita aikavälin: tulevat 7 päivää, viikonloppu, 30 päivää tai kaikki tulevat.</li>
+                    <li>Suodata <strong>baarin</strong>, <strong>tyypin</strong> (musiikki, urheilu, visa, teemailta, muu) ja <strong>kaupungin</strong> mukaan tai hae tekstillä. Puhelimessa suodattimet ovat "Suodattimet"-painikkeen takana.</li>
+                    <li>Napauta tapahtumaa nähdäksesi tiedot: <strong>Lisää kalenteriin</strong> (.ics), <strong>Kartalla</strong>, <strong>Reittiohje</strong> ja baarin sivut.</li>
+                    <li>Valitut suodattimet ja näkymä tallentuvat sivun osoitteeseen, joten voit jakaa linkin.</li>
+                </ul>
+                <figure class="shot "><img src="assets/ohjeet/tapahtumakalenteri-tapahtuma.jpg" alt="Tapahtuman tiedot" loading="lazy"><figcaption>Tapahtuman tiedot ja toiminnot</figcaption></figure>
+            </div>
+        
+            <div class="card">
+                <div class="role-pills"><span class="role-pill admin"><i class="bi bi-shield-fill"></i> Vain admin</span></div>
+                <div class="card-title"><i class="bi bi-share"></i> Jaa ja upota</div>
+                <ul class="feature-list">
+                    <li>Kun profiili on julkaistu, <em>Hallinta → Julkinen profiili</em> -sivun alaosassa on <strong>Jaa ja upota</strong> -kortti.</li>
+                    <li><strong>iCal-syöte:</strong> lisää osoite Google- tai Apple-kalenteriin (tilaus), niin baarin julkiset tapahtumat päivittyvät kalenteriin automaattisesti.</li>
+                    <li><strong>RSS-syöte:</strong> uutislukijoille ja automaatioihin.</li>
+                    <li><strong>Widget:</strong> kopioi upotuskoodi (iframe) baarin omalle verkkosivulle. Osoitteessa voi säätää: <code>n</code> (tapahtumien määrä), <code>theme=dark</code> ja <code>color=E14D2A</code> (korostusväri).</li>
+                    <li>Kaikissa näkyy vain julkiseksi merkityt tapahtumat ja julkinen profiili, ei työntekijätietoja.</li>
+                </ul>
+                <div class="shots">
+                    <figure class="shot "><img src="assets/ohjeet/jaa-ja-upota.jpg" alt="Jaa ja upota -kortti" loading="lazy"><figcaption>Jaa ja upota: iCal, RSS ja widgetin upotuskoodi</figcaption></figure>
+                    <figure class="shot phone"><img src="assets/ohjeet/widget.jpg" alt="Upotettu tapahtumawidget" loading="lazy"><figcaption>Widget baarin omalla sivulla</figcaption></figure>
+                </div>
+            </div>
+        
+            <div class="card">
+                <div class="role-pills"><span class="role-pill admin"><i class="bi bi-shield-fill"></i> Vain admin</span></div>
+                <div class="card-title"><i class="bi bi-ticket-perforated"></i> Ilmoittautuminen, liput ja pöytävaraukset</div>
+                <ul class="feature-list">
+                    <li>Molemmat ovat <strong>baarikohtaisia ja oletuksena pois</strong>: ota käyttöön kohdassa <em>Hallinta → Baari → Asiakaspalvelut</em>. Ne toimivat vain, kun julkinen profiili on julkaistu.</li>
+                    <li><strong>Ilmoittautuminen / liput:</strong> tapahtumalomakkeeseen tulee kohta <em>Ilmoittautuminen ja liput</em> (paikkamäärä, hinta tiedoksi tai ulkoinen https-lippulinkki). Kävijä ilmoittautuu tapahtumakalenterin tapahtumakortista ja saa vahvistuksen, peruutuslinkin ja muistutuksen sähköpostilla. Tapahtumalistassa näkyy ilmoittautuneiden määrä; napauta nähdäksesi nimet, merkitäksesi saapuneet tai ladataksesi CSV:n. BarShift ei käsittele maksuja.</li>
+                    <li><strong>Pöytävaraukset:</strong> aseta aukioloajat, paikkamäärä, suurin ryhmä, varauksen kesto ja vahvistetaanko varaukset automaattisesti. Kävijät varaavat sivulla <code>varaus.html?pub=…</code> (osoite näkyy <em>Hallinta → Varaukset</em>). Välilehdellä vahvistat tai hylkäät pyynnöt, merkitset asiakkaan paikalle tai poissaolleeksi ja kirjaat puhelinvarauksia.</li>
+                    <li>Julkisessa kalenterissa tapahtumakortista voi ladata myös <strong>some-kortin</strong> (PNG) jakoa varten.</li>
+                </ul>
+                <figure class="shot "><img src="assets/ohjeet/hallinta-varaukset.jpg" alt="Hallinta: Varaukset" loading="lazy"><figcaption>Varaukset-välilehti: vahvista, hylkää, merkitse paikalle</figcaption></figure>
+            </div>
+        </section>
+
+        <!-- 9. ESIMERKIT -->
+        <section class="section" id="esimerkit">
+            <div class="section-header">
+                <div class="section-icon teal"><i class="bi bi-lightbulb"></i></div>
+                <h2 class="section-title">Käytännön esimerkit</h2>
+            </div>
+
+            <p style="font-size:14px; color:var(--text2); margin-bottom:24px; line-height:1.5;">Klikkaa tilanteen otsikkoa nähdäksesi vaihe vaiheelta ohjeet.</p>
+
+            <div class="example-list">
+
+                <div class="example open" onclick="toggleExample(this)">
+                    <div class="example-header">
+                        <div class="example-label"><span class="num">1</span> Tarkistan omat tulevat vuoroni</div>
+                        <i class="bi bi-chevron-down example-chevron"></i>
+                    </div>
+                    <div class="example-body">
+                        <div class="example-who">Tilanne: Mikko haluaa katsoa, milloin on seuraava vuoro.</div>
+                        <div class="steps">
+                            <div class="step"><div class="step-num">1</div><div class="step-text">Kirjaudu sisään: <strong>mikko@demobaari</strong></div></div>
+                            <div class="step"><div class="step-num">2</div><div class="step-text">Sivu avautuu <strong>Koti</strong>-näkymään — näet seuraavan vuorosi ja avoimet vuorot. Kuluvan viikon vuorot löydät <strong>Kalenteri</strong>-sivulta</div></div>
+                            <div class="step"><div class="step-num">3</div><div class="step-text">Klikkaa <strong>Omat</strong> -painiketta, niin näet vain omat vuorosi helpommin</div></div>
+                            <div class="step"><div class="step-num">4</div><div class="step-text">Selaa tulevia viikkoja <strong>&gt; -nuolella</strong></div></div>
+                            <div class="step"><div class="step-num">5</div><div class="step-text">Vuorot-sivun <strong>Lista</strong>-välilehdellä näet vuorot aikajärjestyksessä (valitse "Vain omat")</div></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="example" onclick="toggleExample(this)">
+                    <div class="example-header">
+                        <div class="example-label"><span class="num">2</span> Tarjoan vuoroni vaihtoon</div>
+                        <i class="bi bi-chevron-down example-chevron"></i>
+                    </div>
+                    <div class="example-body">
+                        <div class="example-who">Tilanne: Sari ei pääse torstain vuoroon ja haluaa tarjota sitä muille.</div>
+                        <div class="steps">
+                            <div class="step"><div class="step-num">1</div><div class="step-text">Siirry <strong>Vuorot</strong>-sivulle</div></div>
+                            <div class="step"><div class="step-num">2</div><div class="step-text">Avaa <strong>Lista</strong>-välilehti ja etsi torstain vuoro</div></div>
+                            <div class="step"><div class="step-num">3</div><div class="step-text">Klikkaa <strong>"Vaihda"</strong> -painiketta kyseisen vuoron kohdalla</div></div>
+                            <div class="step"><div class="step-num">4</div><div class="step-text">Vahvista toimenpide — vuoro ilmestyy kaikkien kalenteriin tarjottavaksi</div></div>
+                            <div class="step"><div class="step-num">5</div><div class="step-text">Kun kollega ilmoittaa haluavansa vuoron, <strong>sinulle tulee ilmoitus</strong> ja pyyntö näkyy etusivun <strong>Huomio → Vuoronvaihdot</strong> -ryhmässä</div></div>
+                            <div class="step"><div class="step-num">6</div><div class="step-text">Klikkaa <strong>"Hyväksy"</strong> — vuoro siirtyy automaattisesti kollegalle</div></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="example" onclick="toggleExample(this)">
+                    <div class="example-header">
+                        <div class="example-label"><span class="num">3</span> Admin lisää uuden työvuoron</div>
+                        <i class="bi bi-chevron-down example-chevron"></i>
+                    </div>
+                    <div class="example-body">
+                        <div class="example-who">Tilanne: Laura (admin) lisää Jerelle järjestyksenvalvojan vuoron juhannukseksi.</div>
+                        <div class="steps">
+                            <div class="step"><div class="step-num">1</div><div class="step-text">Siirry <strong>Vuorot</strong>-sivulle</div></div>
+                            <div class="step"><div class="step-num">2</div><div class="step-text">Paina sivun yläreunan <strong>"Uusi vuoro"</strong> -painiketta (tai napauta tyhjää solua Viikkonäkymässä)</div></div>
+                            <div class="step"><div class="step-num">3</div><div class="step-text">Valitse <strong>Työntekijäksi: Jere (JV)</strong></div></div>
+                            <div class="step"><div class="step-num">4</div><div class="step-text">Aseta päiväksi <strong>19.6.2026</strong>, alkaa <strong>20:00</strong>, loppuu <strong>04:00</strong></div></div>
+                            <div class="step"><div class="step-num">5</div><div class="step-text">Rooliksi <strong>Järjestyksenvalvoja</strong></div></div>
+                            <div class="step"><div class="step-num">6</div><div class="step-text">Tallenna — vuoro ilmestyy listalle ja kalenteriin</div></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="example" onclick="toggleExample(this)">
+                    <div class="example-header">
+                        <div class="example-label"><span class="num">4</span> Admin lisää konserttitapahtuman</div>
+                        <i class="bi bi-chevron-down example-chevron"></i>
+                    </div>
+                    <div class="example-body">
+                        <div class="example-who">Tilanne: Demobaari isännöi livekonsertin toukokuussa.</div>
+                        <div class="steps">
+                            <div class="step"><div class="step-num">1</div><div class="step-text">Siirry <strong>Tapahtumat</strong>-sivulle</div></div>
+                            <div class="step"><div class="step-num">2</div><div class="step-text">Paina <strong>Lisää uusi tapahtuma</strong> ja täytä: <strong>Nimi: "Live: Paikallinen Bändi Y"</strong>, tyypiksi <strong>Musiikki</strong></div></div>
+                            <div class="step"><div class="step-num">3</div><div class="step-text">Päivä: <strong>15.5.2026</strong>, alkaa: <strong>21:00</strong>, päättyy: <strong>01:00</strong></div></div>
+                            <div class="step"><div class="step-num">4</div><div class="step-text">Halutessasi kirjoita kuvaus ja lisää mainoskuva. Tallenna — tapahtuma ilmestyy listalle ja kalenteriin</div></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="example" onclick="toggleExample(this)">
+                    <div class="example-header">
+                        <div class="example-label"><span class="num">5</span> Ilmoitan sairaslomasta</div>
+                        <i class="bi bi-chevron-down example-chevron"></i>
+                    </div>
+                    <div class="example-body">
+                        <div class="example-who">Tilanne: Mikko sairastuu eikä pääse töihin muutamaan päivään.</div>
+                        <div class="steps">
+                            <div class="step"><div class="step-num">1</div><div class="step-text">Siirry <strong>Poissaolot</strong>-sivulle</div></div>
+                            <div class="step"><div class="step-num">2</div><div class="step-text">Valitse tyypiksi <strong>Sairasloma 🤒</strong></div></div>
+                            <div class="step"><div class="step-num">3</div><div class="step-text">Aseta alkamis- ja päättymispäivä</div></div>
+                            <div class="step"><div class="step-num">4</div><div class="step-text">Lisää halutessasi selite: <em>"Kova flunssa ja kuumetta"</em></div></div>
+                            <div class="step"><div class="step-num">5</div><div class="step-text">Klikkaa <strong>"Lähetä"</strong> — hakemus menee adminille (tila: <span class="badge badge-amber">Odottaa käsittelyä</span>)</div></div>
+                            <div class="step"><div class="step-num">6</div><div class="step-text">Admin hyväksyy — tila muuttuu <span class="badge badge-teal">Hyväksytty</span> ja poissaolo näkyy kalenterissa</div></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="example" onclick="toggleExample(this)">
+                    <div class="example-header">
+                        <div class="example-label"><span class="num">6</span> Admin tarkistaa työntekijän tunnit</div>
+                        <i class="bi bi-chevron-down example-chevron"></i>
+                    </div>
+                    <div class="example-body">
+                        <div class="example-who">Tilanne: Admin haluaa nähdä Mikon tunnit touko–heinäkuulta.</div>
+                        <div class="steps">
+                            <div class="step"><div class="step-num">1</div><div class="step-text">Siirry <strong>Tilastot</strong>-sivulle</div></div>
+                            <div class="step"><div class="step-num">2</div><div class="step-text">Valitse työntekijaksi <strong>Mikko (Baarimestari)</strong></div></div>
+                            <div class="step"><div class="step-num">3</div><div class="step-text">Aseta aikaväli: <strong>1.5.2026 – 31.7.2026</strong></div></div>
+                            <div class="step"><div class="step-num">4</div><div class="step-text">Kuukausikortit ilmestyvät — klikkaa kutakin auki nähdäksesi tunnit eriteltynä</div></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="example" onclick="toggleExample(this)">
+                    <div class="example-header">
+                        <div class="example-label"><span class="num">7</span> Admin lisää uuden työntekijän</div>
+                        <i class="bi bi-chevron-down example-chevron"></i>
+                    </div>
+                    <div class="example-body">
+                        <div class="example-who">Tilanne: Baariin palkataan uusi tarjoilija Petra.</div>
+                        <div class="steps">
+                            <div class="step"><div class="step-num">1</div><div class="step-text">Siirry <strong>Hallinta → Työntekijät</strong> ja paina <strong>Lisää uusi työntekijä</strong></div></div>
+                            <div class="step"><div class="step-num">2</div><div class="step-text">Täytä lomake: <strong>Nimi: Petra Virtanen</strong>, tunnus: <strong>petra</strong>, aloituspäivä ja työsuhteen tyyppi</div></div>
+                            <div class="step"><div class="step-num">3</div><div class="step-text">Valitse turvallinen salasana ja rooliksi <strong>Työntekijä</strong></div></div>
+                            <div class="step"><div class="step-num">4</div><div class="step-text">Tallenna</div></div>
+                            <div class="step"><div class="step-num">5</div><div class="step-text">Petra kirjautuu jatkossa: <code style="background:rgba(225,77,42,0.1);color:var(--accent);padding:1px 6px;border-radius:4px;">petra@demobaari</code></div></div>
+                        </div>
+                    </div>
+                </div>
+
+
+                <div class="example" onclick="toggleExample(this)">
+                    <div class="example-header">
+                        <div class="example-label"><span class="num">8</span> Hyväksyn lomahakemuksen ja tarkistan lomasaldon</div>
+                        <i class="bi bi-chevron-down example-chevron"></i>
+                    </div>
+                    <div class="example-body">
+                        <div class="example-who">Tilanne: Mikko on hakenut lomaa ensi kuulle.</div>
+                        <div class="steps"><div class="step"><div class="step-num">1</div><div class="step-text">Avaa <strong>Poissaolot</strong>-sivu (tai etusivun <strong>Huomio → Poissaolopyynnöt</strong> ja "Käsittele pyynnöt")</div></div><div class="step"><div class="step-num">2</div><div class="step-text">Löydä Mikon lomahakemus <strong>Odottaa</strong>-suodattimesta. Kortissa näet syyn, ajan ja <strong>lomasaldon</strong></div></div><div class="step"><div class="step-num">3</div><div class="step-text">Tarkista: hakemus kuluttaa esim. 6 loma-arkipäivää ja jäljelle jää 18 pv. Jos saldo ylittyy, näet punaisen varoituksen</div></div><div class="step"><div class="step-num">4</div><div class="step-text">Paina <strong>Hyväksy</strong>. Jos Mikolla on vuoroja loman aikana, valitse <strong>vapautetaanko vuorot</strong> avoimiksi vai jätetäänkö ne</div></div><div class="step"><div class="step-num">5</div><div class="step-text">Vahvista. Mikko saa ilmoituksen ja loma näkyy kalenterissa</div></div></div>
+                    </div>
+                </div>
+
+                <div class="example" onclick="toggleExample(this)">
+                    <div class="example-header">
+                        <div class="example-label"><span class="num">9</span> Julkaisen baarin tapahtumat julkiseen kalenteriin</div>
+                        <i class="bi bi-chevron-down example-chevron"></i>
+                    </div>
+                    <div class="example-body">
+                        <div class="example-who">Tilanne: Demobaari haluaa tapahtumansa asiakkaiden nähtäville.</div>
+                        <div class="steps"><div class="step"><div class="step-num">1</div><div class="step-text">Avaa <strong>Hallinta → Julkinen profiili</strong></div></div><div class="step"><div class="step-num">2</div><div class="step-text">Kirjoita julkinen nimi, osoite (esim. "Mannerheimintie 1") ja kaupunki. Paina tarvittaessa <strong>Tarkista sijainti nyt</strong></div></div><div class="step"><div class="step-num">3</div><div class="step-text">Rastita <strong>Julkaise baari…</strong> ja tallenna</div></div><div class="step"><div class="step-num">4</div><div class="step-text">Avaa <strong>Tapahtumat</strong> ja muokkaa tai lisää tapahtuma. Varmista, että <strong>Näytä julkisessa tapahtumakalenterissa</strong> on rastitettu</div></div><div class="step"><div class="step-num">5</div><div class="step-text">Avaa <strong>tapahtumat.html</strong> ja tarkista, että baari ja tapahtumat näkyvät listassa ja kartalla</div></div></div>
+                    </div>
+                </div>
+
+                <div class="example" onclick="toggleExample(this)">
+                    <div class="example-header">
+                        <div class="example-label"><span class="num">10</span> Merkitsen jo pidetyn loman työntekijälle</div>
+                        <i class="bi bi-chevron-down example-chevron"></i>
+                    </div>
+                    <div class="example-body">
+                        <div class="example-who">Tilanne: Laura piti loman ennen kuin BarShift otettiin käyttöön, ja saldon pitää täsmätä.</div>
+                        <div class="steps"><div class="step"><div class="step-num">1</div><div class="step-text">Avaa <strong>Poissaolot</strong> ja paina <strong>Ilmoita uusi poissaolo</strong></div></div><div class="step"><div class="step-num">2</div><div class="step-text">Valitse <strong>Työntekijä: Laura</strong>, tyypiksi <strong>Loma</strong> ja lomapäivät (menneisyyteen)</div></div><div class="step"><div class="step-num">3</div><div class="step-text">Tallenna — merkintä tallentuu suoraan <span class="badge badge-teal">Hyväksyttynä</span> ja vähentää Lauran lomasaldoa</div></div><div class="step"><div class="step-num">4</div><div class="step-text">Tarkista tulos Hallinta → Työntekijät -taulukon <strong>Loma</strong>-sarakkeesta</div></div></div>
+                    </div>
+                </div>
+
+                <div class="example" onclick="toggleExample(this)">
+                    <div class="example-header">
+                        <div class="example-label"><span class="num">11</span> Otan avoimen vuoron etusivulta</div>
+                        <i class="bi bi-chevron-down example-chevron"></i>
+                    </div>
+                    <div class="example-body">
+                        <div class="example-who">Tilanne: Sari näkee etusivulla, että perjantaille on avoin vuoro.</div>
+                        <div class="steps"><div class="step"><div class="step-num">1</div><div class="step-text">Avaa etusivun <strong>Huomio → Avoimet vuorot</strong> (numero kertoo montako on)</div></div><div class="step"><div class="step-num">2</div><div class="step-text">Paina vuoron kohdalla <strong>Ota vuoro</strong> ja vahvista</div></div><div class="step"><div class="step-num">3</div><div class="step-text">Vuoro siirtyy sinulle ja näkyy Kalenterissa sekä Vuorot-listassa merkinnällä <span class="badge badge-red">Oma</span></div></div></div>
+                    </div>
+                </div>
+
+                <div class="example" onclick="toggleExample(this)">
+                    <div class="example-header">
+                        <div class="example-label"><span class="num">12</span> Teen kassatilityksen illan päätteeksi</div>
+                        <i class="bi bi-chevron-down example-chevron"></i>
+                    </div>
+                    <div class="example-body">
+                        <div class="example-who">Tilanne: Sari sulkee baarin ja syöttää illan loppusumman.</div>
+                        <div class="steps">
+                            <div class="step"><div class="step-num">1</div><div class="step-text">Avaa <strong>Koti</strong> ja napauta Rutiinit-listasta kassatilitys-rutiinia (<em>syötä loppusumma</em>). Lomake avautuu</div></div>
+                            <div class="step"><div class="step-num">2</div><div class="step-text">Kirjoita <strong>loppusumma</strong>. Halutessasi lisää korttimaksut, kassapohja, kassasta maksetut kulut, käteistipit ja <strong>laskettu käteinen</strong></div></div>
+                            <div class="step"><div class="step-num">3</div><div class="step-text">Lomake näyttää heti odotetun käteisen ja <strong>eron</strong>: 0 € = kassa täsmää, miinus = rahaa puuttuu, plus = rahaa on liikaa</div></div>
+                            <div class="step"><div class="step-num">4</div><div class="step-text">Voit liittää kuvan (esim. kassaraportti) ja kirjoittaa huomion. Paina <strong>Tallenna tilitys</strong> — rutiini kuittautuu tehdyksi</div></div>
+                            <div class="step"><div class="step-num">5</div><div class="step-text">Virheen huomatessasi ylläpitäjä korjaa tilityksen <strong>Tilastot → Tilitykset</strong> -näkymän kynäpainikkeesta</div></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="example" onclick="toggleExample(this)">
+                    <div class="example-header">
+                        <div class="example-label"><span class="num">13</span> Katson myyntiä ja kassaeroja</div>
+                        <i class="bi bi-chevron-down example-chevron"></i>
+                    </div>
+                    <div class="example-body">
+                        <div class="example-who">Tilanne: Laura (admin) haluaa nähdä, miten viikko, kuukausi ja vuosi ovat menneet.</div>
+                        <div class="steps">
+                            <div class="step"><div class="step-num">1</div><div class="step-text">Avaa <strong>Tilastot → Myynti</strong>: valitse Viikko, Kuukausi tai Vuosi ja selaa nuolilla. Katkoviiva näyttää edellisen jakson</div></div>
+                            <div class="step"><div class="step-num">2</div><div class="step-text"><strong>Tavoitteet</strong>-painikkeella asetat viikko- ja kuukausitavoitteen sekä ALV-kannan</div></div>
+                            <div class="step"><div class="step-num">3</div><div class="step-text"><strong>Tilitykset</strong>-välilehdellä näet päivä- ja viikkotasolla tilitysten määrät ja summat, ja sivun alalaidassa <strong>kassaerojen seurannan</strong> (toistuvat vajaukset liputetaan)</div></div>
+                            <div class="step"><div class="step-num">4</div><div class="step-text"><strong>Kirjanpitovienti</strong> lataa jakson päiväsummat ALV-erittelyllä CSV:nä</div></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="example" onclick="toggleExample(this)">
+                    <div class="example-header">
+                        <div class="example-label"><span class="num">14</span> Lisään nimiä tapahtuman vieraslistalle</div>
+                        <i class="bi bi-chevron-down example-chevron"></i>
+                    </div>
+                    <div class="example-body">
+                        <div class="example-who">Tilanne: Viskimaistelussa on 25 paikkaa, ja henkilökunta kirjaa ennakkoilmoittautuneet.</div>
+                        <div class="steps">
+                            <div class="step"><div class="step-num">1</div><div class="step-text">Ylläpitäjä täyttää tapahtuman lomakkeella kohdan <strong>Vieraslista: paikkamäärä</strong> (esim. 25)</div></div>
+                            <div class="step"><div class="step-num">2</div><div class="step-text">Avaa <strong>Tapahtumat</strong> ja paina tapahtuman kohdalla <strong>Vieraslista</strong>-painiketta (tai napauta tapahtumaa kalenterissa)</div></div>
+                            <div class="step"><div class="step-num">3</div><div class="step-text">Kirjoita nimi ja halutessasi huomio (esim. allergia) ja paina <strong>+</strong>. Lista ei mene yli paikkamäärän</div></div>
+                            <div class="step"><div class="step-num">4</div><div class="step-text">Kuka tahansa työntekijä voi muokata tai poistaa nimiä. Lista näkyy vain baarin henkilökunnalle, ei koskaan julkisesti</div></div>
+                            <div class="step"><div class="step-num">5</div><div class="step-text">Ylläpito voi ladata listan ovelle <strong>CSV</strong>-napilla</div></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="example" onclick="toggleExample(this)">
+                    <div class="example-header">
+                        <div class="example-label"><span class="num">15</span> Vahvistan kuun tunnit</div>
+                        <i class="bi bi-chevron-down example-chevron"></i>
+                    </div>
+                    <div class="example-body">
+                        <div class="example-who">Tilanne: Mikko tarkistaa toteutuneet tuntinsa kuun lopussa.</div>
+                        <div class="steps">
+                            <div class="step"><div class="step-num">1</div><div class="step-text">Kuun 25. päivän jälkeen (tai seuraavan kuun alussa) etusivulle ilmestyy huomio <strong>Vahvista tunnit</strong> — tai avaa <strong>Tilastot → Tunnit</strong></div></div>
+                            <div class="step"><div class="step-num">2</div><div class="step-text">Paina <strong>Tarkista ja vahvista</strong> ja katso tuntimäärä</div></div>
+                            <div class="step"><div class="step-num">3</div><div class="step-text">Jos se täsmää, paina <strong>Vahvista tunnit</strong>. Jos ei, kirjoita syy huomautukseen ja paina <strong>Kiistä</strong></div></div>
+                            <div class="step"><div class="step-num">4</div><div class="step-text">Ylläpito hyväksyy tunnit kohdassa <strong>Tilastot → Tuntien hyväksyntä</strong> tai palauttaa ne korjattavaksi. Hyväksytyt näkyvät palkka-ajossa</div></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="example" onclick="toggleExample(this)">
+                    <div class="example-header">
+                        <div class="example-label"><span class="num">16</span> Luon vuoropäällikön roolin</div>
+                        <i class="bi bi-chevron-down example-chevron"></i>
+                    </div>
+                    <div class="example-body">
+                        <div class="example-who">Tilanne: Admin haluaa antaa vuoropäällikölle oikeuden suunnitella vuoroja ja nähdä myynnin, mutta ei palkkoja.</div>
+                        <div class="steps">
+                            <div class="step"><div class="step-num">1</div><div class="step-text">Avaa <strong>Hallinta → Oikeudet</strong> ja paina <strong>Lisää rooli</strong>, nimeä se "Vuoropäällikkö"</div></div>
+                            <div class="step"><div class="step-num">2</div><div class="step-text">Rastita sarakkeesta <strong>Vuorojen suunnittelu</strong>, <strong>Poissaolojen käsittely</strong> ja <strong>Myynti ja kassa</strong>, paina <strong>Tallenna</strong></div></div>
+                            <div class="step"><div class="step-num">3</div><div class="step-text">Avaa <strong>Hallinta → Työntekijät</strong>, muokkaa työntekijää ja valitse <strong>Käyttöoikeusrooliksi</strong> Vuoropäällikkö</div></div>
+                            <div class="step"><div class="step-num">4</div><div class="step-text">Työntekijälle ilmestyy vain hänen oikeuksiinsa kuuluvat Hallinta- ja Tilastot-välilehdet</div></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="example" onclick="toggleExample(this)">
+                    <div class="example-header">
+                        <div class="example-label"><span class="num">17</span> Haen avointa vuoroa (kun vuorojen haku on käytössä)</div>
+                        <i class="bi bi-chevron-down example-chevron"></i>
+                    </div>
+                    <div class="example-body">
+                        <div class="example-who">Tilanne: Baari on ottanut vuorojen haun käyttöön, joten vuoroa ei voi napata suoraan.</div>
+                        <div class="steps">
+                            <div class="step"><div class="step-num">1</div><div class="step-text">Avoimen vuoron kohdalla painike on <strong>Hae vuoroa</strong> (etusivulla, Vuorot-listassa ja viikkonäkymässä)</div></div>
+                            <div class="step"><div class="step-num">2</div><div class="step-text">Voit kirjoittaa ylläpidolle viestin. Hakemuksen voi perua painamalla uudelleen</div></div>
+                            <div class="step"><div class="step-num">3</div><div class="step-text">Ylläpito avaa vuoron <strong>Hakijat</strong>-listan, näkee jokaisen hakijan varoitukset (lepoaika, osaaminen, poissaolo) ja painaa <strong>Valitse</strong></div></div>
+                            <div class="step"><div class="step-num">4</div><div class="step-text">Valittu saa ilmoituksen, ja muille hakijoille kerrotaan, että vuoro täytettiin</div></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="example" onclick="toggleExample(this)">
+                    <div class="example-header">
+                        <div class="example-label"><span class="num">18</span> Haen jotain ja vaihdan kielen</div>
+                        <i class="bi bi-chevron-down example-chevron"></i>
+                    </div>
+                    <div class="example-body">
+                        <div class="example-who">Tilanne: Haluan löytää työntekijän, vuoron tai viestin nopeasti sekä käyttää sovellusta englanniksi.</div>
+                        <div class="steps">
+                            <div class="step"><div class="step-num">1</div><div class="step-text">Paina <strong>Ctrl+K</strong> (tai yläpalkin suurennuslasia) ja kirjoita vähintään 2 merkkiä. Tulokset rajautuvat oikeuksiesi mukaan</div></div>
+                            <div class="step"><div class="step-num">2</div><div class="step-text">Napauta tulosta, niin pääset suoraan kohteeseen</div></div>
+                            <div class="step"><div class="step-num">3</div><div class="step-text">Yläpalkin <strong>FI / EN / SV</strong> -painikkeella vaihdat kielen (myös kirjautumissivulla). Puuttuvat käännökset näkyvät suomeksi</div></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="example" onclick="toggleExample(this)">
+                    <div class="example-header">
+                        <div class="example-label"><span class="num">19</span> Peruutan pöytävarauksen tai ilmoittautumisen sähköpostin linkistä</div>
+                        <i class="bi bi-chevron-down example-chevron"></i>
+                    </div>
+                    <div class="example-body">
+                        <div class="example-who">Tilanne: Asiakas ei pääsekään paikalle.</div>
+                        <div class="steps">
+                            <div class="step"><div class="step-num">1</div><div class="step-text">Avaa vahvistussähköpostin viimeinen linkki (<em>peru varaus tästä</em>)</div></div>
+                            <div class="step"><div class="step-num">2</div><div class="step-text">Paina <strong>Vahvista peruutus</strong> — varaus vapautuu ja baari saa ilmoituksen</div></div>
+                            <div class="step"><div class="step-num">3</div><div class="step-text">Jos maksoit lipun MobilePaylla, baari palauttaa maksun erikseen</div></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <div style="height: 80px;"></div>
+
+    </main>
+</div>
+
+<div class="lightbox" id="lightbox" onclick="this.classList.remove('open')"><img id="lightbox-img" alt=""></div>
+<script src="assets/ohjeet.js"></script>
+</body>
+</html>

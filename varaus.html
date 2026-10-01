@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="fi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>Pöytävaraus</title>
+<style>
+  :root { --accent:#FF5A36; --accent2:#FF9A3C; --bg:#FFF8F2; --text:#241a15; --text2:#6b5a50; --border:#F3D9C7; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font:16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width:520px; margin:0 auto; padding:24px 16px 60px; }
+  h1 { font-size:26px; margin:0 0 4px; } p.sub { color:var(--text2); margin:0 0 20px; }
+  .card { background:#fff; border:1px solid var(--border); border-radius:18px; padding:20px; box-shadow:0 6px 24px rgba(255,90,54,.08); }
+  label { display:block; font-size:12px; font-weight:800; text-transform:uppercase; letter-spacing:.03em; color:var(--text2); margin:14px 0 5px; }
+  input, select, textarea { width:100%; padding:11px 12px; border:2px solid var(--border); border-radius:12px; font:inherit; background:#fff; }
+  input:focus, select:focus, textarea:focus { outline:0; border-color:var(--accent2); }
+  .slots { display:flex; flex-wrap:wrap; gap:8px; margin-top:4px; }
+  .slot { padding:9px 14px; border-radius:100px; border:2px solid var(--border); background:#fff; font:inherit; font-weight:700; cursor:pointer; }
+  .slot[aria-pressed=true] { background:linear-gradient(135deg,var(--accent),var(--accent2)); color:#fff; border-color:transparent; }
+  .go { margin-top:20px; width:100%; padding:14px; border:0; border-radius:14px; background:linear-gradient(135deg,var(--accent),var(--accent2)); color:#fff; font:inherit; font-weight:800; cursor:pointer; }
+  .go:disabled { opacity:.55; cursor:default; }
+  .msg { margin-top:12px; font-size:14px; } .err { color:#B91C1C; } .ok { color:#0D7A6E; }
+  .hint { font-size:12px; color:var(--text2); margin-top:10px; } a { color:var(--accent); }
+  .hp { position:absolute; left:-9999px; }
+</style>
+</head>
+<body>
+<main><div id="root" class="card">Ladataan…</div><p class="hint" style="text-align:center"><a href="tapahtumat.html">← Tapahtumakalenteriin</a> · <a href="tietosuoseloste.html">Tietosuojaseloste</a></p></main>
+<script src="assets/varaus.js"></script>
+</body>
+</html>

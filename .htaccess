@@ -1,0 +1,53 @@
+# php -- BEGIN cPanel-generated handler, do not edit
+# Set the “ea-php82” package as the default “PHP” programming language.
+<IfModule mime_module>
+  AddHandler application/x-httpd-ea-php82 .php .php8 .phtml
+</IfModule>
+# php -- END cPanel-generated handler, do not edit
+
+Options -Indexes
+
+# Pakota HTTPS
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteCond %{HTTPS} !=on
+  RewriteCond %{HTTP:X-Forwarded-Proto} !=https
+  RewriteCond %{REQUEST_URI} !^/\.well-known/
+  RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+</IfModule>
+
+# Estä pääsy konfiguraatioon, riippuvuuksiin ja piilotiedostoihin
+<FilesMatch "^(config(\.example)?\.php|migrate\.php|cron\.php|composer\.(json|lock)|install\.lock|install_token\.php|\.gitignore|.*\.(log|sql|md))$">
+  Require all denied
+</FilesMatch>
+<FilesMatch "^\.(?!well-known)">
+  Require all denied
+</FilesMatch>
+<IfModule mod_rewrite.c>
+  RewriteRule ^(vendor|db|lib|tests|tools|\.git|\.github)(/|$) - [F,L]
+</IfModule>
+
+# Tietoturvaotsakkeet
+<IfModule mod_headers.c>
+  Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains"
+  Header always set X-Content-Type-Options "nosniff"
+  Header always set X-Frame-Options "DENY"
+  Header always set Referrer-Policy "strict-origin-when-cross-origin"
+  Header always set Permissions-Policy "camera=(), microphone=(), geolocation=()"
+  Header always set Content-Security-Policy "default-src 'self'; script-src 'self'; script-src-attr 'unsafe-inline'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+</IfModule>
+
+# Julkinen tapahtumakalenteri: kartan laatat OpenStreetMapista
+<FilesMatch "^tapahtumat\.html$">
+  <IfModule mod_headers.c>
+    Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://tile.openstreetmap.org; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+  </IfModule>
+</FilesMatch>
+
+# Upotettava tapahtumawidget: saa olla iframessa millä tahansa sivulla (sisältää vain julkista dataa, ei inline-skriptejä)
+<FilesMatch "^widget\.html$">
+  <IfModule mod_headers.c>
+    Header always unset X-Frame-Options
+    Header always set Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'; frame-ancestors *"
+  </IfModule>
+</FilesMatch>

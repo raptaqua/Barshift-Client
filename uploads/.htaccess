@@ -1,0 +1,14 @@
+# Estä kaikki skriptien suoritus lataushakemistossa
+<IfModule mod_php.c>
+  php_flag engine off
+</IfModule>
+<FilesMatch "(?i)\.(php|php[0-9]|phtml|phar|pl|py|cgi|sh|html?|svg)$">
+  Require all denied
+</FilesMatch>
+Options -Indexes -ExecCGI
+RemoveHandler .php .php8 .phtml
+RemoveType .php .php8 .phtml
+<IfModule mod_headers.c>
+  Header set X-Content-Type-Options "nosniff"
+  Header set Content-Security-Policy "default-src 'none'; img-src 'self'; sandbox"
+</IfModule>

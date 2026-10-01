@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="fi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tietosuojaseloste – BarShift</title>
+<style>
+  :root { --bg:#F4F7FA; --surface:#fff; --text:#0F172A; --text2:#475569; --border:#E2E8F0; --accent:#E14D2A; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#0F172A; --surface:#1E293B; --text:#F1F5F9; --text2:#CBD5E1; --border:#334155; } }
+  body { margin:0; background:var(--bg); color:var(--text); font:16px/1.6 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width:760px; margin:0 auto; padding:24px 16px 60px; }
+  h1 { font-size:26px; margin:8px 0 4px; } h2 { font-size:18px; margin:28px 0 6px; }
+  .card { background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:18px 20px; margin-top:16px; }
+  p, li { color:var(--text2); } a { color:var(--accent); }
+  .todo { background:rgba(245,158,11,.15); border-radius:4px; padding:0 4px; color:inherit; }
+  table { border-collapse:collapse; width:100%; font-size:14px; } td, th { border-bottom:1px solid var(--border); padding:8px 6px; text-align:left; vertical-align:top; color:var(--text2); } th { color:var(--text); }
+</style>
+</head>
+<body>
+<main>
+  <a href="index.php">← Takaisin sovellukseen</a>
+  <h1>Tietosuojaseloste</h1>
+  <p>BarShift Pro on baarien työvuoro- ja työaikaseurantajärjestelmä. Tämä seloste kertoo, mitä henkilötietoja järjestelmässä käsitellään ja mitkä oikeutesi ovat.</p>
+
+  <div class="card">
+    <p><strong>Ylläpitäjä huomio:</strong> tämä on pohja. Täydennä <span class="todo">korostetut kohdat</span> (rekisterinpitäjän tiedot, yhteystiedot, käytetyt palvelut) ennen käyttöönottoa ja tarkistuta seloste tarvittaessa juristilla.</p>
+  </div>
+
+  <h2>1. Rekisterinpitäjä</h2>
+  <p>Työntekijöiden tietojen rekisterinpitäjä on työnantaja eli kyseinen baari: <span class="todo">[baarin/yrityksen nimi, Y-tunnus, osoite]</span>. Tietosuoja-asioissa yhteyshenkilö on <span class="todo">[nimi, sähköposti]</span>.
+     Järjestelmän palveluntarjoaja ja tekninen ylläpitäjä <span class="todo">[nimi]</span> käsittelee tietoja rekisterinpitäjän lukuun.</p>
+
+  <h2>2. Mitä tietoja käsitellään</h2>
+  <table>
+    <tr><th>Tieto</th><th>Tarkoitus</th></tr>
+    <tr><td>Nimi, käyttäjätunnus, salasana (vain salattuna hashina), puhelinnumero, väri</td><td>Tunnistautuminen ja yhteydenpito</td></tr>
+    <tr><td>Tuntipalkka, tavoitetunnit, työsuhteen aloituspäivä ja tyyppi (vakituinen/keikkalainen)</td><td>Palkanlaskennan tuki, vuosilomalaskenta</td></tr>
+    <tr><td>Työvuorot, leimaukset (sisään/ulos), saatavuus, vuoronvaihdot</td><td>Työvuorosuunnittelu ja työajan seuranta (työaikalaki)</td></tr>
+    <tr><td>Poissaolot ja niiden perustelut (mm. sairauspoissaolot)</td><td>Poissaolojen ja vuosiloman hallinta. Sairauspoissaolon kuvaus näkyy vain ylläpitäjälle.</td></tr>
+    <tr><td>JV-kortin, hygieniapassin ja anniskelupassin tiedot</td><td>Lakisääteisten pätevyyksien seuranta</td></tr>
+    <tr><td>Yksityisviestit, vuorokirjan merkinnät, ostoslistamerkinnät</td><td>Työyhteisön viestintä. Viestit tallennetaan salattuina, mutta palvelin voi purkaa ne.</td></tr>
+    <tr><td>Push-ilmoitusten tilaustiedot</td><td>Ilmoitusten lähettäminen selaimeen/puhelimeen (vain jos sallit ilmoitukset)</td></tr>
+    <tr><td>Kiitokset, perehdytyslistojen ja dokumenttien kuittaukset, vastuuhenkilömerkinnät</td><td>Työyhteisön toiminta ja perehdytys. Nimettömien kyselyjen vastauksiin ei tallenneta vastaajan tunnistetta.</td></tr>
+    <tr><td>Keikkatyöprofiili (vain jos itse otat sen käyttöön): kuvaus ja lyhennetty nimi</td><td>Mahdollistaa muiden baarien kutsut keikkatöihin. Näkyy muiden baarien ylläpitäjille vain suostumuksellasi; voit poistaa näkyvyyden milloin tahansa.</td></tr>
+    <tr><td>Leimausten perusteella laskettu täsmällisyys- ja tuntitilasto, työaikapankki</td><td>Työajan seuranta ja vuorosuunnittelu. Ylläpito näkee tilastot työntekijäkohtaisesti.</td></tr>
+    <tr><td>Vieraskortisto (nimi, yhteystiedot, VIP-merkintä, allergiat ja muistiinpanot) – vain jos baari on ottanut ominaisuuden käyttöön</td><td>Kanta-asiakkaiden palvelu (esim. allergioiden huomioiminen). Näkyy vain baarin henkilökunnalle. Poistetaan 24 kuukauden kuluttua, jos vieraalla ei ole käyntejä; baari poistaa tiedot aiemminkin pyynnöstä.</td></tr>
+    <tr><td>Tapahtumien vieraslistat (henkilökunnan kirjaamat nimet ja huomiot)</td><td>Rajatun osallistujamäärän tapahtumien järjestäminen. Näkyvät vain baarin henkilökunnalle, eivät koskaan julkisesti. Poistuvat tapahtuman poiston tai säilytysajan myötä.</td></tr>
+    <tr><td>Asiakkaiden ilmoittautumiset ja pöytävaraukset (nimi, sähköposti, puhelin, ryhmäkoko) – vain jos baari on ottanut ominaisuuden käyttöön</td><td>Tapahtuma- ja pöytävarausten hoito. Poistetaan 12 kuukauden kuluttua. Asiakas voi perua varauksensa sähköpostin linkistä.</td></tr>
+    <tr><td>Ylläpitäjän toimien auditloki</td><td>Väärinkäytösten selvittäminen ja tietoturva</td></tr>
+    <tr><td>Kirjautumisyritykset (IP-osoite, tunnus)</td><td>Tietoturva (raa'an voiman hyökkäysten esto), poistuu automaattisesti</td></tr>
+  </table>
+  <p>Järjestelmä ei käytä seurantaevästeitä eikä mainontaa. Käytössä on vain välttämätön istuntoeväste (BSSESSID), joka poistuu selaimen sulkemisen tai uloskirjautumisen jälkeen.</p>
+
+  <h2>3. Käsittelyn peruste</h2>
+  <p>Käsittely perustuu työsopimukseen ja työnantajan lakisääteisiin velvoitteisiin (mm. työaikalaki, vuosilomalaki, kirjanpitolaki) sekä rekisterinpitäjän oikeutettuun etuun työvuorojen suunnittelussa. Push-ilmoitukset perustuvat suostumukseesi, jonka voit perua selaimen asetuksista.</p>
+
+  <h2>4. Säilytysajat</h2>
+  <ul>
+    <li>Leimaukset ja vuorot: baarin asettama säilytysaika (oletus 5 vuotta, <em>Hallinta → Baari</em>), minkä jälkeen ne poistetaan automaattisesti.</li>
+    <li>Auditloki: 24 kuukautta. Kirjautumisyritykset: 30 päivää.</li>
+    <li>Yksityisviestit ja vuorokirjan merkinnät: poistetaan säilytysajan päätyttyä tai viimeistään käyttäjän anonymisoinnin yhteydessä.</li>
+    <li>Työsuhteen päätyttyä ylläpitäjä voi anonymisoida tunnuksen: henkilötiedot poistetaan, mutta työtunnit ja vuorot säilyvät nimettöminä lakisääteisen säilytysajan.</li>
+  </ul>
+
+  <h2>5. Tietojen luovutus ja vastaanottajat</h2>
+  <ul>
+    <li>Palvelimen hosting: <span class="todo">[palveluntarjoaja, sijainti EU/ETA]</span>.</li>
+    <li>Push-ilmoitukset kulkevat selaimen valmistajan push-palvelun (esim. Google, Apple, Mozilla) kautta; viestissä on vain ilmoituksen lyhyt teksti.</li>
+    <li>Julkisessa tapahtumakalenterissa näkyvät vain baarin itse julkaisemat tiedot (baarin esittely, osoite, julkiset tapahtumat). Työntekijätietoja ei julkaista. Baarin osoitteesta haetaan sijainti OpenStreetMapin Nominatim-palvelusta.</li>
+    <li>Tietoja ei myydä eikä siirretä EU/ETA-alueen ulkopuolelle muutoin kuin edellä kuvatuissa push-palveluissa.</li>
+  </ul>
+
+  <h2>6. Oikeutesi</h2>
+  <ul>
+    <li><strong>Tarkastusoikeus ja siirrettävyys:</strong> voit ladata kaikki tietosi omasta profiilistasi (<em>Oma profiili → Lataa omat tietoni</em>).</li>
+    <li><strong>Oikaisu:</strong> pyydä ylläpitäjää korjaamaan virheelliset tiedot.</li>
+    <li><strong>Poisto ja rajoitus:</strong> pyydä ylläpitäjää anonymisoimaan tunnuksesi. Lakisääteisesti säilytettäviä tietoja ei voida poistaa ennen säilytysajan päättymistä.</li>
+    <li><strong>Vastustaminen ja valitus:</strong> voit vastustaa käsittelyä ja tehdä valituksen tietosuojavaltuutetulle (tietosuoja.fi).</li>
+  </ul>
+
+  <h2>7. Tietoturva</h2>
+  <p>Yhteys on salattu (HTTPS), salasanat tallennetaan hash-muodossa, käyttöoikeudet tarkistetaan palvelimella baari- ja roolikohtaisesti, yksityisviestit salataan tallennuksessa ja ylläpitäjien toimista pidetään lokia.</p>
+
+  <p style="font-size:13px; margin-top:32px;">Seloste päivitetty: <span class="todo">[pvm]</span></p>
+</main>
+</body>
+</html>

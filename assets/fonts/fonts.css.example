@@ -1,0 +1,11 @@
+/* Valinnainen: BarShiftin alkuperäiset kirjasimet (DM Sans ja Syne) omalta palvelimelta.
+ * 1) Lataa fontit (SIL Open Font License) esim. https://gwfh.mranftl.com/fonts tai fontsource.org -palvelusta woff2-muodossa.
+ * 2) Tallenna tiedostot tähän hakemistoon nimillä alla.
+ * 3) Nimeä tämä tiedosto fonts.css (index.php lataa sen automaattisesti, jos se on olemassa).
+ * Ilman tätä käytetään laitteen omia järjestelmäkirjasimia, eikä sivu ota yhteyttä Googleen (GDPR-ystävällistä). */
+@font-face { font-family: 'DM Sans'; font-weight: 400; font-style: normal; font-display: swap; src: url('dm-sans-400.woff2') format('woff2'); }
+@font-face { font-family: 'DM Sans'; font-weight: 500; font-style: normal; font-display: swap; src: url('dm-sans-500.woff2') format('woff2'); }
+@font-face { font-family: 'DM Sans'; font-weight: 600; font-style: normal; font-display: swap; src: url('dm-sans-600.woff2') format('woff2'); }
+@font-face { font-family: 'DM Sans'; font-weight: 700; font-style: normal; font-display: swap; src: url('dm-sans-700.woff2') format('woff2'); }
+@font-face { font-family: 'Syne'; font-weight: 700; font-style: normal; font-display: swap; src: url('syne-700.woff2') format('woff2'); }
+@font-face { font-family: 'Syne'; font-weight: 800; font-style: normal; font-display: swap; src: url('syne-800.woff2') format('woff2'); }

@@ -1,0 +1,63 @@
+// Staattinen tarkistus: jokainen HTML-attribuuteissa (onclick="…") kutsuttu funktio on määritelty jossakin skriptitiedostossa.
+// Kun tiedostoja jaetaan tai muokataan, hukkuneet funktiot paljastuvat tässä (ei vasta käyttäjän klikatessa).
+const fs = require('fs'), path = require('path');
+const root = path.join(__dirname, '..');
+const jsFiles = fs.readdirSync(path.join(root, 'assets/js')).filter(f => f.endsWith('.js')).map(f => path.join(root, 'assets/js', f)).concat(path.join(root, 'leave.js'));
+const htmlFiles = ['index.php'].map(f => path.join(root, f));
+const src = jsFiles.map(f => fs.readFileSync(f, 'utf8')).join('\n');
+
+const defined = new Set();
+for (const m of src.matchAll(/(?:^|\n)\s*(?:async\s+)?function\s+([A-Za-z_$][\w$]*)/g)) defined.add(m[1]);
+for (const m of src.matchAll(/(?:^|\n)\s*(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=/g)) defined.add(m[1]);
+for (const m of src.matchAll(/window\.([A-Za-z_$][\w$]*)\s*=/g)) defined.add(m[1]);
+
+const builtins = new Set(['if', 'for', 'while', 'return', 'function', 'alert', 'confirm', 'prompt', 'parseInt', 'parseFloat', 'isNaN', 'String', 'Number', 'Boolean', 'JSON', 'Math', 'Date',
+  'Array', 'Object', 'Set', 'Map', 'encodeURIComponent', 'decodeURIComponent', 'setTimeout', 'clearTimeout', 'fetch', 'Promise', 'stopPropagation', 'preventDefault', 'select', 'click',
+  'catch', 'typeof', 'new', 'else', 'switch', 'event', 'this', 'value', 'checked', 'toString']);
+
+const handlerRe = /\son(?:click|change|input|keydown|keyup|submit|focus|blur|mouseover|mouseout|load|error)\s*=\s*(?:"([^"]*)"|'([^']*)')/g;
+const missing = new Map();
+const scan = (text, where) => {
+  for (const h of text.matchAll(handlerRe)) {
+    const code = (h[1] ?? h[2]).replace(/\$\{[^}]*\}/g, '0');   // mallipohjan lausekkeet pois
+    for (const c of code.matchAll(/(?<![.\w$])([A-Za-z_$][\w$]*)\s*\(/g)) {
+      const name = c[1];
+      if (!builtins.has(name) && !defined.has(name)) missing.set(name, (missing.get(name) || []).concat(where));
+    }
+  }
+};
+scan(src, 'assets/js');
+for (const f of htmlFiles) scan(fs.readFileSync(f, 'utf8'), path.basename(f));
+
+// Lisäksi: kaikki sisäiset kutsut "state.x" -tyyppisiin funktioihin eivät kuulu tähän; tarkistetaan vain käsittelijät.
+if (missing.size) {
+  console.log('FAIL: määrittelemättömät käsittelijäfunktiot:');
+  for (const [n, w] of missing) console.log('  - ' + n + '  (' + [...new Set(w)].join(', ') + ')');
+  process.exit(1);
+}
+console.log(`ok: ${defined.size} funktiota/muuttujaa määritelty, kaikki HTML-käsittelijät löytyvät`);
+
+// Sivujen viittaamien paikallisten tiedostojen on oltava versionhallinnassa (esim. .gitignore ei saa ohittaa niitä)
+try {
+  const { execSync } = require('child_process');
+  const tracked = new Set(execSync('git ls-files', { cwd: root }).toString().split('\n'));
+  const bad = [];
+  for (const f of ['index.php', 'barshift_ohjeet.html', 'tapahtumat.html', 'varaus.html', 'widget.html', 'setpassword.html', 'tietosuoseloste.html', 'manifest.json']) {
+    const src = fs.readFileSync(path.join(root, f), 'utf8');
+    for (const m of src.matchAll(/(?:href|src)="(?!https?:|data:|#|mailto:|<\?|\$)([^"?#]+)/g)) if (fs.existsSync(path.join(root, m[1])) && !tracked.has(m[1])) bad.push(f + ' -> ' + m[1]);
+  }
+  for (const f of fs.readdirSync(path.join(root, 'assets/lang'))) if (!tracked.has('assets/lang/' + f)) bad.push('assets/lang/' + f + ' (kielitiedosto)');
+  if (bad.length) { console.log('FAIL: tiedostoja ei ole versionhallinnassa:\n  ' + bad.join('\n  ')); process.exit(1); }
+  console.log('ok: kaikki sivujen viittaamat tiedostot ovat versionhallinnassa');
+} catch (e) { console.log('(git-tarkistus ohitettu: ' + e.message.split('\n')[0] + ')'); }
+
+// Sivuston CSP (script-src 'self') estää inline-<script>-lohkot: staattisissa sivuissa ei saa olla niitä (tapahtumat.html:llä on oma, väljempi CSP)
+{
+  const bad = [];
+  for (const f of ['barshift_ohjeet.html', 'varaus.html', 'widget.html', 'setpassword.html', 'tietosuoseloste.html', 'index.php']) {
+    const src = fs.readFileSync(path.join(root, f), 'utf8');
+    if (/<script(?![^>]*\bsrc=)[^>]*>\s*\S/i.test(src)) bad.push(f);
+  }
+  if (bad.length) { console.log('FAIL: inline-skriptilohko (CSP estää sen) tiedostoissa: ' + bad.join(', ')); process.exit(1); }
+  console.log('ok: staattisissa sivuissa ei inline-skriptejä');
+}

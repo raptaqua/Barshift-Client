@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="fi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
+<meta name="theme-color" content="#FF7A59">
+<meta name="description" content="Baarien tapahtumat: live-musiikkia, visoja, urheilua ja bileitä kalenterissa ja kartalla.">
+<title>Baarien tapahtumat</title>
+<link rel="stylesheet" href="assets/leaflet/leaflet.css">
+<style>
+:root{
+  color-scheme:light;
+  --bg:#FFFBF4;--surface:#fff;--soft:#FFF3E2;--text:#1F2A44;--text2:#4B5675;--text3:#7C86A2;--line:#F0E4D3;
+  --accent:#FF5A36;--accent2:#FF9A3C;--sun:#FFC93C;--radius:20px;
+  --shadow:0 4px 14px rgba(255,120,60,.10),0 1px 3px rgba(31,42,68,.06);--shadow-hi:0 14px 34px rgba(255,90,54,.22),0 4px 10px rgba(31,42,68,.08);
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--text);font:16px/1.5 "Nunito","Segoe UI",system-ui,-apple-system,Roboto,sans-serif;-webkit-text-size-adjust:100%}
+button,input,select{font:inherit;color:inherit}
+button{cursor:pointer}
+.wrap{max-width:1180px;margin:0 auto;padding:0 18px 56px}
+
+/* ---------- Hero ---------- */
+.hero{position:relative;overflow:hidden;background:linear-gradient(115deg,#FF6B4A 0%,#FF9A3C 52%,#FFCB47 100%);color:#fff;padding:34px 0 64px;border-radius:0 0 42px 42px}
+.hero .in{max-width:1180px;margin:0 auto;padding:0 18px;position:relative;z-index:2}
+.hero h1{margin:0;font-size:clamp(30px,6vw,54px);line-height:1.08;font-weight:900;letter-spacing:-.02em;text-shadow:0 2px 0 rgba(0,0,0,.08)}
+.hero p{margin:10px 0 0;font-size:clamp(16px,2.4vw,20px);font-weight:700;opacity:.96;max-width:620px}
+.confetti{position:absolute;inset:0;z-index:1;pointer-events:none;user-select:none}
+.confetti span{position:absolute;font-size:34px;opacity:.28;animation:float 7s ease-in-out infinite}
+.confetti span:nth-child(1){left:64%;top:14%}.confetti span:nth-child(2){left:78%;top:52%;animation-delay:-2s;font-size:44px}
+.confetti span:nth-child(3){left:90%;top:12%;animation-delay:-4s}.confetti span:nth-child(4){left:52%;top:62%;animation-delay:-1s;font-size:28px}
+.confetti span:nth-child(5){left:70%;top:76%;animation-delay:-3s}
+@keyframes float{50%{transform:translateY(-10px) rotate(6deg)}}
+
+.controls{margin-top:-30px;position:relative;z-index:3}
+.bar{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+.tabs{display:inline-flex;background:#fff;border-radius:100px;padding:5px;gap:3px;box-shadow:var(--shadow-hi)}
+.tab{border:0;background:none;padding:10px 22px;border-radius:100px;font-weight:800;color:var(--text2);transition:background .15s,color .15s}
+.tab:hover{background:var(--soft)}
+.tab[aria-selected=true]{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;box-shadow:0 4px 12px rgba(255,90,54,.35)}
+.search{flex:1;min-width:210px;max-width:380px;border:2px solid transparent;background:#fff;border-radius:100px;padding:11px 20px;box-shadow:var(--shadow);outline:none}
+.search:focus{border-color:var(--accent2)}
+:where(.tab,.chip,.btn,.day,.ev,.tile,.pill,.bar-item):focus-visible{outline:3px solid rgba(255,90,54,.55);outline-offset:2px}
+
+.toolbar{margin:20px 0 6px}
+.frows{display:flex;flex-direction:column;gap:10px}
+.btn.ftoggle{display:none}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.lbl{font-size:12px;font-weight:900;letter-spacing:.06em;text-transform:uppercase;color:var(--text3);min-width:74px}
+.chip{display:inline-flex;align-items:center;gap:7px;border:2px solid transparent;background:#fff;border-radius:100px;padding:6px 14px;font-size:14px;font-weight:800;color:var(--text2);box-shadow:var(--shadow);transition:transform .12s}
+.chip:hover{transform:translateY(-1px)}
+.chip[aria-pressed=true]{background:var(--c,var(--accent));border-color:var(--c,var(--accent));color:#fff}
+.chip[aria-pressed=true] .dot{background:#fff}
+.dot{width:10px;height:10px;border-radius:50%;background:var(--c,var(--accent));flex:none}
+.btn{border:2px solid var(--line);background:#fff;border-radius:12px;padding:9px 15px;font-weight:800;display:inline-flex;gap:6px;align-items:center;text-decoration:none;color:var(--text);transition:transform .12s,box-shadow .12s}
+.btn:hover{transform:translateY(-1px);box-shadow:var(--shadow)}
+.btn.primary{background:linear-gradient(135deg,var(--accent),var(--accent2));border-color:transparent;color:#fff}
+.btn.sm{padding:6px 12px;font-size:13px}
+.card{background:var(--surface);border-radius:var(--radius);box-shadow:var(--shadow)}
+
+/* ---------- Lista: isot tapahtumakortit ---------- */
+.dayblock{margin-top:26px}
+.dh{display:flex;align-items:center;gap:12px;margin:0 2px 12px;flex-wrap:wrap}
+.dh h2{margin:0;font-size:22px;font-weight:900;text-transform:capitalize}
+.dh .tag{font-size:12px;font-weight:900;letter-spacing:.04em;text-transform:uppercase;color:#fff;background:var(--accent);padding:3px 12px;border-radius:100px}
+.dh .tag.tmr{background:var(--accent2)}
+.dh .cnt{color:var(--text3);font-weight:700;font-size:14px}
+.tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:18px}
+.tile{position:relative;display:flex;flex-direction:column;background:#fff;border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden;cursor:pointer;text-align:left;transition:transform .18s,box-shadow .18s;border-bottom:5px solid var(--c)}
+.tile:hover{transform:translateY(-5px);box-shadow:var(--shadow-hi)}
+.tile .pic{height:158px;background:var(--g) center/cover no-repeat;position:relative;display:flex;align-items:center;justify-content:center;font-size:64px}
+.tile .pic .em{filter:drop-shadow(0 4px 8px rgba(0,0,0,.2));transition:transform .25s}
+.tile:hover .pic .em{transform:scale(1.12) rotate(-4deg)}
+.tile .leaf{position:absolute;left:12px;top:12px;background:#fff;border-radius:14px;padding:5px 11px 6px;text-align:center;line-height:1.05;box-shadow:0 4px 10px rgba(0,0,0,.15)}
+.tile .leaf small{display:block;font-size:11px;font-weight:900;letter-spacing:.06em;text-transform:uppercase;color:var(--accent)}
+.tile .leaf b{font-size:24px;font-weight:900;color:var(--text)}
+.tile .leaf small.mo{color:var(--text3);letter-spacing:.02em}
+.ribbon{position:absolute;left:12px;bottom:12px;background:var(--accent);color:#fff;font-weight:900;font-size:12px;letter-spacing:.04em;text-transform:uppercase;padding:4px 12px;border-radius:100px;box-shadow:0 4px 10px rgba(255,90,54,.4)}
+.ribbon.tmr{background:var(--accent2)}
+.wk{grid-column:1/-1;margin:14px 2px 0;font-size:14px;font-weight:900;letter-spacing:.06em;text-transform:uppercase;color:var(--text3);display:flex;gap:10px;align-items:baseline}
+.wk span{font-weight:700;letter-spacing:0;text-transform:none}
+.tile .type{position:absolute;right:12px;top:12px;background:rgba(255,255,255,.95);border-radius:100px;padding:3px 11px;font-size:12px;font-weight:900;color:var(--text2);box-shadow:0 3px 8px rgba(0,0,0,.12)}
+.tile .txt{padding:14px 16px 16px;display:flex;flex-direction:column;gap:6px;flex:1}
+.tile h3{margin:0;font-size:19px;line-height:1.25;font-weight:900;overflow-wrap:anywhere}
+.tile .time{font-weight:800;color:var(--accent);display:flex;gap:6px;align-items:center}
+.tile .where{display:flex;align-items:center;gap:8px;color:var(--text2);font-weight:700;font-size:14px}
+.tile .desc{color:var(--text2);font-size:14px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;margin-top:2px}
+.tile.today{box-shadow:0 0 0 3px var(--sun),var(--shadow-hi)}
+.rangebar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:22px 0 0}
+.empty{padding:54px 18px;text-align:center;color:var(--text2);background:#fff;border-radius:var(--radius);box-shadow:var(--shadow);margin-top:20px}
+.empty .big{font-size:54px;line-height:1}
+.empty h2{margin:10px 0 4px}
+
+/* ---------- Kuukausikalenteri ---------- */
+.cal-head{display:flex;align-items:center;gap:10px;justify-content:space-between;padding:16px 18px;flex-wrap:wrap}
+.cal-title{font-size:24px;font-weight:900;margin:0;text-transform:capitalize}
+.cal-nav{display:flex;gap:6px}
+.grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr))}
+.dow{padding:9px 6px;text-align:center;font-size:12px;font-weight:900;letter-spacing:.06em;text-transform:uppercase;color:var(--text3);background:var(--soft)}
+.day{cursor:pointer;min-height:118px;border-top:1px solid var(--line);border-left:1px solid var(--line);padding:6px;text-align:left;display:flex;flex-direction:column;gap:3px;min-width:0;overflow:hidden;transition:background .12s}
+.day:hover{background:#FFF8EC}
+.day:nth-child(7n+1){border-left:0}
+.day.out{background:#FCF7EE;opacity:.55}
+.day .n{font-size:13px;font-weight:900;color:var(--text2);width:27px;height:27px;display:flex;align-items:center;justify-content:center;border-radius:50%}
+.day.today .n{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff}
+.day.sel{outline:3px solid var(--accent2);outline-offset:-3px;background:#FFF8EC}
+.pill{display:block;width:100%;text-align:left;border:0;border-radius:8px;padding:2px 7px;font-size:12px;font-weight:700;line-height:1.4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;background:var(--c);color:#fff}
+.pill b{font-weight:900;opacity:.85;margin-right:4px}
+.more{font-size:12px;font-weight:800;color:var(--text3);padding-left:4px}
+.dots{display:none;gap:3px;flex-wrap:wrap}
+.dots i{width:8px;height:8px;border-radius:50%;background:var(--c)}
+.daylist{padding:18px;margin-top:16px}
+.daylist h3{margin:0 0 12px;font-size:18px;font-weight:900}
+
+/* ---------- Kartta ---------- */
+.mapwrap{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:18px;margin-top:14px}
+#map{height:min(70vh,660px);min-height:380px;border-radius:var(--radius);box-shadow:var(--shadow);z-index:0}
+.side{max-height:min(70vh,660px);overflow:auto;padding:12px;display:flex;flex-direction:column;gap:10px}
+.bar-item{width:100%;text-align:left;border:0;background:var(--soft);border-radius:16px;padding:12px 14px;border-left:6px solid var(--c);transition:transform .12s}
+.bar-item:hover{transform:translateX(3px)}
+.bar-item.off{opacity:.6}
+.bar-item b{display:block;font-weight:900}
+.bar-item small{color:var(--text2);font-weight:600}
+.pin{width:36px;height:36px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);background:var(--c);border:3px solid #fff;box-shadow:0 4px 12px rgba(0,0,0,.3);display:flex;align-items:center;justify-content:center}
+.pin span{transform:rotate(45deg);color:#fff;font-weight:900;font-size:14px}
+.pin.off{background:#B7BDCC}
+.leaflet-popup-content{margin:14px 16px;font:14px/1.45 "Nunito","Segoe UI",system-ui,sans-serif}
+.leaflet-popup-content-wrapper{border-radius:16px}
+.pp h4{margin:0 0 2px;font-size:17px;font-weight:900}
+.pp ul{margin:8px 0 0;padding:0;list-style:none}
+.pp li{padding:5px 0;border-top:1px solid #f1e6d6}
+.pp a,.pp button{color:var(--accent);font-weight:800;background:none;border:0;padding:0;cursor:pointer;text-decoration:underline;font-size:14px}
+
+/* ---------- Modaali ---------- */
+.ov{position:fixed;inset:0;background:rgba(31,42,68,.55);backdrop-filter:blur(3px);display:none;align-items:center;justify-content:center;padding:16px;z-index:1000}
+.ov.open{display:flex}
+.modal{background:#fff;color:var(--text);border-radius:26px;max-width:580px;width:100%;max-height:92vh;overflow:auto;box-shadow:0 30px 80px rgba(31,42,68,.4);position:relative}
+.modal .img{height:230px;background:var(--g) center/cover no-repeat;display:flex;align-items:center;justify-content:center;font-size:88px}
+.modal .in{padding:22px}
+.modal h2{margin:8px 0 6px;font-size:26px;line-height:1.2;font-weight:900;overflow-wrap:anywhere}
+.modal .x{position:absolute;right:14px;top:14px;z-index:2;background:#fff}
+.facts{display:grid;gap:8px;margin:14px 0;color:var(--text2);font-weight:700}
+.acts{display:flex;gap:8px;flex-wrap:wrap;margin-top:18px}
+.badge{display:inline-block;font-size:12px;font-weight:900;padding:3px 12px;border-radius:100px;background:var(--soft);color:var(--text2)}
+footer{margin-top:44px;color:var(--text3);font-size:13px;text-align:center;font-weight:600}
+footer a{color:inherit}
+
+@media(max-width:820px){
+  .btn.ftoggle{display:inline-flex;box-shadow:var(--shadow)}
+  .frows{display:none;margin-top:12px}
+  .frows.open{display:flex}
+  .rangebar{flex-wrap:nowrap;overflow-x:auto;padding-bottom:6px;scrollbar-width:none}
+  .rangebar .chip{flex:none}
+  .hero{padding:26px 0 56px;border-radius:0 0 30px 30px}
+  .mapwrap{grid-template-columns:1fr}
+  .side{max-height:none}
+  .day{min-height:66px;align-items:center}
+  .day .pill,.day .more{display:none}
+  .dots{display:flex;justify-content:center}
+  .lbl{min-width:100%}
+  .tiles{grid-template-columns:1fr}
+  .tab{padding:9px 16px}
+  .confetti span:nth-child(n+4){display:none}
+}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
+.reg{margin:12px 0;padding:14px;border-radius:14px;background:#FFF6EF;border:1px solid #FFD9C2}.reg .rf{display:grid;grid-template-columns:1fr 1fr 110px;gap:8px;margin-top:8px}.reg input,.reg select{padding:10px 12px;border:2px solid #FFD9C2;border-radius:12px;font:inherit;min-width:0}.reg .hint{font-size:12px;color:var(--text2);margin-top:6px}@media(max-width:560px){.reg .rf{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div id="paid-banner" hidden style="max-width:720px;margin:12px auto;padding:12px 16px;border-radius:10px;background:#D1FAE5;color:#065F46;font-weight:600"></div>
+<header class="hero">
+  <div class="confetti" aria-hidden="true"><span>🎵</span><span>🍻</span><span>🎉</span><span>⚽</span><span>🧠</span></div>
+  <div class="in">
+    <h1>Mitä baareissa<br>tapahtuu? 🎉</h1>
+    <p id="subtitle">Live-musiikkia, visoja, urheilua ja bileitä – kaikki yhdessä paikassa.</p>
+  </div>
+</header>
+
+<div class="wrap">
+  <div class="controls bar">
+    <div class="tabs" role="tablist" aria-label="Näkymä">
+      <button class="tab" role="tab" data-view="list">✨ Lista</button>
+      <button class="tab" role="tab" data-view="month">📅 Kalenteri</button>
+      <button class="tab" role="tab" data-view="map">📍 Kartta</button>
+    </div>
+    <input id="q" class="search" type="search" placeholder="Hae tapahtumaa tai baaria…" aria-label="Hae">
+  </div>
+
+  <div class="toolbar" id="toolbar"></div>
+  <main id="view"></main>
+  <footer>Tapahtumatiedot tulevat baarien omista ilmoituksista. Kartta © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMapin tekijät</a>.</footer>
+</div>
+
+<div class="ov" id="ov" role="dialog" aria-modal="true" aria-labelledby="mt"><div class="modal" id="modal"></div></div>
+
+<script src="assets/leaflet/leaflet.js"></script>
+<script>
+(function () {
+'use strict';
+/* ---------- Asetukset: vaihda, jos sivu sijoitetaan eri palvelimelle kuin BarShift ---------- */
+const BASE = '';                          // esim. 'https://tyovuorot.example.fi/'
+const API_URL = BASE + 'api.php?action=public_events';
+
+const TYPES = { music: ['🎵', 'Musiikki', ['#8B5CF6', '#EC4899']], sports: ['⚽', 'Urheilu', ['#10B981', '#84CC16']], quiz: ['🧠', 'Visa / peli', ['#3B82F6', '#06B6D4']],
+                theme: ['🎉', 'Teemailta', ['#FF9A3C', '#FF5A36']], other: ['📌', 'Muu', ['#64748B', '#A0AEC0']] };
+const PALETTE = ['#FF5A36', '#14B8A6', '#3B82F6', '#8B5CF6', '#F59E0B', '#EC4899', '#10B981', '#0EA5E9', '#84CC16', '#EF4444'];
+const MONTHS = ['tammikuu', 'helmikuu', 'maaliskuu', 'huhtikuu', 'toukokuu', 'kesäkuu', 'heinäkuu', 'elokuu', 'syyskuu', 'lokakuu', 'marraskuu', 'joulukuu'];
+const DOW = ['Ma', 'Ti', 'Ke', 'To', 'Pe', 'La', 'Su'], DOWL = ['sunnuntai', 'maanantai', 'tiistai', 'keskiviikko', 'torstai', 'perjantai', 'lauantai'];
+const MON3 = ['tammi', 'helmi', 'maalis', 'huhti', 'touko', 'kesä', 'heinä', 'elo', 'syys', 'loka', 'marras', 'joulu'];
+
+const $ = s => document.querySelector(s);
+const esc = v => String(v ?? '').replace(/[&<>"'`]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;', '`': '&#96;' }[c]));
+const pad = n => String(n).padStart(2, '0');
+const ymd = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+const parse = s => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); };
+const addDays = (s, n) => { const d = parse(s); d.setDate(d.getDate() + n); return ymd(d); };
+const today = ymd(new Date());
+const safeUrl = u => /^https?:\/\//i.test(u || '') ? u : null;
+const imgUrl = p => p && /^uploads\/[\w\/.\-]+$/.test(p) && !p.includes('..') ? BASE + p : null;
+const cssUrl = u => "url('" + String(u).replace(/['\\()\s]/g, encodeURIComponent) + "')";
+const fmtDate = s => { const d = parse(s); return `${DOWL[d.getDay()]} ${d.getDate()}.${d.getMonth() + 1}.${d.getFullYear()}`; };
+const fmtShort = s => { const d = parse(s); return `${DOWL[d.getDay()]} ${d.getDate()}.${d.getMonth() + 1}.`; };
+const rel = s => { const diff = Math.round((parse(s) - parse(today)) / 86400000); return diff === 0 ? 'Tänään' : diff === 1 ? 'Huomenna' : diff === -1 ? 'Eilen' : ''; };
+const timeText = e => e.start ? (e.end ? `${e.start}–${e.end}` : e.start) : '';
+const grad = t => { const g = (TYPES[t] || TYPES.other)[2]; return `linear-gradient(135deg,${g[0]},${g[1]})`; };
+
+let DATA = { pubs: [], events: [] }, PUB = {};
+const S = { view: 'list', month: today.slice(0, 7), sel: null, pubs: new Set(), types: new Set(), q: '', listRange: 'week', listLimit: 60, mapRange: 'all', city: '' };
+const LIST_RANGES = { week: ['Tulevat 7 päivää'], weekend: ['Viikonloppu'], month: ['30 päivää'], all: ['Kaikki tulevat'] };
+
+/* ---------- Tila <-> URL ---------- */
+function readHash() {
+    const p = new URLSearchParams(location.hash.slice(1));
+    S.view = ['month', 'list', 'map'].includes(p.get('view')) ? p.get('view') : 'list';
+    if (/^\d{4}-\d{2}$/.test(p.get('m') || '')) S.month = p.get('m');
+    if (LIST_RANGES[p.get('r')]) S.listRange = p.get('r');
+    S.pubs = new Set((p.get('pubs') || '').split(',').filter(Boolean));
+    S.types = new Set((p.get('types') || '').split(',').filter(t => TYPES[t]));
+    S.q = p.get('q') || ''; S.city = p.get('city') || '';
+    $('#q').value = S.q;
+}
+function writeHash() {
+    const p = new URLSearchParams();
+    if (S.view !== 'list') p.set('view', S.view);
+    if (S.month !== today.slice(0, 7)) p.set('m', S.month);
+    if (S.listRange !== 'week') p.set('r', S.listRange);
+    if (S.pubs.size) p.set('pubs', [...S.pubs].join(','));
+    if (S.types.size) p.set('types', [...S.types].join(','));
+    if (S.q) p.set('q', S.q); if (S.city) p.set('city', S.city);
+    const h = p.toString(); history.replaceState(null, '', h ? '#' + h : location.pathname + location.search);
+}
+
+/* ---------- Data ---------- */
+function filtered(extra) {
+    const q = S.q.trim().toLowerCase();
+    return DATA.events.filter(e => {
+        const pub = PUB[e.pub]; if (!pub) return false;
+        if (S.pubs.size && !S.pubs.has(e.pub)) return false;
+        if (S.types.size && !S.types.has(e.type)) return false;
+        if (S.city && pub.city !== S.city) return false;
+        if (q && !(e.title + ' ' + pub.name + ' ' + (e.description || '')).toLowerCase().includes(q)) return false;
+        return extra ? extra(e) : true;
+    });
+}
+async function load() {
+    $('#view').innerHTML = '<div class="empty"><div class="big">⏳</div><h2>Ladataan tapahtumia…</h2></div>';
+    try {
+        const r = await fetch(API_URL, { headers: { Accept: 'application/json' } });
+        if (!r.ok) throw new Error(r.status);
+        DATA = await r.json();
+    } catch (err) {
+        $('#view').innerHTML = '<div class="empty"><div class="big">😕</div><h2>Tapahtumien lataus epäonnistui</h2>Yritä hetken kuluttua uudelleen.</div>'; return;
+    }
+    PUB = {};
+    DATA.pubs.forEach((p, i) => { p.color = p.color || PALETTE[i % PALETTE.length]; PUB[p.id] = p; });
+    const upcoming = DATA.events.filter(e => e.date >= today).length;
+    if (DATA.pubs.length) $('#subtitle').textContent = `${upcoming} tulevaa tapahtumaa ${DATA.pubs.length === 1 ? 'baarissa' : DATA.pubs.length + ' baarissa'} – valitse illan meno!`;
+    render();
+}
+
+/* ---------- Työkalurivi ---------- */
+function toggle(set, v) { set.has(v) ? set.delete(v) : set.add(v); S.listLimit = 60; render(); }
+function renderToolbar() {
+    const cities = [...new Set(DATA.pubs.map(p => p.city).filter(Boolean))].sort();
+    const usedTypes = [...new Set(DATA.events.map(e => e.type))].filter(t => TYPES[t]);
+    let h = '';
+    if (DATA.pubs.length > 1) h += `<div class="row"><span class="lbl">Baarit</span>${DATA.pubs.map(p => `<button class="chip" style="--c:${esc(p.color)}" data-pub="${esc(p.id)}" aria-pressed="${S.pubs.has(p.id)}"><span class="dot"></span>${esc(p.name)}</button>`).join('')}</div>`;
+    if (usedTypes.length > 1) h += `<div class="row"><span class="lbl">Tyyppi</span>${usedTypes.map(t => `<button class="chip" style="--c:${TYPES[t][2][0]}" data-type="${t}" aria-pressed="${S.types.has(t)}">${TYPES[t][0]} ${TYPES[t][1]}</button>`).join('')}</div>`;
+    if (cities.length > 1) h += `<div class="row"><span class="lbl">Kaupunki</span><button class="chip" data-city="" aria-pressed="${!S.city}">Kaikki</button>${cities.map(c => `<button class="chip" data-city="${esc(c)}" aria-pressed="${S.city === c}">${esc(c)}</button>`).join('')}</div>`;
+    if (S.pubs.size || S.types.size || S.city || S.q) h += `<div class="row"><button class="btn sm" id="clear">✕ Tyhjennä suodattimet</button></div>`;
+    const active = S.pubs.size + S.types.size + (S.city ? 1 : 0);
+    $('#toolbar').innerHTML = h ? `<button class="btn sm ftoggle" id="ftoggle" aria-expanded="${!!S.fOpen}">🎛️ Suodattimet${active ? ` (${active})` : ''} ${S.fOpen ? '▲' : '▼'}</button><div class="frows ${S.fOpen ? 'open' : ''}">${h}</div>` : '';
+}
+
+/* ---------- Lista: isot kortit (oletus) ---------- */
+function tile(e) {
+    const p = PUB[e.pub], img = imgUrl(e.image), t = TYPES[e.type] || TYPES.other, d = parse(e.date);
+    return `<div role="button" tabindex="0" class="tile ${e.date === today ? 'today' : ''}" style="--c:${esc(p.color)};--g:${img ? cssUrl(img) : grad(e.type)}" data-ev="${e.id}" aria-label="${esc(e.title)}, ${esc(p.name)}, ${fmtShort(e.date)}">
+        <div class="pic">${img ? '' : `<span class="em">${t[0]}</span>`}
+            <div class="leaf"><small>${DOW[(d.getDay() + 6) % 7]}</small><b>${d.getDate()}</b><small class="mo">${MON3[d.getMonth()]}</small></div>
+            <div class="type">${t[0]} ${t[1]}</div>
+            ${rel(e.date) === 'Tänään' ? '<span class="ribbon">Tänään!</span>' : rel(e.date) === 'Huomenna' ? '<span class="ribbon tmr">Huomenna</span>' : ''}</div>
+        <div class="txt"><h3>${esc(e.title)}</h3>
+            <div class="time">🕒 ${esc(timeText(e) || 'Aika ilmoitetaan')}</div>
+            <div class="where"><span class="dot" style="--c:${esc(p.color)}"></span>${esc(p.name)}${p.city ? ' · ' + esc(p.city) : ''}</div>
+            ${e.description ? `<div class="desc">${esc(e.description)}</div>` : ''}</div></div>`;
+}
+function weekNo(d) { const t = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate())); t.setUTCDate(t.getUTCDate() + 4 - (t.getUTCDay() || 7)); return Math.ceil((((t - new Date(Date.UTC(t.getUTCFullYear(), 0, 1))) / 86400000) + 1) / 7); }
+function rangeBounds() {
+    if (S.listRange === 'week') return [today, addDays(today, 6)];
+    if (S.listRange === 'month') return [today, addDays(today, 29)];
+    if (S.listRange === 'weekend') {                              // viikonloppu = pe–su
+        const dow = parse(today).getDay();                        // 0 = sunnuntai
+        if (dow >= 1 && dow <= 4) { const st = addDays(today, 5 - dow); return [st, addDays(st, 2)]; }
+        return [today, addDays(today, dow === 5 ? 2 : dow === 6 ? 1 : 0)];
+    }
+    return [today, '9999-12-31'];
+}
+function renderList() {
+    const [from, to] = rangeBounds();
+    const list = filtered(e => e.date >= from && e.date <= to).sort((a, b) => (a.date + (a.start || '')).localeCompare(b.date + (b.start || '')));
+    let h = `<div class="rangebar">${Object.entries(LIST_RANGES).map(([k, v]) => `<button class="chip" data-lrange="${k}" aria-pressed="${S.listRange === k}">${v[0]}</button>`).join('')}
+        <span style="color:var(--text3);font-weight:700;margin-left:6px">${list.length} tapahtumaa</span></div>`;
+    if (!list.length) {
+        const later = filtered(e => e.date > to).length;
+        return h + `<div class="empty"><div class="big">🌤️</div><h2>Ei tapahtumia tälle ajalle</h2>${later ? `Mutta tulossa on ${later} tapahtumaa myöhemmin!<br><br><button class="btn primary" data-lrange="all">Näytä kaikki tulevat</button>` : 'Tarkista hetken kuluttua uudelleen tai kokeile toista suodatinta.'}</div>`;
+    }
+    const shown = list.slice(0, S.listLimit), longRange = S.listRange === 'month' || S.listRange === 'all';
+    let wk = '';
+    h += '<div class="tiles" style="margin-top:20px">';
+    shown.forEach(e => {
+        if (longRange) {
+            const ws = ymd((() => { const d = parse(e.date); d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); return d; })());
+            if (ws !== wk) { wk = ws; const a = parse(ws), z = parse(addDays(ws, 6)); h += `<div class="wk">Viikko ${weekNo(a)} <span>${a.getDate()}.${a.getMonth() + 1}. – ${z.getDate()}.${z.getMonth() + 1}.</span></div>`; }
+        }
+        h += tile(e);
+    });
+    h += '</div>';
+    if (list.length > S.listLimit) h += `<div style="text-align:center;margin-top:24px"><button class="btn primary" id="more">Näytä lisää (${list.length - S.listLimit})</button></div>`;
+    return h;
+}
+
+/* ---------- Kuukausinäkymä ---------- */
+function pillHtml(e) { const p = PUB[e.pub]; return `<button class="pill" style="--c:${esc(p.color)}" data-ev="${e.id}" title="${esc(e.title)} – ${esc(p.name)}">${e.start ? `<b>${esc(e.start)}</b>` : ''}${esc(e.title)}</button>`; }
+function evRow(e) {
+    const p = PUB[e.pub], t = TYPES[e.type] || TYPES.other;
+    return `<div role="button" tabindex="0" class="ev btn" style="--c:${esc(p.color)};justify-content:flex-start;width:100%;text-align:left;border-left:6px solid ${esc(p.color)}" data-ev="${e.id}">
+        <span style="font-size:24px">${t[0]}</span><span><b>${esc(e.title)}</b><br><small style="color:var(--text2)">🕒 ${esc(timeText(e) || '–')} · ${esc(p.name)}</small></span></div>`;
+}
+function renderMonth() {
+    const [y, m] = S.month.split('-').map(Number), first = new Date(y, m - 1, 1);
+    const lead = (first.getDay() + 6) % 7, start = new Date(y, m - 1, 1 - lead);
+    const evs = filtered(), byDay = {};
+    evs.forEach(e => (byDay[e.date] = byDay[e.date] || []).push(e));
+    let cells = '';
+    for (let i = 0; i < 42; i++) {
+        const d = new Date(start.getFullYear(), start.getMonth(), start.getDate() + i), k = ymd(d), list = byDay[k] || [];
+        if (i >= 35 && d.getMonth() !== m - 1) break;
+        cells += `<div role="button" tabindex="0" class="day ${d.getMonth() !== m - 1 ? 'out' : ''} ${k === today ? 'today' : ''} ${S.sel === k ? 'sel' : ''}" data-day="${k}" aria-label="${fmtDate(k)}, ${list.length} tapahtumaa">
+            <span class="n">${d.getDate()}</span>
+            ${list.slice(0, 3).map(pillHtml).join('')}${list.length > 3 ? `<span class="more">+${list.length - 3} muuta</span>` : ''}
+            ${list.length ? `<span class="dots">${list.slice(0, 6).map(e => `<i style="--c:${esc(PUB[e.pub].color)}"></i>`).join('')}</span>` : ''}</div>`;
+    }
+    const sel = S.sel && byDay[S.sel] ? byDay[S.sel] : null;
+    return `<div class="card" style="margin-top:16px;overflow:hidden"><div class="cal-head"><h2 class="cal-title">${MONTHS[m - 1]} ${y}</h2>
+        <div class="cal-nav"><button class="btn sm" data-nav="-1" aria-label="Edellinen kuukausi">‹</button><button class="btn sm" data-nav="0">Tänään</button><button class="btn sm" data-nav="1" aria-label="Seuraava kuukausi">›</button></div></div>
+        <div class="grid">${DOW.map(d => `<div class="dow">${d}</div>`).join('')}${cells}</div></div>
+        ${S.sel ? `<div class="card daylist"><h3>${fmtDate(S.sel)} ${rel(S.sel) ? `· <span style="color:var(--accent)">${rel(S.sel)}</span>` : ''}</h3>${sel ? `<div class="tiles" style="grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px">${sel.map(evRow).join('')}</div>` : '<span style="color:var(--text3)">Ei tapahtumia tänä päivänä.</span>'}</div>` : ''}`;
+}
+
+/* ---------- Karttanäkymä ---------- */
+let map = null, layer = null;
+const RANGES = { today: ['Tänään', 0], week: ['7 päivää', 6], month: ['30 päivää', 29], all: ['Kaikki tulevat', 9999] };
+function rangeEnd() { return addDays(today, RANGES[S.mapRange][1]); }
+function renderMapShell() {
+    return `<div class="row" style="margin:16px 0 0"><span class="lbl">Ajankohta</span>${Object.entries(RANGES).map(([k, v]) => `<button class="chip" data-range="${k}" aria-pressed="${S.mapRange === k}">${v[0]}</button>`).join('')}</div>
+    <div class="mapwrap"><div id="map" role="application" aria-label="Baarien sijainnit kartalla"></div><aside class="card side" id="side" aria-label="Baarit"></aside></div>`;
+}
+function mapData() {
+    const end = rangeEnd(), evs = filtered(e => e.date >= today && e.date <= end);
+    const byPub = {}; evs.forEach(e => (byPub[e.pub] = byPub[e.pub] || []).push(e));
+    Object.values(byPub).forEach(l => l.sort((a, b) => (a.date + (a.start || '')).localeCompare(b.date + (b.start || ''))));
+    let pubs = DATA.pubs.filter(p => (!S.pubs.size || S.pubs.has(p.id)) && (!S.city || p.city === S.city));
+    return { pubs, byPub };
+}
+function popupHtml(p, list) {
+    const web = safeUrl(p.website);
+    return `<div class="pp"><h4>${esc(p.name)}</h4><div style="color:#666">${esc([p.address, p.city].filter(Boolean).join(', '))}</div>
+        ${list.length ? `<ul>${list.slice(0, 4).map(e => `<li><button data-open="${e.id}">${esc(e.title)}</button><br><span style="color:#666">${fmtShort(e.date)} ${esc(timeText(e))}</span></li>`).join('')}</ul>${list.length > 4 ? `<div style="margin-top:6px;color:#666">+${list.length - 4} muuta</div>` : ''}` : '<div style="margin-top:8px;color:#666">Ei tapahtumia valitulla ajalla.</div>'}
+        ${web ? `<div style="margin-top:8px"><a href="${esc(web)}" target="_blank" rel="noopener noreferrer">Baarin sivut ↗</a></div>` : ''}</div>`;
+}
+function setupMap() {
+    const el = $('#map'); if (!el) return;
+    if (map) { map.remove(); map = null; }
+    map = L.map(el, { scrollWheelZoom: true }).setView([64.5, 26], 5);
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>' }).addTo(map);
+    layer = L.layerGroup().addTo(map);
+    const { pubs, byPub } = mapData(), located = pubs.filter(p => p.lat !== null && p.lng !== null), pts = [], markers = {};
+    located.forEach(p => {
+        const n = (byPub[p.id] || []).length;
+        const icon = L.divIcon({ className: '', iconSize: [36, 36], iconAnchor: [18, 36], popupAnchor: [0, -34],
+            html: `<div class="pin ${n ? '' : 'off'}" style="--c:${esc(p.color)}"><span>${n || '·'}</span></div>` });
+        const m = L.marker([p.lat, p.lng], { icon, title: p.name, alt: p.name }).addTo(layer).bindPopup(popupHtml(p, byPub[p.id] || []), { maxWidth: 300 });
+        markers[p.id] = m; pts.push([p.lat, p.lng]);
+    });
+    if (pts.length > 1) map.fitBounds(pts, { padding: [50, 50], maxZoom: 14 }); else if (pts.length === 1) map.setView(pts[0], 14);
+    const order = pubs.slice().sort((a, b) => ((byPub[b.id] || []).length ? 1 : 0) - ((byPub[a.id] || []).length ? 1 : 0) || a.name.localeCompare(b.name, 'fi'));
+    $('#side').innerHTML = order.length ? order.map(p => { const l = byPub[p.id] || [], nx = l[0], has = p.lat !== null && p.lng !== null;
+        return `<button class="bar-item ${l.length ? '' : 'off'}" style="--c:${esc(p.color)}" data-bar="${esc(p.id)}"><b>${esc(p.name)}</b><small>${esc([p.address, p.city].filter(Boolean).join(', ') || '–')}</small><br>
+            <small>${l.length ? `${l.length} tapahtumaa · seuraava ${fmtShort(nx.date)} ${esc(nx.start || '')}` : 'Ei tapahtumia valitulla ajalla'}${has ? '' : ' · ei sijaintia kartalla'}</small></button>`; }).join('')
+        : '<div style="padding:20px;text-align:center;color:var(--text3)">Ei baareja.</div>';
+    $('#side').onclick = ev => { const b = ev.target.closest('[data-bar]'); if (!b) return; const m = markers[b.dataset.bar]; if (m) { map.flyTo(m.getLatLng(), 16, { duration: .6 }); m.openPopup(); } };
+    map.on('popupopen', ev => ev.popup.getElement().querySelectorAll('[data-open]').forEach(b => b.onclick = () => openEvent(+b.dataset.open)));
+    window.__markers = markers;
+}
+
+/* ---------- Tapahtuman tiedot ---------- */
+function icsEscape(t) { return String(t || '').replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\r?\n/g, '\\n'); }
+function downloadIcs(e) {
+    const p = PUB[e.pub], d = e.date.replace(/-/g, ''), st = (e.start || '18:00').replace(':', '') + '00';
+    let endDate = e.date, en = e.end ? e.end.replace(':', '') + '00' : null;
+    if (e.end && e.end <= (e.start || '00:00')) endDate = addDays(e.date, 1);
+    if (!en) { const h = Math.min(23, parseInt((e.start || '18:00').slice(0, 2)) + 3); en = pad(h) + (e.start || '18:00').slice(3, 5).replace(':', '') + '00'; }
+    const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//BarShift//Tapahtumat//FI', 'CALSCALE:GREGORIAN', 'BEGIN:VEVENT',
+        `UID:${e.pub}-${e.id}@barshift`, `DTSTAMP:${new Date().toISOString().replace(/[-:]|\.\d+/g, '')}`,
+        `DTSTART:${d}T${st}`, `DTEND:${endDate.replace(/-/g, '')}T${en}`, `SUMMARY:${icsEscape(e.title)}`,
+        `LOCATION:${icsEscape([p.name, p.address, p.city].filter(Boolean).join(', '))}`, `DESCRIPTION:${icsEscape(e.description || '')}`, 'END:VEVENT', 'END:VCALENDAR'];
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([lines.join('\r\n')], { type: 'text/calendar;charset=utf-8' }));
+    a.download = 'tapahtuma.ics'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+}
+/* ---------- Ilmoittautuminen, liput ja some-kortti (vain baareille, jotka ovat ottaneet ominaisuuden käyttöön) ---------- */
+function regHtml(e) {
+    const r = e.reg; if (!r) return '';
+    const price = r.price ? ` · ${String(r.price).replace('.', ',')} €` : '';
+    if (r.url) return `<div class="reg"><b>🎟️ Liput${esc(price)}</b><div class="acts" style="margin-top:8px"><a class="btn primary" href="${esc(r.url)}" target="_blank" rel="noopener noreferrer">Osta liput ↗</a></div></div>`;
+    if (r.left === 0) return `<div class="reg" id="reg"><b>🎟️ Tapahtuma on täynnä</b><div class="hint">Liity odotuslistalle, niin saat sähköpostia, jos paikkoja vapautuu.</div>
+        <div class="rf"><input id="wl-name" placeholder="Nimi" maxlength="100" autocomplete="name"><input id="wl-email" type="email" placeholder="Sähköposti" maxlength="150" autocomplete="email"><select id="wl-qty" aria-label="Henkilömäärä">${Array.from({ length: 10 }, (_, i) => `<option value="${i + 1}">${i + 1} hlö</option>`).join('')}</select>
+        <input id="wl-web" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px" name="website"></div>
+        <button class="btn primary" id="wl-go" style="margin-top:8px">Liity odotuslistalle</button><div id="wl-msg" class="hint" role="status"></div></div>`;
+    const max = Math.min(10, r.left === null ? 10 : r.left);
+    return `<div class="reg" id="reg"><b>${r.mode === 'tickets' ? '🎟️ Varaa liput' : '🎟️ Ilmoittaudu'}${esc(price)}</b>${r.mode === 'tickets' ? (r.pay ? `<div class="hint">${(r.pay_methods || ['mobilepay']).length === 1 && (r.pay_methods || ['mobilepay'])[0] === 'mobilepay' ? 'Maksat MobilePaylla.' : 'Maksat verkossa turvallisesti.'}</div>` : '<div class="hint">Maksu ovella.</div>') : ''}${r.left !== null ? `<div class="hint">${r.left} paikkaa vapaana</div>` : ''}
+        <div class="rf"><input id="rg-name" placeholder="Nimi" maxlength="100" autocomplete="name"><input id="rg-email" type="email" placeholder="Sähköposti" maxlength="150" autocomplete="email">
+        <select id="rg-qty" aria-label="Henkilömäärä">${Array.from({ length: max }, (_, i) => `<option value="${i + 1}">${i + 1} hlö</option>`).join('')}</select>
+        <input id="rg-web" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px" name="website"></div>
+        <button class="btn primary" id="rg-go" style="margin-top:8px">${r.pay ? ((r.pay_methods || ['mobilepay']).join() === 'mobilepay' ? 'Maksa MobilePaylla' : 'Siirry maksamaan') : 'Vahvista ilmoittautuminen'}</button><div id="rg-msg" class="hint" role="status"></div>
+        <div class="hint">Tietojasi käytetään vain tähän ilmoittautumiseen ja poistetaan 12 kk kuluttua. Saat vahvistuksen sähköpostiin.</div></div>`;
+}
+function wireReg(e) {
+    const wl = $('#wl-go');
+    if (wl) wl.onclick = async () => {
+        const msg = $('#wl-msg'); msg.textContent = ''; wl.disabled = true;
+        try {
+            const res = await fetch(BASE + 'api.php?action=public_waitlist', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ eventId: e.id, name: $('#wl-name').value, email: $('#wl-email').value, qty: +$('#wl-qty').value, website: $('#wl-web').value }) });
+            const j = await res.json();
+            if (!res.ok) { msg.textContent = j.error || 'Liittyminen epäonnistui'; msg.style.color = '#B91C1C'; wl.disabled = false; return; }
+            $('#reg').innerHTML = '<b>✅ Olet odotuslistalla</b><div class="hint">Sijasi jonossa: ' + (+j.position || 1) + '. Saat sähköpostia, jos paikkoja vapautuu.</div>';
+        } catch (err) { msg.textContent = 'Yhteys palvelimeen epäonnistui'; wl.disabled = false; }
+    };
+    const go = $('#rg-go'); if (!go) return;
+    go.onclick = async () => {
+        const msg = $('#rg-msg'); msg.textContent = ''; go.disabled = true;
+        try {
+            const res = await fetch(BASE + 'api.php?action=public_register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ eventId: e.id, name: $('#rg-name').value, email: $('#rg-email').value, qty: +$('#rg-qty').value, website: $('#rg-web').value }) });
+            const j = await res.json();
+            if (!res.ok) { msg.textContent = j.error || 'Ilmoittautuminen epäonnistui'; msg.style.color = '#B91C1C'; go.disabled = false; return; }
+            if (j.checkout_url) { $('#reg').innerHTML = '<b>Siirrytään maksamaan…</b><div class="hint">Paikkasi on varattu 30 minuutiksi.</div>'; location.href = j.checkout_url; return; }
+            $('#reg').innerHTML = `<b>✅ Ilmoittautuminen vahvistettu!</b><div class="hint">Varauskoodisi: <b>${esc(j.code)}</b>. Vahvistus ja peruutuslinkki on lähetetty sähköpostiisi.</div>`;
+        } catch (err) { msg.textContent = 'Yhteys palvelimeen epäonnistui'; go.disabled = false; }
+    };
+}
+function shareCard(e, p) {   // 1080x1080 PNG jaettavaksi someen: piirretään selaimessa, ei palvelinkutsuja
+    const c = document.createElement('canvas'); c.width = c.height = 1080; const g = c.getContext('2d');
+    const col = /^#[0-9a-f]{6}$/i.test(p.color || '') ? p.color : '#FF5A36';
+    const grad = g.createLinearGradient(0, 0, 1080, 1080); grad.addColorStop(0, col); grad.addColorStop(1, '#FF9A3C'); g.fillStyle = grad; g.fillRect(0, 0, 1080, 1080);
+    g.fillStyle = 'rgba(255,255,255,.12)'; g.beginPath(); g.arc(950, 130, 260, 0, 7); g.fill(); g.beginPath(); g.arc(90, 980, 200, 0, 7); g.fill();
+    g.fillStyle = '#fff'; g.textBaseline = 'top';
+    const wrap = (txt, x, y, w, lh, font, max) => { g.font = font; const words = String(txt).split(' '); let line = '', n = 0; for (const wd of words) { const t = line ? line + ' ' + wd : wd; if (g.measureText(t).width > w && line) { g.fillText(line, x, y); y += lh; line = wd; if (++n >= max - 1) { line = words.slice(words.indexOf(wd)).join(' '); break; } } else line = t; } g.fillText(line, x, y); return y + lh; };
+    g.font = '700 44px system-ui, sans-serif'; g.fillText(p.name.toUpperCase(), 90, 90);
+    let y = wrap(e.title, 90, 260, 900, 100, '800 88px system-ui, sans-serif', 4);
+    g.font = '600 52px system-ui, sans-serif'; g.fillText('📅 ' + fmtDate(e.date), 90, y + 30); if (timeText(e)) g.fillText('🕒 ' + timeText(e), 90, y + 110);
+    g.font = '500 40px system-ui, sans-serif'; g.fillText([p.address, p.city].filter(Boolean).join(', '), 90, 960);
+    c.toBlob(b => { const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = 'tapahtuma-kortti.png'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 2000); }, 'image/png');
+}
+let lastFocus = null;
+function openEvent(id) {
+    const e = DATA.events.find(x => x.id === id); if (!e) return;
+    const p = PUB[e.pub], img = imgUrl(e.image), t = TYPES[e.type] || TYPES.other, web = safeUrl(p.website);
+    const dest = p.lat !== null && p.lng !== null ? `${p.lat},${p.lng}` : [p.name, p.address, p.city].filter(Boolean).join(' ');
+    lastFocus = document.activeElement;
+    $('#modal').innerHTML = `<div class="img" style="--g:${img ? cssUrl(img) : grad(e.type)}" role="img" aria-label="${img ? 'Tapahtuman kuva' : t[1]}">${img ? '' : t[0]}</div>
+        <button class="btn sm x" id="xclose" aria-label="Sulje">✕</button>
+        <div class="in"><span class="badge">${t[0]} ${t[1]}</span>
+        <h2 id="mt">${esc(e.title)}</h2>
+        <div class="facts"><div>📅 ${fmtDate(e.date)} ${rel(e.date) ? `<b style="color:var(--accent)">· ${rel(e.date)}</b>` : ''}</div>
+        ${timeText(e) ? `<div>🕒 ${esc(timeText(e))}</div>` : ''}
+        <div>📍 <b>${esc(p.name)}</b>${p.address || p.city ? `<br><span style="font-weight:600">${esc([p.address, p.city].filter(Boolean).join(', '))}</span>` : ''}</div></div>
+        ${e.description ? `<p style="white-space:pre-line;margin:0 0 6px;color:var(--text2)">${esc(e.description)}</p>` : ''}
+        ${regHtml(e)}
+        <div class="acts"><button class="btn primary" id="ics">📥 Lisää kalenteriin</button>
+        ${p.lat !== null ? `<button class="btn" id="onmap">🗺️ Kartalla</button>` : ''}
+        <a class="btn" href="https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(dest)}" target="_blank" rel="noopener noreferrer">🧭 Reittiohje</a>
+        ${p.features && p.features.bookings ? `<a class="btn" href="varaus.html?pub=${encodeURIComponent(p.id)}">🍽️ Varaa pöytä</a>` : ''}
+        <button class="btn" id="share">🖼️ Some-kortti</button>
+        ${web ? `<a class="btn" href="${esc(web)}" target="_blank" rel="noopener noreferrer">Baarin sivut ↗</a>` : ''}</div></div>`;
+    $('#ov').classList.add('open'); $('#xclose').focus();
+    $('#xclose').onclick = closeModal; $('#ics').onclick = () => downloadIcs(e);
+    $('#share').onclick = () => shareCard(e, p); wireReg(e);
+    const om = $('#onmap'); if (om) om.onclick = () => { closeModal(); S.view = 'map'; render(); const m = (window.__markers || {})[e.pub]; if (m) setTimeout(() => { map.flyTo(m.getLatLng(), 16, { duration: .6 }); m.openPopup(); }, 250); };
+}
+function closeModal() { $('#ov').classList.remove('open'); if (lastFocus && lastFocus.focus) lastFocus.focus(); }
+
+/* ---------- Piirto ---------- */
+function render() {
+    document.querySelectorAll('.tab').forEach(t => t.setAttribute('aria-selected', t.dataset.view === S.view));
+    renderToolbar(); writeHash();
+    if (!DATA.pubs.length) { $('#view').innerHTML = '<div class="empty"><div class="big">🍻</div><h2>Tapahtumia ei ole vielä julkaistu</h2>Baarit voivat julkaista tapahtumansa hallintapaneelin Julkinen profiili -asetuksista.</div>'; return; }
+    const v = $('#view');
+    if (S.view === 'month') v.innerHTML = renderMonth();
+    else if (S.view === 'list') v.innerHTML = renderList();
+    else { v.innerHTML = renderMapShell(); setupMap(); }
+}
+document.addEventListener('click', ev => {
+    const t = ev.target;
+    let el;
+    if ((el = t.closest('.tab'))) { S.view = el.dataset.view; return render(); }
+    if ((el = t.closest('[data-pub]'))) return toggle(S.pubs, el.dataset.pub);
+    if ((el = t.closest('[data-type]'))) return toggle(S.types, el.dataset.type);
+    if ((el = t.closest('[data-city]'))) { S.city = el.dataset.city; return render(); }
+    if ((el = t.closest('[data-range]'))) { S.mapRange = el.dataset.range; return render(); }
+    if ((el = t.closest('[data-lrange]'))) { S.listRange = el.dataset.lrange; S.listLimit = 60; return render(); }
+    if (t.closest('#clear')) { S.pubs.clear(); S.types.clear(); S.city = ''; S.q = ''; $('#q').value = ''; return render(); }
+    if (t.closest('#ftoggle')) { S.fOpen = !S.fOpen; return renderToolbar(); }
+    if (t.closest('#more')) { S.listLimit += 60; return render(); }
+    if ((el = t.closest('[data-nav]'))) {
+        const n = +el.dataset.nav, [y, m] = S.month.split('-').map(Number);
+        const d = n === 0 ? new Date() : new Date(y, m - 1 + n, 1); S.month = `${d.getFullYear()}-${pad(d.getMonth() + 1)}`; S.sel = n === 0 ? today : null; return render();
+    }
+    if ((el = t.closest('.pill[data-ev]'))) { ev.stopPropagation(); return openEvent(+el.dataset.ev); }
+    if ((el = t.closest('.tile[data-ev], .ev[data-ev]'))) return openEvent(+el.dataset.ev);
+    if ((el = t.closest('.day'))) { S.sel = el.dataset.day; return render(); }
+    if (t === $('#ov')) closeModal();
+});
+document.addEventListener('keydown', ev => {
+    if (ev.key === 'Escape' && $('#ov').classList.contains('open')) return closeModal();
+    if ((ev.key === 'Enter' || ev.key === ' ') && ev.target.matches && ev.target.matches('[role=button]')) { ev.preventDefault(); ev.target.click(); }
+});
+let qTimer; $('#q').addEventListener('input', ev => { clearTimeout(qTimer); qTimer = setTimeout(() => { S.q = ev.target.value; S.listLimit = 60; render(); }, 200); });
+window.addEventListener('hashchange', () => { readHash(); render(); });
+(function () { const q = new URLSearchParams(location.search), b = document.getElementById('paid-banner');
+    if (q.get('paid')) { b.textContent = '✅ Maksu onnistui! Paikkasi vahvistetaan hetken kuluttua ja vahvistus tulee sähköpostiisi (varauskoodi ' + q.get('paid').replace(/[^A-Za-z0-9]/g, '') + ').'; b.hidden = false; }
+    else if (q.get('cancelled')) { b.textContent = 'Maksu peruttiin, paikkaa ei vahvistettu. Voit yrittää uudelleen.'; b.style.background = '#FEF3C7'; b.style.color = '#92400E'; b.hidden = false; }
+    if (q.get('paid') || q.get('cancelled')) history.replaceState(null, '', location.pathname + location.hash); })();
+readHash(); load();
+})();
+</script>
+</body>
+</html>
