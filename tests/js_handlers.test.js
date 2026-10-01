@@ -73,3 +73,20 @@ try {
   }
   console.log('ok: tilan kenttäluettelot ovat yhtenevät');
 }
+
+// deleteItem() kutsutaan myös muokkausikkunoista (esim. vuoron Poista-painike): onnistunut poisto sulkee ikkunan, virhe näytetään eikä ikkunaa sulleta
+{
+  const src = require('fs').readFileSync(require('path').join(__dirname, '..', 'assets/js/admin.js'), 'utf8');
+  const fn = src.slice(src.indexOf('async function deleteItem'), src.indexOf('function changeDate'));
+  const run = async (resp) => {
+    const log = []; const ctx = { confirm: () => true, fetch: async () => resp, showToast: (m, t) => log.push(['toast', m, t || 'success']), closeModal: () => log.push(['close']), load: () => log.push(['load']), console };
+    require('vm').createContext(ctx); require('vm').runInContext(fn, ctx); await ctx.deleteItem(1, 'shift'); return log.map(l => l[0] + (l[2] === 'error' ? ':error' : '')).join(',');
+  };
+  (async () => {
+    const okLog = await run({ ok: true, json: async () => ({ success: true }) });
+    const errLog = await run({ ok: false, json: async () => ({ error: 'Ei oikeuksia' }) });
+    if (okLog !== 'close,toast,load') { console.log('FAIL: onnistunut poisto ei sulje ikkunaa: ' + okLog); process.exit(1); }
+    if (errLog !== 'toast:error') { console.log('FAIL: virheellinen poisto: ' + errLog); process.exit(1); }
+    console.log('ok: poisto sulkee muokkausikkunan');
+  })();
+}
