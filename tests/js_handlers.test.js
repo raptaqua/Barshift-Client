@@ -61,3 +61,15 @@ try {
   if (bad.length) { console.log('FAIL: inline-skriptilohko (CSP estää sen) tiedostoissa: ' + bad.join(', ')); process.exit(1); }
   console.log('ok: staattisissa sivuissa ei inline-skriptejä');
 }
+
+// Sovelluksen tila rakennetaan API-vastauksesta kenttäluettelolla (load ja loadSilent): jokainen etusivun käyttämä kenttä on oltava mukana molemmissa,
+// muuten tieto näkyy API:ssa mutta ei käyttöliittymässä (esim. Huomio-lista).
+{
+  const core = require('fs').readFileSync(require('path').join(__dirname, '..', 'assets/js/core.js'), 'utf8');
+  const builders = core.split('private_messages: data.private_messages || []').length - 1;
+  for (const k of ['hub_pending_apps']) {
+    const n = core.split(k + ': data.' + k).length - 1;
+    if (n !== builders) { console.log(`FAIL: ${k} puuttuu load()- tai loadSilent()-funktion tilasta (${n}/${builders})`); process.exit(1); }
+  }
+  console.log('ok: tilan kenttäluettelot ovat yhtenevät');
+}

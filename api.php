@@ -1951,7 +1951,7 @@ if ($method === 'GET') {
         if ($tr['status'] === 'open' && (int)$tr['offered_by_id'] !== $myId && !$canShifts) $tr['my_warnings'] = shiftWarnings($conn, $pubForTrades, $myId, $sh['date'], $sh['start'], $sh['end'], 0, $sh['role'] ?? null);
     }
     unset($tr);
-    if ($admin || !empty($pubForTrades['features']['hub_feed'])) hubSyncAfterResponse($conn, $cfg, $vapid_auth, true, 120);   // ei vaadi croniakaan: ylläpitäjän sivulataus hakee hakemukset ja lähettää viivästyneet muutokset
+    if ($admin || !empty($pubForTrades['features']['hub_feed'])) hubSyncAfterResponse($conn, $cfg, $vapid_auth, true, 60);   // ei vaadi croniakaan: ylläpitäjän sivulataus hakee hakemukset ja lähettää viivästyneet muutokset
     $hubPend = [];   // etusivun Huomio-lista: käsittelemättömät keikkahakemukset (vain vuorojen hallitsijoille)
     if ($canShifts && !empty($pubForTrades['features']['hub_gigs'])) {
         $hubPend = fetchAllRows(prepareQuery($conn, "SELECT a.id, a.name, s.date, s.start, s.end, s.role FROM hub_applications a JOIN shifts s ON s.id = a.shift_id WHERE a.status = 'pending' AND s.date >= CURDATE() ORDER BY s.date, a.id LIMIT 20"));
