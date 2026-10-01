@@ -75,7 +75,7 @@ function renderGigs() {
     if (!state.gigFeed) loadGigFeed();
     const f = state.gigFeed || { loading: true, shifts: [], applications: [] };
     const head = `<div class="page-header"><h2>Keikat muissa baareissa</h2></div><p style="color:var(--text2); font-size:13px; max-width:720px;">Muiden baarien avoimet vuorot yhteisen keskuksen kautta. Kun haet vuoroa, nimesi, yhteystietosi ja viestisi lähetetään vain sille baarille, jonka vuoroa haet.</p>`;
-    if (f.loading) return head + `<div class="card card-sm"><p style="margin:0; color:var(--text2);">Ladataan…</p></div>`;
+    if (f.loading) return head + `<div class="card card-sm"><p style="margin:0; color:var(--text2);">Haetaan uusia vuoroja…</p></div>`;
     if (f.error) return head + `<div class="card card-sm"><p style="margin:0; color:var(--red);">${esc(f.error)}</p></div>`;
     if (f.enabled === false) return head + `<div class="card card-sm"><p style="margin:0; color:var(--text2);">Toiminto ei ole käytössä tässä baarissa.</p></div>`;
     const mine = (f.applications || []);

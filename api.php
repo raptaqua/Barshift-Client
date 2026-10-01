@@ -2172,12 +2172,20 @@ if ($method === 'POST') {
     } elseif ($action === 'hub_feed') {   // muiden baarien vapaat vuorot ja omat hakemukset (kaikki kirjautuneet)
         $pf = getPub($conn);
         if (empty($pf['features']['hub_feed']) || !hubConfigured($cfg)) jsonResponse(["success" => true, "enabled" => false, "shifts" => [], "applications" => []]);
+        // Välilehden avaus hakee uudet vuorot ja hakemusten tilan heti (enintään kerran 15 s välein; keskus ei voi itse ilmoittaa)
+        $lastPull = fetchOne(prepareQuery($conn, "SELECT v FROM system_status WHERE k = 'hub_feed_pull'"));
+        $refreshed = false;
+        if (!$lastPull || time() - (int)$lastPull['v'] >= 15) {
+            $nowTs = (string)time(); $stp = prepareQuery($conn, "INSERT INTO system_status (k, v) VALUES ('hub_feed_pull', ?) ON DUPLICATE KEY UPDATE v = VALUES(v)"); $stp->bind_param('s', $nowTs); run($stp);
+            $prowF = fetchOne(prepareQuery($conn, "SELECT feature_hub_events, feature_hub_gigs, feature_hub_feed FROM pubs ORDER BY id LIMIT 1"));
+            if ($prowF) { hubFeedPull($conn, $cfg, $prowF, $vapid_auth); hubOutgoingPull($conn, $cfg, $prowF, $vapid_auth); $refreshed = true; }
+        }
         $shifts = fetchAllRows(prepareQuery($conn, "SELECT f.hub_shift_id AS id, f.bar_name, f.city, f.date, f.time_start, f.time_end, f.role, f.pay_text, f.note,
                 (SELECT o.status FROM hub_outgoing o WHERE o.hub_shift_id = f.hub_shift_id AND o.user_id = " . (int)$myId . ") AS my_status
             FROM hub_feed f WHERE f.gone = 0 AND f.date >= CURDATE() ORDER BY f.date, f.time_start LIMIT 200"));
         $apps = fetchAllRows(prepareQuery($conn, "SELECT id, status, bar_name, city, date, time_start, time_end, role, address FROM hub_outgoing WHERE user_id = " . (int)$myId . " AND date >= CURDATE() - INTERVAL 14 DAY ORDER BY date DESC, id DESC LIMIT 50"));
         $me2 = fetchOne(prepareQuery($conn, "SELECT phone, email FROM users WHERE id = " . (int)$myId));
-        jsonResponse(["success" => true, "enabled" => true, "shifts" => $shifts, "applications" => $apps, "profile" => ["phone" => $me2['phone'] ?? '', "email" => $me2['email'] ?? '', "name" => $me['name']]]);
+        jsonResponse(["success" => true, "enabled" => true, "refreshed" => $refreshed, "shifts" => $shifts, "applications" => $apps, "profile" => ["phone" => $me2['phone'] ?? '', "email" => $me2['email'] ?? '', "name" => $me['name']]]);
 
     } elseif ($action === 'hub_apply') {   // oma työntekijä hakee toisen baarin vuoroa: tiedot lähtevät keskuksen kautta vain vuoron tarjonneelle baarille
         $pf = getPub($conn);
