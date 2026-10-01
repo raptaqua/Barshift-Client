@@ -630,7 +630,9 @@ async function saveShiftLog() {
 
 async function deleteItem(id, type) { 
     if(!confirm('Poistetaanko lopullisesti?')) return; 
-    await fetch(`api.php?id=${id}&type=${type}`, { method:'DELETE' }); 
+    let r = {}; try { const res = await fetch(`api.php?id=${id}&type=${type}`, { method:'DELETE' }); r = await res.json().catch(() => ({})); if (!res.ok && !r.error) r = { error: 'Poisto epäonnistui' }; } catch (e) { r = { error: 'Verkkovirhe. Tarkista netti.' }; }
+    if (r.error) return showToast(r.error, 'error');
+    closeModal();   // poisto voi tapahtua muokkausikkunasta (esim. vuoro): ikkuna sulkeutuu
     showToast('Poistettu'); load(); 
 }
 
