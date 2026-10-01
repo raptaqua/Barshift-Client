@@ -6,8 +6,6 @@ install_token.php
 *.pem
 *.key
 
-# Riippuvuudet (asenna: composer install --no-dev)
-/vendor/
 
 # Käyttäjien lataamat tiedostot
 uploads/*

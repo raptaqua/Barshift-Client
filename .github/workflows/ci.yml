@@ -39,8 +39,13 @@ jobs:
         run: |
           if git ls-files | grep -E '(^|/)(config\.php|install_token\.php|install\.lock)$'; then echo "Salaisuustiedosto versionhallinnassa"; exit 1; fi
           if git grep -nE "BEGIN (RSA |EC )?PRIVATE KEY|AKIA[0-9A-Z]{16}" -- . ':!vendor'; then echo "Mahdollinen salaisuus koodissa"; exit 1; fi
-      - name: Riippuvuudet
-        run: composer install --no-dev --no-progress --prefer-dist
+      - name: vendor/ on versionhallinnassa ja ajan tasalla
+        run: |
+          test -f vendor/autoload.php
+          composer validate --no-check-publish --no-check-all -q
+          php -r 'require "vendor/autoload.php"; exit(class_exists("Minishlink\\WebPush\\WebPush") ? 0 : 1);'
+          tools/update_vendor.sh
+          git diff --exit-code --stat -- vendor || { echo "vendor/ ei vastaa composer.lockia: aja tools/update_vendor.sh ja committaa"; exit 1; }
       - name: Lomalaskennan testit
         run: node tests/leave.test.js
       - name: Käyttöliittymän käsittelijöiden tarkistus

@@ -1,6 +1,7 @@
 name: Julkaisupaketti
 
 # Rakentaa asennusvalmiin zip-paketin (vendor/ mukana), jotta palvelimella ei tarvita SSH:ta eikä composeria.
+# (vendor/ on repossa, joten paketti on pelkkä zip versionhallinnan tiedostoista.)
 #  - versiotunniste (esim. v1.2.0): paketti liitetään GitHub Releaseen
 #  - push main-haaraan tai käsin ajo: paketti ladattavissa ajon Artifacts-kohdasta
 on:

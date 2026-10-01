@@ -10,16 +10,15 @@ Salasanan tai 2FA:n palautus palvelimelta: `php bin/admin.php reset-password <tu
 
 ## Käyttöönotto (asennusohjelma)
 
-1. Lataa **valmis julkaisupaketti** `barshift-client.zip` (GitHub: *Releases*, tai *Actions → Julkaisupaketti → Artifacts*), pura se palvelimelle (File Manager/FTP) ja jatka kohtaan 2. Paketissa on `vendor/` valmiina, joten SSH:ta ja composeria ei tarvita. (Kehittäjä: kloonattuun repoon `vendor/` luodaan komennolla `composer install --no-dev`, ja paketin saa itse komennolla `tools/build_release.sh`.)
+1. Lataa tiedostot palvelimelle (File Manager/FTP): joko `git clone`, GitHubin *Download ZIP* tai valmis julkaisupaketti `barshift-client.zip` (*Releases*). Riippuvuudet (`vendor/`) ovat mukana repossa, joten SSH:ta ja composeria ei tarvita. (Kehittäjä: `vendor/` päivitetään komennolla `tools/update_vendor.sh`, kun `composer.json` muuttuu.)
 2. Tietokantaa ei tarvitse luoda: oletuksena käytetään **SQLitea**, jolloin kaikki tallentuu yhteen tiedostoon kansiossa `data/` (kansion on oltava PHP:lle kirjoitettava; PHP:n `pdo_sqlite` on lähes aina valmiina). Haluatko MariaDB/MySQL:n, luo tyhjä tietokanta ja käyttäjä (cPanel: *MySQL Databases*) ja valitse asennuksessa MariaDB.
-3. Avaa selaimessa `https://SIVUSI/install.php`. Sivu tarkistaa vaatimukset ja pyytää **asennustunnisteen**:
-   avaa palvelimella tiedosto `install_token.php` (File Manager/FTP) ja kopioi `TOKEN:`-sanan jälkeinen teksti.
+3. Avaa selaimessa `https://SIVUSI/install.php`. Sivu tarkistaa vaatimukset eikä vaadi erillistä tunnistetta: **asenna heti tiedostojen lataamisen jälkeen**, koska ensimmäinen asennuksen suorittaja saa luotua ylläpitäjän. Haluatko lisäsuojan, luo palvelimelle tiedosto `install_token.php` sisällöllä `<?php // TOKEN: <32 satunnaista heksamerkkiä>`; silloin asennus pyytää tunnisteen.
 4. Valitse tietokanta (SQLite: ei lisätietoja; MariaDB: osoite, nimi, käyttäjä ja salasana, voit painaa *Testaa tietokanta*), baarin nimi, ylläpitäjän nimi, tunnus, sähköposti ja salasana (väh. 12 merkkiä)
    ja paina *Asenna BarShift*.
 
 Asennusohjelma luo tietokantataulut, `config.php`:n (oikeudet 640), push-ilmoitusten VAPID-avaimet, viestien salausavaimen
 ja baarin ylläpitäjän tunnuksen. Salaisuuksia ei näytetä selaimessa. Lopuksi se lukitsee itsensä (`install.lock`) ja poistaa
-`install.php`:n ja tunnisteen; jos poisto ei onnistu, poista ne käsin. Ilman tunnistetta asennusta ei voi ajaa,
+`install.php`:n; jos poisto ei onnistu, poista ne käsin. 
 eikä se toimi lainkaan kun `config.php` on olemassa.
 
 Kirjautuminen: ylläpitäjän tunnus ja salasana (baaria ei valita; asennus palvelee täsmälleen yhtä baaria).

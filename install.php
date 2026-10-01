@@ -6,8 +6,8 @@
 //
 // TURVALLISUUS
 //  - Toimii vain kun config.php ja install.lock puuttuvat.
-//  - Vaatii asennustunnisteen, joka luetaan palvelimen tiedostosta install_token.php
-//    (vain tiedostojärjestelmään pääsevä näkee sen, selain ei).
+//  - Asennustunniste on valinnainen lisäsuoja: jos palvelimella on tiedosto install_token.php (sisältö: `<?php // TOKEN: <32 heksamerkkiä>`),
+//    asennus vaatii sen. Oletuksena tunnistetta ei tarvita; asenna heti tiedostojen lataamisen jälkeen.
 //  - Lukitsee itsensä valmistuttuaan ja yrittää poistaa itsensä sekä tunnisteen.
 //  - Salaisuuksia (tietokantasalasana, avaimet) ei koskaan näytetä selaimessa.
 declare(strict_types=1);
@@ -57,21 +57,13 @@ function page(string $title, string $body, int $status = 200): void {
 $envCfg = getenv('BARSHIFT_CONFIG');
 if (file_exists($configPath) || file_exists($lockPath) || ($envCfg && is_readable($envCfg))) {
     page('Asennettu jo', '<div class="card"><div class="msg note"><b>BarShift on jo asennettu.</b><br>'
-        . 'Poista <code>install.php</code> ja <code>install_token.php</code> palvelimelta, jos ne ovat vielä olemassa. '
+        . 'Poista <code>install.php</code> palvelimelta, jos se on vielä olemassa. '
         . 'Uudelleenasennus: poista <code>config.php</code> ja <code>install.lock</code> ensin.</div></div>', 403);
 }
 
-// ---------- Asennustunniste ----------
-if (!is_file($tokenPath)) {
-    $t = bin2hex(random_bytes(16));
-    $ok = @file_put_contents($tokenPath, "<?php http_response_code(404); exit; // TOKEN: {$t}\n", LOCK_EX);
-    if ($ok === false) {
-        page('Kansio ei ole kirjoitettava', '<div class="card"><div class="msg err">Asennusohjelma ei voi kirjoittaa kansioon <code>'
-            . h(basename($root)) . '</code>. Anna kansiolle kirjoitusoikeus (esim. 755, omistajana PHP-käyttäjä) ja lataa sivu uudelleen.</div></div>', 500);
-    }
-    @chmod($tokenPath, 0640);
-}
-$expectedToken = preg_match('/TOKEN: ([a-f0-9]{32})/', (string)@file_get_contents($tokenPath), $m) ? $m[1] : '';
+// ---------- Asennustunniste (valinnainen) ----------
+$expectedToken = is_file($tokenPath) && preg_match('/TOKEN: ([a-f0-9]{32})/', (string)@file_get_contents($tokenPath), $m) ? $m[1] : '';
+$needToken = $expectedToken !== '';
 
 session_name('BSINSTALL');
 session_set_cookie_params(['lifetime' => 0, 'path' => '/', 'httponly' => true, 'samesite' => 'Strict',
@@ -176,9 +168,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $errors[] = 'Istunto vanheni. Yritä uudelleen.';
     } elseif ($_SESSION['tries'] >= 10) {
         $errors[] = 'Liian monta väärää tunnistetta. Sulje selain ja aloita alusta.';
-    } elseif (empty($_SESSION['token_ok']) && (!$expectedToken || !hash_equals($expectedToken, trim((string)($_POST['token'] ?? ''))))) {
+    } elseif ($needToken && empty($_SESSION['token_ok']) && (!hash_equals($expectedToken, trim((string)($_POST['token'] ?? ''))))) {
         $_SESSION['tries']++; sleep(1);
-        $errors[] = 'Asennustunniste on väärä. Avaa tiedosto <code>install_token.php</code> palvelimella (File Manager/FTP) ja kopioi sieltä <code>TOKEN:</code>-jälkeinen teksti.';
+        $errors[] = 'Asennustunniste on väärä. Avaa tiedosto <code>install_token.php</code> palvelimella (File Manager/FTP) ja kopioi sieltä <code>TOKEN:</code>-jälkeinen teksti, tai poista tiedosto, jos et halua käyttää tunnistetta.';
     } elseif (($_SESSION['token_ok'] = true) && $blocking) {
         $errors[] = 'Korjaa ensin vaatimukset, joissa on punainen merkintä.';
     } else {
@@ -279,7 +271,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         if (!is_dir($root . '/uploads')) @mkdir($root . '/uploads', 0755, true);
                         $protected = $isSqlite ? dataFolderProtected($root, $sqliteRel) : true;
                         @file_put_contents($lockPath, 'Asennettu ' . date('c') . "\n");
-                        @unlink($tokenPath);
+                        if ($needToken) @unlink($tokenPath);
                         $selfDeleted = @unlink(__FILE__);
                         $done = ['user' => $in['su_user'], 'deleted' => $selfDeleted, 'demo' => $in['demo'], 'dataOpen' => $isSqlite && $protected === false];
                         $_SESSION = [];
@@ -299,7 +291,7 @@ if ($done) {
         . (!empty($done['dataOpen']) ? '<div class="msg err"><b>Varoitus:</b> kansio <code>data/</code> näyttää olevan ladattavissa selaimella. Estä pääsy (Apache: <code>data/.htaccess</code> on luotu, mutta palvelin ei ehkä lue sitä; nginx: <code>location ^~ /data/ { deny all; }</code>) tai siirrä tietokanta www-juuren ulkopuolelle ja muuta config.php:n <code>db_file</code>.</div>' : '')
         . ($done['demo'] ? '<div class="msg note">Demodata on tuotu. Demobaarin käyttäjien salasana on julkinen (ks. README), joten <b>älä käytä demodataa tuotannossa</b>.</div>' : '')
         . ($done['deleted'] ? '<p class="ok">✓ install.php ja asennustunniste poistettiin palvelimelta.</p>'
-                            : '<div class="msg err"><b>Poista nyt käsin</b> tiedostot <code>install.php</code> ja <code>install_token.php</code> palvelimelta. (Asennusohjelma on lukittu, mutta poisto on silti suositeltavaa.)</div>')
+                            : '<div class="msg err"><b>Poista nyt käsin</b> tiedosto <code>install.php</code> palvelimelta. (Asennusohjelma on lukittu, mutta poisto on silti suositeltavaa.)</div>')
         . '<p>Seuraavat askeleet: tarkista Baarin asetukset ja lisää työntekijät.</p>'
         . '<div class="actions"><a href="index.php"><button type="button">Avaa BarShift</button></a></div></div>';
     page('Asennus valmis', $body);
@@ -318,15 +310,18 @@ foreach ($reqs as [$label, $ok, $info, $must]) {
 $body .= '</div>';
 
 $body .= '<form method="post" autocomplete="off"><input type="hidden" name="csrf" value="' . h($_SESSION['csrf']) . '">';
-$body .= '<div class="card"><h2>2. Asennustunniste</h2>';
-if (!empty($_SESSION['token_ok'])) {
-    $body .= '<p class="ok" style="margin:0">✓ Tunniste hyväksytty tälle istunnolle.</p></div>';
-} else {
-    $body .= '<p style="margin:0 0 8px;font-size:14px;color:var(--muted)">Varmistaa, että asennusta ajaa sivuston ylläpitäjä. Avaa palvelimella tiedosto <code>install_token.php</code> (File Manager / FTP) ja kopioi <code>TOKEN:</code>-sanan jälkeinen teksti tähän.</p>'
-           . '<label for="token">Asennustunniste</label><input type="text" id="token" name="token" required autocomplete="off" spellcheck="false" maxlength="64"></div>';
+$step = 2;
+if ($needToken) {
+    $body .= '<div class="card"><h2>' . $step++ . '. Asennustunniste</h2>';
+    if (!empty($_SESSION['token_ok'])) {
+        $body .= '<p class="ok" style="margin:0">✓ Tunniste hyväksytty tälle istunnolle.</p></div>';
+    } else {
+        $body .= '<p style="margin:0 0 8px;font-size:14px;color:var(--muted)">Palvelimella on tiedosto <code>install_token.php</code>, joten asennus vaatii tunnisteen. Avaa tiedosto (File Manager / FTP) ja kopioi <code>TOKEN:</code>-sanan jälkeinen teksti tähän.</p>'
+               . '<label for="token">Asennustunniste</label><input type="text" id="token" name="token" required autocomplete="off" spellcheck="false" maxlength="64"></div>';
+    }
 }
 
-$body .= '<div class="card"><h2>3. Tietokanta</h2>'
+$body .= '<div class="card"><h2>' . $step++ . '. Tietokanta</h2>'
        . '<label class="chk" style="font-weight:400;margin-top:6px"><input type="radio" name="db_driver" value="sqlite"' . ($in['db_driver'] === 'sqlite' ? ' checked' : '') . '><span><b>SQLite (suositus)</b>: ei erillistä tietokantapalvelinta, ei tunnuksia. Tiedot tallennetaan yhteen tiedostoon kansiossa <code>data/</code>.</span></label>'
        . '<label class="chk" style="font-weight:400;margin-top:8px"><input type="radio" name="db_driver" value="mysql"' . ($in['db_driver'] === 'mysql' ? ' checked' : '') . '><span><b>MariaDB / MySQL</b>: isompiin asennuksiin tai jos tietokantapalvelin on jo olemassa. Luo tyhjä tietokanta ja käyttäjä esim. cPanelin MySQL Databases -työkalulla ja täytä tiedot alle.</span></label>'
        . '<div class="row"><div><label for="db_host">Osoite (vain MariaDB)</label><input type="text" id="db_host" name="db_host" value="' . h($in['db_host']) . '"></div>'
@@ -335,7 +330,7 @@ $body .= '<div class="card"><h2>3. Tietokanta</h2>'
        . '<div><label for="db_pass">Salasana</label><input type="password" id="db_pass" name="db_pass" autocomplete="new-password"' . ($matchesSaved($in) ? ' placeholder="•••••••• (tallennettu, jätä tyhjäksi)"' : '') . '></div></div>'
        . '<div class="actions"><button type="submit" name="act" value="test" class="ghost" formnovalidate>Testaa tietokanta</button></div></div>';
 
-$body .= '<div class="card"><h2>4. Baari ja ylläpitäjä</h2>'
+$body .= '<div class="card"><h2>' . $step++ . '. Baari ja ylläpitäjä</h2>'
        . '<label for="pub_name">Baarin nimi</label><input type="text" id="pub_name" name="pub_name" value="' . h($in['pub_name']) . '" required maxlength="100"><small>Tämä asennus palvelee vain tätä yhtä baaria.</small>'
        . '<label for="admin_name">Ylläpitäjän nimi</label><input type="text" id="admin_name" name="admin_name" value="' . h($in['admin_name']) . '" required maxlength="100">'
        . '<label for="su_user">Ylläpitäjän tunnus</label><input type="text" id="su_user" name="su_user" value="' . h($in['su_user']) . '" required>'
@@ -344,7 +339,7 @@ $body .= '<div class="card"><h2>4. Baari ja ylläpitäjä</h2>'
        . '<div><label for="su_pass2">Salasana uudelleen</label><input type="password" id="su_pass2" name="su_pass2" minlength="12" autocomplete="new-password"></div></div></div>';
 
 $demoExists = is_file($root . '/db/seed_demo.sql');
-$body .= '<div class="card"><h2>5. Valinnat</h2>'
+$body .= '<div class="card"><h2>' . $step++ . '. Valinnat</h2>'
        . ($demoExists ? '<label class="chk" style="font-weight:400"><input type="checkbox" name="demo" value="1"' . ($in['demo'] ? ' checked' : '') . '><span><b>Tuo demodata</b> (demobaari, 2 kk esimerkkidataa). Vain testi- ja esittelykäyttöön: demokäyttäjillä on julkinen salasana.</span></label>'
                       : '<p style="margin:0;color:var(--muted);font-size:14px">Demodatatiedostoa ei löytynyt, joten demodata ohitetaan.</p>')
        . '<p style="font-size:14px;color:var(--muted);margin:14px 0 0">Asennus luo automaattisesti: <code>config.php</code> (oikeudet 640), push-ilmoitusten VAPID-avaimet ja viestien salausavaimen. Avaimia ei näytetä ruudulla.</p>'

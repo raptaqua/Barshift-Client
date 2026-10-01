@@ -25,10 +25,11 @@ for i in $(seq 1 30); do curl -s -o /dev/null "http://127.0.0.1:$PORT/install.ph
 J="$TMP/jar"; B="http://127.0.0.1:$PORT"
 page="$(curl -s -c "$J" -b "$J" "$B/install.php")"
 csrf="$(echo "$page" | grep -o 'name="csrf" value="[a-f0-9]*"' | head -1 | sed 's/.*value="//;s/"//')"
-token="$(grep -o 'TOKEN: [a-f0-9]*' "$APP/install_token.php" | sed 's/TOKEN: //')"
-[ -n "$csrf" ] && [ -n "$token" ] || { echo "csrf/token puuttuu"; exit 1; }
+[ -n "$csrf" ] || { echo "csrf puuttuu"; exit 1; }
+[ ! -e "$APP/install_token.php" ] || { echo "install_token.php luotiin vaikka tunniste on valinnainen"; exit 1; }
+echo "$page" | grep -qi "Asennustunniste" && { echo "tunnistekenttä näkyy vaikka tunnistetta ei käytetä"; exit 1; }
 out="$(curl -s -c "$J" -b "$J" "$B/install.php" \
-  --data-urlencode "csrf=$csrf" --data-urlencode "token=$token" --data-urlencode "act=install" --data-urlencode "db_driver=sqlite" \
+  --data-urlencode "csrf=$csrf" --data-urlencode "act=install" --data-urlencode "db_driver=sqlite" \
   --data-urlencode "email=a@example.test" --data-urlencode "pub_name=Testibaari" --data-urlencode "admin_name=Testi Admin" \
   --data-urlencode "su_user=admin" --data-urlencode "su_pass=pitkasalasana123" --data-urlencode "su_pass2=pitkasalasana123")"
 echo "$out" | grep -q "Asennus valmis" || { echo "$out" | sed 's/<[^>]*>/ /g' | grep -i "virhe\|epäonn\|varoitus" | head; echo "asennus epäonnistui"; exit 1; }
@@ -39,4 +40,15 @@ code="$(curl -s -o /dev/null -w '%{http_code}' "$B/data/$(basename "$APP"/data/b
 [ "$code" = 403 ] || { echo "tietokantatiedosto latautuu selaimella ($code)"; exit 1; }
 login="$(curl -s -c "$J" -b "$J" -H 'Content-Type: application/json' -d '{"username":"admin","password":"pitkasalasana123"}' "$B/api.php?action=login")"
 echo "$login" | grep -q '"success":true' || { echo "kirjautuminen epäonnistui: $login"; exit 1; }
-echo "ok: SQLite-asennus, kirjautuminen ja data/-suojaus"
+echo "ok: SQLite-asennus (ilman tunnistetta), kirjautuminen ja data/-suojaus"
+
+# Valinnainen tunniste: kun install_token.php on olemassa, väärällä tunnisteella asennus estetään
+rm -rf "$APP/data" "$APP/config.php" "$APP/install.lock"; mkdir "$APP/data"; cp data/.htaccess "$APP/data/" 2>/dev/null || true
+cp install.php "$APP/install.php"
+echo '<?php http_response_code(404); exit; // TOKEN: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' > "$APP/install_token.php"
+J2="$TMP/jar2"; page="$(curl -s -c "$J2" -b "$J2" "$B/install.php")"
+echo "$page" | grep -q "Asennustunniste" || { echo "tunnistekenttä puuttuu vaikka install_token.php on olemassa"; exit 1; }
+csrf="$(echo "$page" | grep -o 'name="csrf" value="[a-f0-9]*"' | head -1 | sed 's/.*value="//;s/"//')"
+bad="$(curl -s -c "$J2" -b "$J2" "$B/install.php" --data-urlencode "csrf=$csrf" --data-urlencode "token=vaara" --data-urlencode "act=test" --data-urlencode "db_driver=sqlite")"
+echo "$bad" | grep -q "Asennustunniste on väärä" || { echo "väärä tunniste hyväksyttiin"; exit 1; }
+echo "ok: valinnainen asennustunniste toimii"
