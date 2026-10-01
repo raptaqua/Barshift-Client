@@ -110,7 +110,7 @@ async function loadPubProfile() {
     state.pubProfileLoading = true;
     try {
         const r = await (await fetch('api.php?action=pub_profile')).json();
-        if (r.profile) { state.pubProfile = r.profile; state.pubShare = { id: r.public_id, base: r.base_url }; state.pubProfileError = null; }
+        if (r.profile) { state.pubProfile = r.profile; state.pubShare = { base: r.base_url }; state.pubProfileError = null; }
         else state.pubProfileError = r.error || 'Profiilin lataus epäonnistui';
     } catch (e) { state.pubProfileError = 'Yhteysvirhe: profiilia ei voitu ladata'; }
     state.pubProfileLoading = false; render();
@@ -165,10 +165,10 @@ function adminTabProfile() {
 }
 function shareCardHtml(p) {
     const sh = state.pubShare;
-    if (!sh || !sh.id) return '';
+    if (!sh) return '';
     if (p.is_public != 1) return `<div class="card card-sm" style="max-width:720px; margin-top:16px;"><div class="section-header"><span class="section-title"><i class="bi bi-share"></i> Jaa ja upota</span><div class="section-line"></div></div><p style="font-size:13px; color:var(--text2); margin:0;">Julkaise profiili ensin, niin saat baarille oman iCal-/RSS-syötteen ja upotettavan tapahtumawidgetin.</p></div>`;
-    const b = sh.base, ical = `${b}/api.php?action=public_ics&pub=${sh.id}`, rss = `${b}/api.php?action=public_rss&pub=${sh.id}`;
-    const embed = `<iframe src="${b}/widget.html?pub=${sh.id}&n=5" width="360" height="480" style="border:0" loading="lazy" title="Tulevat tapahtumat"></iframe>`;
+    const b = sh.base, ical = `${b}/api.php?action=public_ics`, rss = `${b}/api.php?action=public_rss`;
+    const embed = `<iframe src="${b}/widget.html?n=5" width="360" height="480" style="border:0" loading="lazy" title="Tulevat tapahtumat"></iframe>`;
     const row = (label, val, id) => `<div class="form-group" style="margin-bottom:12px;"><label class="form-label">${label}</label><div style="display:flex; gap:6px;"><input id="${id}" class="form-input" readonly value="${esc(val)}" onclick="this.select()"><button class="btn btn-ghost btn-sm" onclick="copyField('${id}')" title="Kopioi"><i class="bi bi-clipboard"></i></button></div></div>`;
     return `<div class="card card-sm" style="max-width:720px; margin-top:16px;">
         <div class="section-header"><span class="section-title"><i class="bi bi-share"></i> Jaa ja upota</span><div class="section-line"></div></div>
@@ -177,7 +177,7 @@ function shareCardHtml(p) {
         ${row('RSS-syöte', rss, 'sh-rss')}
         ${row('Upotuskoodi (widget)', embed, 'sh-embed')}
         <small style="color:var(--text3)">Widgetin asetukset osoitteessa: <code>n</code> = tapahtumien määrä (1–20), <code>theme=dark</code> = tumma, <code>color=E14D2A</code> = korostusväri.</small>
-        <div style="margin-top:10px;"><a class="btn btn-ghost btn-sm" href="widget.html?pub=${sh.id}" target="_blank" rel="noopener"><i class="bi bi-eye"></i> Esikatsele widget</a></div>
+        <div style="margin-top:10px;"><a class="btn btn-ghost btn-sm" href="widget.html" target="_blank" rel="noopener"><i class="bi bi-eye"></i> Esikatsele widget</a></div>
     </div>`;
 }
 function copyField(id) {

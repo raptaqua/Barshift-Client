@@ -95,24 +95,21 @@ const future = (days) => { const d = new Date(Date.now() + days * 864e5); return
   });
   await t('julkinen rajapinta ei paljasta baaritunnusta tai käyttäjiä', async () => {
     const r = await anon.req('GET', 'public_events', { raw: true }); assert.strictEqual(r.status, 200);
-    const j = JSON.parse(r.text); assert.ok(j.pubs.length > 0);
-    assert.ok(j.pubs.every(p => /^p[0-9a-f]{12}$/.test(p.id)) && !('pub_name' in j.pubs[0]));
+    const j = JSON.parse(r.text); assert.ok(j.pub && j.pub.name); assert.ok(!('pubs' in j) && !('id' in j.pub) && !('pub_name' in j.pub), 'monibaarimuoto jäi julkiseen rajapintaan');
+    assert.ok(j.events.every(e => !('pub' in e)));
     assert.ok(!/hourly_wage|password|username/.test(r.text));
   });
 
   console.log('Julkiset syötteet');
-  await t('iCal- ja RSS-syöte sekä rajaus yhteen baariin', async () => {
-    const pid = (await admin.get('pub_profile')).json.public_id; assert.ok(/^p[0-9a-f]{12}$/.test(pid));
-    const ics = await anon.req('GET', 'public_ics', { query: `&pub=${pid}`, raw: true });
+  await t('iCal- ja RSS-syöte', async () => {
+    assert.ok(!('public_id' in (await admin.get('pub_profile')).json));
+    const ics = await anon.req('GET', 'public_ics', { raw: true });
     assert.strictEqual(ics.status, 200); assert.ok(/text\/calendar/.test(ics.headers.get('content-type')));
     assert.ok(ics.text.startsWith('BEGIN:VCALENDAR') && ics.text.includes('BEGIN:VEVENT') && ics.text.trim().endsWith('END:VCALENDAR'));
     assert.ok(ics.text.split('\r\n').every(l => Buffer.byteLength(l) <= 75), 'rivi > 75 tavua');
-    const rss = await anon.req('GET', 'public_rss', { query: `&pub=${pid}`, raw: true });
+    const rss = await anon.req('GET', 'public_rss', { raw: true });
     assert.ok(/rss\+xml/.test(rss.headers.get('content-type')) && rss.text.includes('<item>'));
-    const one = (await anon.req('GET', 'public_events', { query: `&pub=${pid}` })).json; assert.strictEqual(one.pubs.length, 1);
-    assert.ok(one.events.every(e => e.pub === pid));
-    assert.strictEqual((await anon.req('GET', 'public_ics', { query: '&pub=pdeadbeef0000' })).status, 404);
-    assert.strictEqual((await anon.req('GET', 'public_rss')).status, 400);
+    assert.strictEqual((await anon.req('GET', 'public_ics', { query: '&pub=vanha-parametri-ei-vaikuta', raw: true })).status, 200, 'vanha ?pub= rikkoi syötteen');
     assert.ok(!/hourly_wage|password|toinenbaari/.test(ics.text + rss.text));
   });
 
@@ -576,7 +573,7 @@ const future = (days) => { const d = new Date(Date.now() + days * 864e5); return
     // toinen baari ei näe eikä pääse käsiksi
     // julkiset rajapinnat eivät sisällä nimiä
     await admin.post('save_pub_profile', { display_name: 'Demo', is_public: 1, city: 'Helsinki', address: 'Testikatu 1' });
-    for (const a of ['public_events', 'public_ics', 'public_rss']) { const r = await anon.req('GET', a, { raw: true, query: a === 'public_events' ? '' : '&pub=' + ((await anon.req('GET', 'public_events')).json.pubs[0] || {}).id }); assert.ok(!/Matti|Liisa|Neljäs|vieras/i.test(r.text), a + ' vuotaa vieraslistan'); }
+    for (const a of ['public_events', 'public_ics', 'public_rss']) { const r = await anon.req('GET', a, { raw: true, query: '' }); assert.ok(!/Matti|Liisa|Neljäs|vieras/i.test(r.text), a + ' vuotaa vieraslistan'); }
   });
 
   await t('kalenterisyöte: oikea iCalendar, UTC-ajat, valinnat ja suojaus', async () => {
@@ -909,17 +906,16 @@ const future = (days) => { const d = new Date(Date.now() + days * 864e5); return
 
 
   console.log('Ilmoittautuminen, liput ja pöytävaraukset (baarikohtaisesti aktivoitavat)');
-  const pidDemo = (await admin.get('pub_profile')).json.public_id;
   const evForm = (o) => fdOf({ title: 'Live-ilta', date: future(20), time_start: '20:00', time_end: '23:00', type: 'music', is_public: '1', ...o });
   let regEvent;
   await t('ominaisuudet ovat oletuksena pois: ei ilmoittautumista eikä varauksia', async () => {
     const pub0 = (await admin.get('')).json.pub; assert.strictEqual(pub0.features.tickets, false); assert.strictEqual(pub0.features.bookings, false);
     assert.ok((await admin.form('event', evForm({ registration: 'rsvp', capacity: '5' }))).json.success);   // tallentuu, mutta asetusta ei oteta huomioon
     const ev = (await admin.get('')).json.events.find(e => e.title === 'Live-ilta'); assert.strictEqual(ev.registration, 'none');
-    const pe = (await anon.req('GET', 'public_events', { query: `&pub=${pidDemo}` })).json; assert.ok(pe.events.every(e => !e.reg), 'reg näkyy vaikka ominaisuus pois');
+    const pe = (await anon.req('GET', 'public_events', { query: '' })).json; assert.ok(pe.events.every(e => !e.reg), 'reg näkyy vaikka ominaisuus pois');
     assert.strictEqual((await anon.post('public_register', { eventId: ev.id, name: 'Testi', email: 't@example.test', qty: 1 })).status, 404);
-    assert.strictEqual((await anon.get('public_booking_info', `&pub=${pidDemo}`)).status, 404);
-    assert.strictEqual((await anon.post('public_book', { pub: pidDemo, name: 'x', email: 'x@example.test', party: 2, date: future(5), time: '19:00' })).status, 404);
+    assert.strictEqual((await anon.get('public_booking_info', '')).status, 404);
+    assert.strictEqual((await anon.post('public_book', { name: 'x', email: 'x@example.test', party: 2, date: future(5), time: '19:00' })).status, 404);
     assert.strictEqual((await emp.post('booking_status', { id: 1, status: 'confirmed' })).status, 403);
   });
   const ALLDAYS = [0, 1, 2, 3, 4, 5, 6].map(d => ({ dow: d, open: '10:00', close: '23:00' }));
@@ -930,7 +926,7 @@ const future = (days) => { const d = new Date(Date.now() + days * 864e5); return
     assert.ok((await admin.form('event', evForm({ title: 'Ulkoiset liput', registration: 'tickets', ticket_url: 'https://tiketti.example/liput' }))).json.success);
     assert.ok((await admin.form('event', evForm({ title: 'Huono linkki', registration: 'tickets', ticket_url: 'javascript:alert(1)' }))).status >= 400);
     const evs = (await admin.get('')).json.events; regEvent = evs.find(e => e.title === 'Rajattu keikka'); const ext = evs.find(e => e.title === 'Ulkoiset liput');
-    const pe = (await anon.req('GET', 'public_events', { query: `&pub=${pidDemo}` })).json;
+    const pe = (await anon.req('GET', 'public_events', { query: '' })).json;
     const pr = pe.events.find(e => e.id === regEvent.id).reg; assert.deepStrictEqual([pr.mode, pr.left, pr.price], ['rsvp', 5, 12.5]);
     assert.strictEqual(pe.events.find(e => e.id === ext.id).reg.url, 'https://tiketti.example/liput');
     assert.strictEqual((await anon.post('public_register', { eventId: ext.id, name: 'Ulkoinen', email: 'u@example.test', qty: 1 })).status, 400, 'ulkoisen lipun ilmoittautuminen');
@@ -944,11 +940,11 @@ const future = (days) => { const d = new Date(Date.now() + days * 864e5); return
     const before = (await admin.get('')).json.event_regs[regEvent.id]; assert.strictEqual(before.qty, 5);
     assert.ok((await anon.post('public_register', { eventId: regEvent.id, name: 'Botti', email: 'botti@example.test', qty: 1, website: 'http://spam' })).json.success);   // honeypot: näyttää onnistuvan
     assert.strictEqual((await admin.get('')).json.event_regs[regEvent.id].qty, 5, 'honeypot-botti tallentui');
-    assert.strictEqual((await anon.req('GET', 'public_events', { query: `&pub=${pidDemo}` })).json.events.find(e => e.id === regEvent.id).reg.left, 0);
+    assert.strictEqual((await anon.req('GET', 'public_events', { query: '' })).json.events.find(e => e.id === regEvent.id).reg.left, 0);
     // peruutus vapauttaa paikat, kertakäyttöinen
     assert.ok((await anon.post('public_cancel', { token: tok })).json.success);
     const again = await anon.post('public_cancel', { token: tok }); assert.ok(again.json.success && again.json.already, 'toinen peruutus on idempotentti'); assert.strictEqual((await anon.post('public_cancel', { token: 'x'.repeat(48) })).status, 404); assert.strictEqual((await anon.post('public_cancel', { token: 'a'.repeat(48) })).status, 404, 'tuntematon linkki');
-    assert.strictEqual((await anon.req('GET', 'public_events', { query: `&pub=${pidDemo}` })).json.events.find(e => e.id === regEvent.id).reg.left, 3);
+    assert.strictEqual((await anon.req('GET', 'public_events', { query: '' })).json.events.find(e => e.id === regEvent.id).reg.left, 3);
     // admin: lista, saapunut, CSV; työntekijä ei pääse
     const regs = (await admin.get('event_registrations', `&eventId=${regEvent.id}`)).json.registrations; assert.strictEqual(regs.length, 2);
     assert.ok((await admin.post('reg_update', { id: regs.find(x => x.name === 'Ville').id, arrived: 1 })).json.success);
@@ -956,21 +952,21 @@ const future = (days) => { const d = new Date(Date.now() + days * 864e5); return
     assert.strictEqual((await emp.get('event_registrations', `&eventId=${regEvent.id}`)).status, 403);
   });
   const bkDate = future(30);
-  const slotsOf = async (party) => (await anon.get('public_slots', `&pub=${pidDemo}&date=${bkDate}&party=${party}`)).json.slots;
+  const slotsOf = async (party) => (await anon.get('public_slots', `&date=${bkDate}&party=${party}`)).json.slots;
   await t('pöytävaraus: aikavälit, kapasiteetti, vahvistus ja peruutus', async () => {
-    const info = (await anon.get('public_booking_info', `&pub=${pidDemo}`)).json; assert.ok(info.success && info.max_party === 6 && info.hours.length === 7);
+    const info = (await anon.get('public_booking_info', '')).json; assert.ok(info.success && info.max_party === 6 && info.hours.length === 7);
     const s0 = await slotsOf(4); assert.ok(s0.length >= 5 && s0[0].time === '10:00' && s0[0].free === 10, JSON.stringify(s0.slice(0, 2)));
-    assert.strictEqual((await anon.get('public_slots', `&pub=${pidDemo}&date=${bkDate}&party=7`)).status, 400);
-    assert.deepStrictEqual((await anon.get('public_slots', `&pub=${pidDemo}&date=2000-01-01&party=2`)).json.slots, []);
-    const b1 = await anon.post('public_book', { pub: pidDemo, name: 'Pekka Pöytä', email: 'pekka@example.test', phone: '040 123', party: 4, date: bkDate, time: '18:00' });
+    assert.strictEqual((await anon.get('public_slots', `&date=${bkDate}&party=7`)).status, 400);
+    assert.deepStrictEqual((await anon.get('public_slots', `&date=2000-01-01&party=2`)).json.slots, []);
+    const b1 = await anon.post('public_book', { name: 'Pekka Pöytä', email: 'pekka@example.test', phone: '040 123', party: 4, date: bkDate, time: '18:00' });
     assert.ok(b1.json.success && b1.json.status === 'confirmed', JSON.stringify(b1.json));
     const mail = await waitMail(mailbox, m => m.to === 'pekka@example.test' && /Pöytävaraus vahvistettu/.test(m.subject)); assert.ok(mail && mail.body.includes(b1.json.code));
     // 18:00-20:00 varausta vastaan kapasiteetti 10: ryhmä 6 mahtuu (4+6), sen jälkeen ei enää yhtään
-    const b2 = await anon.post('public_book', { pub: pidDemo, name: 'Liisa', email: 'liisa@example.test', party: 6, date: bkDate, time: '19:00' }); assert.ok(b2.json.success, JSON.stringify(b2.json));
+    const b2 = await anon.post('public_book', { name: 'Liisa', email: 'liisa@example.test', party: 6, date: bkDate, time: '19:00' }); assert.ok(b2.json.success, JSON.stringify(b2.json));
     assert.ok(!(await slotsOf(1)).some(s => s.time === '19:00'), 'täysi aika tarjolla');
-    const full = await anon.post('public_book', { pub: pidDemo, name: 'Myöhässä', email: 'm@example.test', party: 1, date: bkDate, time: '19:00' }); assert.strictEqual(full.status, 409);
-    assert.ok((await anon.post('public_book', { pub: pidDemo, name: 'x', email: 'ei-osoite', party: 2, date: bkDate, time: '12:00' })).status >= 400);
-    assert.ok((await anon.post('public_book', { pub: pidDemo, name: 'Botti', email: 'b@example.test', party: 2, date: bkDate, time: '12:00', website: 'x' })).json.success);
+    const full = await anon.post('public_book', { name: 'Myöhässä', email: 'm@example.test', party: 1, date: bkDate, time: '19:00' }); assert.strictEqual(full.status, 409);
+    assert.ok((await anon.post('public_book', { name: 'x', email: 'ei-osoite', party: 2, date: bkDate, time: '12:00' })).status >= 400);
+    assert.ok((await anon.post('public_book', { name: 'Botti', email: 'b@example.test', party: 2, date: bkDate, time: '12:00', website: 'x' })).json.success);
     assert.ok((await admin.get('')).json.bookings.every(b => b.name !== 'Botti'), 'honeypot-varaus tallentui');
     // admin näkee, työntekijä ei
     const bookings = (await admin.get('')).json.bookings; assert.ok(bookings.find(b => b.name === 'Pekka Pöytä').phone === '040 123'); assert.deepStrictEqual((await emp.get('')).json.bookings, []);
@@ -982,7 +978,7 @@ const future = (days) => { const d = new Date(Date.now() + days * 864e5); return
   });
   await t('varausten käsittely: manuaalinen vahvistus ja admin-kirjaus', async () => {
     assert.ok((await admin.post('save_pub_settings', { ...settings, feature_tickets: true, feature_bookings: true, booking: { capacity: 10, max_party: 6, slot_minutes: 60, duration_minutes: 120, lead_hours: 0, days_ahead: 60, auto_confirm: false, hours: ALLDAYS } })).json.success);
-    const b = await anon.post('public_book', { pub: pidDemo, name: 'Odottaja', email: 'odottaja@example.test', party: 2, date: bkDate, time: '12:00' }); assert.strictEqual(b.json.status, 'pending');
+    const b = await anon.post('public_book', { name: 'Odottaja', email: 'odottaja@example.test', party: 2, date: bkDate, time: '12:00' }); assert.strictEqual(b.json.status, 'pending');
     const id = (await admin.get('')).json.bookings.find(x => x.name === 'Odottaja').id;
     assert.strictEqual((await emp.post('booking_status', { id, status: 'confirmed' })).status, 403);
     assert.ok((await admin.post('booking_status', { id, status: 'confirmed' })).json.success);

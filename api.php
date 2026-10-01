@@ -910,51 +910,38 @@ function verifySecondFactor($conn, $cfg, int $uid, string $code): bool {
 $action = $_GET['action'] ?? '';
 
 // ===================== JULKINEN TAPAHTUMAKALENTERI (ei kirjautumista, ei istuntoa) =====================
-// Palauttaa vain baarit, jotka ovat itse julkaisseet profiilinsa (pub_profiles.is_public = 1), ja niiden
-// julkisiksi merkityt tapahtumat. Sisäinen baaritunnus (pub_name) on osa kirjautumistunnusta, joten sitä
-// EI paljasteta: baarille annetaan johdettu julkinen tunniste.
-function publicPubId($cfg, string $pubName): string {
-    return 'p' . substr(hash_hmac('sha256', $pubName, (string)($cfg['message_key'] ?? $cfg['db_pass'])), 0, 12);
-}
-// Julkinen data (vain julkaistut profiilit ja julkiset tapahtumat). Palauttaa [pubs, events, slugById].
+// Julkinen data: baarin julkaistu profiili ja julkiset tapahtumat. Palauttaa [pub|null, events]. Ei julkaistua profiilia = ei mitään.
 function loadPublicData($conn, $cfg): array {
+    $slug = thePub($conn);
     $notFrozen = "NOT EXISTS (SELECT 1 FROM users u WHERE u.pub_name = p.pub_name AND u.status = 'frozen')";
-    $newCols = ($c = $conn->query("SHOW COLUMNS FROM events LIKE 'registration'")) && $c->num_rows > 0;   // päivittämätön kanta: ei kaadeta julkista kalenteria
-    $pubRows = fetchAllRows(prepareQuery($conn, "SELECT p.pub_name, p.display_name, p.description, p.address, p.city, p.lat, p.lng, p.website, p.color"
-        . ($newCols ? ", pb.feature_tickets, pb.feature_bookings" : ", 0 AS feature_tickets, 0 AS feature_bookings") . "
-        FROM pub_profiles p" . ($newCols ? " LEFT JOIN pubs pb ON pb.slug = p.pub_name" : "") . " WHERE p.is_public = 1 AND $notFrozen ORDER BY COALESCE(p.display_name, p.pub_name)"));
-    $evRows = fetchAllRows(prepareQuery($conn, "SELECT e.id, e.pub_name, e.title, e.date, e.type, e.time_start, e.time_end, e.image_path, e.description"
-        . ($newCols ? ", e.registration, e.capacity, e.ticket_price, e.ticket_url, (SELECT COALESCE(SUM(r.qty), 0) FROM event_registrations r WHERE r.event_id = e.id AND (r.status = 'confirmed' OR (r.status = 'pending' AND r.expires_at > NOW()))) AS reg_count" : ", 'none' AS registration, NULL AS capacity, NULL AS ticket_price, NULL AS ticket_url, 0 AS reg_count") . "
-        FROM events e JOIN pub_profiles p ON p.pub_name = e.pub_name
-        WHERE p.is_public = 1 AND e.is_public = 1 AND $notFrozen
-          AND e.date >= CURDATE() - INTERVAL 1 MONTH AND e.date <= CURDATE() + INTERVAL 12 MONTH
-        ORDER BY e.date, e.time_start LIMIT 1500"));
-    $payBy = []; $hasPay = ($c2 = $conn->query("SHOW COLUMNS FROM pubs LIKE 'feature_payments'")) && $c2->num_rows > 0;
-    $pubs = []; $ids = []; $slugById = []; $featById = [];
-    foreach ($pubRows as $r) {
-        $id = publicPubId($cfg, $r['pub_name']); $ids[$r['pub_name']] = $id; $slugById[$id] = $r['pub_name'];
-        $web = $r['website'] && preg_match('#^https?://#i', $r['website']) ? $r['website'] : null;
-        $pubs[] = ['id' => $id, 'name' => $r['display_name'] ?: $r['pub_name'], 'description' => $r['description'], 'address' => $r['address'], 'city' => $r['city'],
-                   'lat' => $r['lat'] !== null ? (float)$r['lat'] : null, 'lng' => $r['lng'] !== null ? (float)$r['lng'] : null, 'website' => $web,
-                   'color' => preg_match('/^#[0-9a-fA-F]{6}$/', (string)$r['color']) ? $r['color'] : null,
-                   'features' => ['tickets' => (bool)$r['feature_tickets'], 'bookings' => (bool)$r['feature_bookings']]];
-        $featById[$id] = (bool)$r['feature_tickets'];
-        if ($hasPay) { $pp = fetchOne(prepareQuery2($conn, "SELECT feature_payments FROM pubs WHERE slug = ?", $r['pub_name'])); $payBy[$id] = $pp && (int)$pp['feature_payments'] === 1; }
-    }
+    $r = fetchOne(prepareQuery2($conn, "SELECT p.pub_name, p.display_name, p.description, p.address, p.city, p.lat, p.lng, p.website, p.color, pb.feature_tickets, pb.feature_bookings, pb.feature_payments
+        FROM pub_profiles p LEFT JOIN pubs pb ON pb.slug = p.pub_name WHERE p.pub_name = ? AND p.is_public = 1 AND $notFrozen", $slug));
+    if (!$r) return [null, []];
+    $web = $r['website'] && preg_match('#^https?://#i', $r['website']) ? $r['website'] : null;
+    $pub = ['name' => $r['display_name'] ?: $r['pub_name'], 'description' => $r['description'], 'address' => $r['address'], 'city' => $r['city'],
+            'lat' => $r['lat'] !== null ? (float)$r['lat'] : null, 'lng' => $r['lng'] !== null ? (float)$r['lng'] : null, 'website' => $web,
+            'color' => preg_match('/^#[0-9a-fA-F]{6}$/', (string)$r['color']) ? $r['color'] : null,
+            'features' => ['tickets' => (bool)$r['feature_tickets'], 'bookings' => (bool)$r['feature_bookings']]];
+    $pays = (int)$r['feature_payments'] === 1;
+    $evRows = fetchAllRows(prepareQuery2($conn, "SELECT e.id, e.title, e.date, e.type, e.time_start, e.time_end, e.image_path, e.description, e.registration, e.capacity, e.ticket_price, e.ticket_url,
+            (SELECT COALESCE(SUM(r.qty), 0) FROM event_registrations r WHERE r.event_id = e.id AND (r.status = 'confirmed' OR (r.status = 'pending' AND r.expires_at > NOW()))) AS reg_count
+        FROM events e WHERE e.pub_name = ? AND e.is_public = 1 AND e.date >= CURDATE() - INTERVAL 1 MONTH AND e.date <= CURDATE() + INTERVAL 12 MONTH
+        ORDER BY e.date, e.time_start LIMIT 1500", $slug));
     $events = [];
     foreach ($evRows as $e) {
         $img = $e['image_path'] && preg_match('#^uploads/[A-Za-z0-9_/.\-]+$#', $e['image_path']) && strpos($e['image_path'], '..') === false ? $e['image_path'] : null;
-        $events[] = ['id' => (int)$e['id'], 'pub' => $ids[$e['pub_name']], 'title' => $e['title'], 'date' => $e['date'], 'type' => $e['type'] ?: 'other',
-                     'start' => $e['time_start'] ? substr($e['time_start'], 0, 5) : null, 'end' => $e['time_end'] ? substr($e['time_end'], 0, 5) : null,
-                     'image' => $img, 'description' => $e['description']];
-        $last = count($events) - 1;
-        if (!empty($featById[$ids[$e['pub_name']]]) && $e['registration'] !== 'none') {   // ilmoittautuminen vain baareilla, jotka ovat sen ottaneet käyttöön
+        $ev = ['id' => (int)$e['id'], 'title' => $e['title'], 'date' => $e['date'], 'type' => $e['type'] ?: 'other',
+               'start' => $e['time_start'] ? substr($e['time_start'], 0, 5) : null, 'end' => $e['time_end'] ? substr($e['time_end'], 0, 5) : null,
+               'image' => $img, 'description' => $e['description']];
+        if ($pub['features']['tickets'] && $e['registration'] !== 'none') {   // ilmoittautuminen vain, jos baari on ottanut sen käyttöön
             $left = $e['capacity'] === null ? null : max(0, (int)$e['capacity'] - (int)$e['reg_count']);
-            $events[$last]['reg'] = ['mode' => $e['registration'], 'left' => $left, 'price' => $e['ticket_price'] === null ? null : (float)$e['ticket_price'], 'pay' => !empty($payBy[$ids[$e['pub_name']]]) && $e['registration'] === 'tickets' && (float)$e['ticket_price'] > 0 && bsStripeConfigured($cfg), 'pay_methods' => bsStripeMethods($cfg),
+            $ev['reg'] = ['mode' => $e['registration'], 'left' => $left, 'price' => $e['ticket_price'] === null ? null : (float)$e['ticket_price'],
+                'pay' => $pays && $e['registration'] === 'tickets' && (float)$e['ticket_price'] > 0 && bsStripeConfigured($cfg), 'pay_methods' => bsStripeMethods($cfg),
                 'url' => $e['ticket_url'] && preg_match('#^https://#i', $e['ticket_url']) ? $e['ticket_url'] : null];
         }
+        $events[] = $ev;
     }
-    return [$pubs, $events, $slugById];
+    return [$pub, $events];
 }
 function publicBaseUrl($cfg): string { return bsBaseUrl($cfg); }
 function icsText(string $t): string {
@@ -974,31 +961,25 @@ function icsFold(string $line): string {   // RFC 5545: rivi enintään 75 tavua
 if ($method === 'GET' && in_array($action, ['public_events', 'public_ics', 'public_rss'], true)) {
     header('Access-Control-Allow-Origin: *');   // julkista dataa, ei evästeitä
     header('Cache-Control: public, max-age=60');
-    [$pubs, $events, $slugById] = loadPublicData($conn, $cfg);
-    $only = (string)($_GET['pub'] ?? '');
-    if ($only !== '') {
-        if (!preg_match('/^p[0-9a-f]{12}$/', $only) || !isset($slugById[$only])) { http_response_code(404); header('Content-Type: text/plain; charset=utf-8'); echo 'Baaria ei löydy tai se ei ole julkinen'; exit; }
-        $pubs = array_values(array_filter($pubs, fn($p) => $p['id'] === $only));
-        $events = array_values(array_filter($events, fn($e) => $e['pub'] === $only));
-    }
-    if ($action === 'public_events') jsonResponse(['pubs' => $pubs, 'events' => $events, 'generated' => date('c')]);
+    [$pub, $events] = loadPublicData($conn, $cfg);
+    if ($action === 'public_events') jsonResponse(['pub' => $pub, 'events' => $events, 'generated' => date('c')]);
 
-    // Syötteet vaativat yhden baarin
-    if ($only === '') { http_response_code(400); header('Content-Type: text/plain; charset=utf-8'); echo 'Anna baari: ?pub=TUNNISTE'; exit; }
-    $pub = $pubs[0]; $base = publicBaseUrl($cfg);
-    $tz = new DateTimeZone(getPub($conn, $slugById[$only])['timezone']);
+    // Syötteet (iCal, RSS) vaativat julkaistun profiilin
+    if (!$pub) { http_response_code(404); header('Content-Type: text/plain; charset=utf-8'); echo 'Baarin julkista profiilia ei ole julkaistu'; exit; }
+    $base = publicBaseUrl($cfg);
+    $tz = new DateTimeZone(getPub($conn, thePub($conn))['timezone']);
     $today = (new DateTime('now', $tz))->format('Y-m-d');
     $events = array_values(array_filter($events, fn($e) => $e['date'] >= $today));
-    $link = fn($e) => $base . '/tapahtumat.html#pubs=' . $only;
+    $link = fn($e) => $base . '/tapahtumat.html';
     if ($action === 'public_ics') {
         header('Content-Type: text/calendar; charset=utf-8');
-        header('Content-Disposition: inline; filename="' . preg_replace('/[^A-Za-z0-9_-]/', '', $only) . '.ics"');
+        header('Content-Disposition: inline; filename="tapahtumat.ics"');
         $host = parse_url($base, PHP_URL_HOST) ?: 'barshift';
         echo "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//BarShift Pro//FI\r\nCALSCALE:GREGORIAN\r\nMETHOD:PUBLISH\r\n";
         echo icsFold('X-WR-CALNAME:' . icsText($pub['name'] . ' – tapahtumat')) . icsFold('X-WR-TIMEZONE:' . $tz->getName());
         $stamp = gmdate('Ymd\THis\Z');
         foreach ($events as $e) {
-            echo "BEGIN:VEVENT\r\n" . icsFold('UID:' . $only . '-' . $e['id'] . '@' . $host) . "DTSTAMP:$stamp\r\n";
+            echo "BEGIN:VEVENT\r\n" . icsFold('UID:event-' . $e['id'] . '@' . $host) . "DTSTAMP:$stamp\r\n";
             if ($e['start']) {
                 $d1 = new DateTime($e['date'] . ' ' . $e['start'], $tz);
                 $d2 = $e['end'] ? new DateTime($e['date'] . ' ' . $e['end'], $tz) : (clone $d1)->modify('+2 hours');
@@ -1024,7 +1005,7 @@ if ($method === 'GET' && in_array($action, ['public_events', 'public_ics', 'publ
     foreach (array_slice($events, 0, 50) as $e) {
         $when = date('j.n.Y', strtotime($e['date'])) . ($e['start'] ? ' klo ' . $e['start'] . ($e['end'] ? '–' . $e['end'] : '') : '');
         echo '<item><title>' . $x($e['title'] . ' (' . $when . ')') . '</title><link>' . $x($link($e)) . '</link>'
-           . '<guid isPermaLink="false">' . $x($only . '-' . $e['id']) . '</guid>'
+           . '<guid isPermaLink="false">' . $x('event-' . $e['id']) . '</guid>'
            . '<pubDate>' . (new DateTime($e['date'] . ' ' . ($e['start'] ?: '12:00'), $tz))->setTimezone(new DateTimeZone('UTC'))->format('D, d M Y H:i:s') . ' GMT</pubDate>'
            . '<description>' . $x($when . ($e['description'] ? ' – ' . $e['description'] : '')) . '</description></item>';
     }
@@ -1035,12 +1016,11 @@ if ($method === 'GET' && in_array($action, ['public_events', 'public_ics', 'publ
 
 // ===================== JULKISET ILMOITTAUTUMISET JA PÖYTÄVARAUKSET (ei kirjautumista) =====================
 // Toimivat vain baareille, jotka ovat julkaisseet profiilinsa ja ottaneet ominaisuuden käyttöön (pubs.feature_tickets / feature_bookings).
-function publicPubSlug($conn, $cfg, string $pid, string $feature): ?array {
-    if (!preg_match('/^p[0-9a-f]{12}$/', $pid)) return null;
-    foreach (fetchAllRows($conn->prepare("SELECT p.pub_name FROM pub_profiles p WHERE p.is_public = 1 AND NOT EXISTS (SELECT 1 FROM users u WHERE u.pub_name = p.pub_name AND u.status = 'frozen')") ?: dbError($conn)) as $r) {
-        if (publicPubId($cfg, $r['pub_name']) === $pid) { $pub = getPub($conn, $r['pub_name']); if (!empty($pub['features'][$feature])) return [$r['pub_name'], $pub]; return null; }
-    }
-    return null;
+function publicPub($conn, string $feature): ?array {
+    $slug = thePub($conn);
+    if (!fetchOne(prepareQuery2($conn, "SELECT 1 FROM pub_profiles p WHERE p.pub_name = ? AND p.is_public = 1 AND NOT EXISTS (SELECT 1 FROM users u WHERE u.pub_name = p.pub_name AND u.status = 'frozen')", $slug))) return null;
+    $pub = getPub($conn, $slug);
+    return !empty($pub['features'][$feature]) ? [$slug, $pub] : null;
 }
 function publicGuard($conn, string $bucket, int $max = 10): void {
     if (rateLimited($conn, $bucket, $max)) fail('Liian monta pyyntöä. Yritä myöhemmin uudelleen.', 429);
@@ -1216,12 +1196,12 @@ if ($method === 'GET' && $action === 'health') {   // valvonta (esim. UptimeRobo
 }
 if ($method === 'GET' && $action === 'public_booking_info') {
     header('Cache-Control: public, max-age=60');
-    $r = publicPubSlug($conn, $cfg, (string)($_GET['pub'] ?? ''), 'bookings'); if (!$r) fail('Varauksia ei ole käytössä', 404);
+    $r = publicPub($conn, 'bookings'); if (!$r) fail('Varauksia ei ole käytössä', 404);
     $pp = fetchOne(prepareQuery2($conn, "SELECT display_name, address, city FROM pub_profiles WHERE pub_name = ?", $r[0])); $b = $r[1]['booking'];
     jsonResponse(["success" => true, "name" => $pp['display_name'] ?: $r[1]['name'], "address" => $pp['address'], "city" => $pp['city'], "max_party" => $b['max_party'], "days_ahead" => $b['days_ahead'], "auto_confirm" => $b['auto_confirm'], "hours" => $b['hours'], "timezone" => $r[1]['timezone']]);
 }
 if ($method === 'GET' && $action === 'public_slots') {
-    $r = publicPubSlug($conn, $cfg, (string)($_GET['pub'] ?? ''), 'bookings'); if (!$r) fail('Varauksia ei ole käytössä', 404);
+    $r = publicPub($conn, 'bookings'); if (!$r) fail('Varauksia ei ole käytössä', 404);
     date_default_timezone_set($r[1]['timezone']);
     $date = validDate($_GET['date'] ?? null, 'date'); $party = (int)($_GET['party'] ?? 2);
     if ($party < 1 || $party > $r[1]['booking']['max_party']) fail('Henkilömäärä 1–' . $r[1]['booking']['max_party']);
@@ -1230,7 +1210,7 @@ if ($method === 'GET' && $action === 'public_slots') {
 if ($method === 'POST' && $action === 'public_book') {
     $d = json_decode(file_get_contents("php://input"), true) ?: [];
     publicGuard($conn, 'book:' . ($_SERVER['REMOTE_ADDR'] ?? ''), 8);
-    $r = publicPubSlug($conn, $cfg, (string)($d['pub'] ?? ''), 'bookings'); if (!$r) fail('Varauksia ei ole käytössä', 404);
+    $r = publicPub($conn, 'bookings'); if (!$r) fail('Varauksia ei ole käytössä', 404);
     [$slug, $pub] = $r; date_default_timezone_set($pub['timezone']); $b = $pub['booking'];
     [$name, $email] = cleanGuestInput($d);
     $phone = limitStr($d['phone'] ?? '', 30, 'phone'); $note = limitStr($d['note'] ?? '', 300, 'note');
@@ -1869,7 +1849,7 @@ if ($method === 'GET') {
         $pp = prepareQuery($conn, "SELECT display_name, description, address, city, lat, lng, website, color, is_public FROM pub_profiles WHERE pub_name = ?");
         $pp->bind_param("s", $myPub);
         $row = fetchOne($pp) ?: ['display_name' => null, 'description' => null, 'address' => null, 'city' => null, 'lat' => null, 'lng' => null, 'website' => null, 'color' => null, 'is_public' => 0];
-        jsonResponse(["success" => true, "profile" => $row, "public_id" => publicPubId($cfg, $myPub), "base_url" => publicBaseUrl($cfg)]);
+        jsonResponse(["success" => true, "profile" => $row, "base_url" => publicBaseUrl($cfg)]);
     }
 
 

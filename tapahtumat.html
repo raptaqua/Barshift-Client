@@ -7,7 +7,6 @@
 <meta name="theme-color" content="#FF7A59">
 <meta name="description" content="Baarien tapahtumat: live-musiikkia, visoja, urheilua ja bileitä kalenterissa ja kartalla.">
 <title>Baarien tapahtumat</title>
-<link rel="stylesheet" href="assets/leaflet/leaflet.css">
 <style>
 :root{
   color-scheme:light;
@@ -42,8 +41,7 @@ button{cursor:pointer}
 .tab[aria-selected=true]{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;box-shadow:0 4px 12px rgba(255,90,54,.35)}
 .search{flex:1;min-width:210px;max-width:380px;border:2px solid transparent;background:#fff;border-radius:100px;padding:11px 20px;box-shadow:var(--shadow);outline:none}
 .search:focus{border-color:var(--accent2)}
-:where(.tab,.chip,.btn,.day,.ev,.tile,.pill,.bar-item):focus-visible{outline:3px solid rgba(255,90,54,.55);outline-offset:2px}
-
+:where(.tab,.chip,.btn,.day,.ev,.tile,.pill):focus-visible{outline:3px solid rgba(255,90,54,.55);outline-offset:2px}
 .toolbar{margin:20px 0 6px}
 .frows{display:flex;flex-direction:column;gap:10px}
 .btn.ftoggle{display:none}
@@ -114,24 +112,6 @@ button{cursor:pointer}
 .daylist{padding:18px;margin-top:16px}
 .daylist h3{margin:0 0 12px;font-size:18px;font-weight:900}
 
-/* ---------- Kartta ---------- */
-.mapwrap{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:18px;margin-top:14px}
-#map{height:min(70vh,660px);min-height:380px;border-radius:var(--radius);box-shadow:var(--shadow);z-index:0}
-.side{max-height:min(70vh,660px);overflow:auto;padding:12px;display:flex;flex-direction:column;gap:10px}
-.bar-item{width:100%;text-align:left;border:0;background:var(--soft);border-radius:16px;padding:12px 14px;border-left:6px solid var(--c);transition:transform .12s}
-.bar-item:hover{transform:translateX(3px)}
-.bar-item.off{opacity:.6}
-.bar-item b{display:block;font-weight:900}
-.bar-item small{color:var(--text2);font-weight:600}
-.pin{width:36px;height:36px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);background:var(--c);border:3px solid #fff;box-shadow:0 4px 12px rgba(0,0,0,.3);display:flex;align-items:center;justify-content:center}
-.pin span{transform:rotate(45deg);color:#fff;font-weight:900;font-size:14px}
-.pin.off{background:#B7BDCC}
-.leaflet-popup-content{margin:14px 16px;font:14px/1.45 "Nunito","Segoe UI",system-ui,sans-serif}
-.leaflet-popup-content-wrapper{border-radius:16px}
-.pp h4{margin:0 0 2px;font-size:17px;font-weight:900}
-.pp ul{margin:8px 0 0;padding:0;list-style:none}
-.pp li{padding:5px 0;border-top:1px solid #f1e6d6}
-.pp a,.pp button{color:var(--accent);font-weight:800;background:none;border:0;padding:0;cursor:pointer;text-decoration:underline;font-size:14px}
 
 /* ---------- Modaali ---------- */
 .ov{position:fixed;inset:0;background:rgba(31,42,68,.55);backdrop-filter:blur(3px);display:none;align-items:center;justify-content:center;padding:16px;z-index:1000}
@@ -154,9 +134,8 @@ footer a{color:inherit}
   .rangebar{flex-wrap:nowrap;overflow-x:auto;padding-bottom:6px;scrollbar-width:none}
   .rangebar .chip{flex:none}
   .hero{padding:26px 0 56px;border-radius:0 0 30px 30px}
-  .mapwrap{grid-template-columns:1fr}
-  .side{max-height:none}
   .day{min-height:66px;align-items:center}
+      .day{min-height:66px;align-items:center}
   .day .pill,.day .more{display:none}
   .dots{display:flex;justify-content:center}
   .lbl{min-width:100%}
@@ -173,8 +152,8 @@ footer a{color:inherit}
 <header class="hero">
   <div class="confetti" aria-hidden="true"><span>🎵</span><span>🍻</span><span>🎉</span><span>⚽</span><span>🧠</span></div>
   <div class="in">
-    <h1>Mitä baareissa<br>tapahtuu? 🎉</h1>
-    <p id="subtitle">Live-musiikkia, visoja, urheilua ja bileitä – kaikki yhdessä paikassa.</p>
+    <h1>Mitä meillä<br>tapahtuu? 🎉</h1>
+    <p id="subtitle">Live-musiikkia, visoja, urheilua ja bileitä.</p>
   </div>
 </header>
 
@@ -183,19 +162,17 @@ footer a{color:inherit}
     <div class="tabs" role="tablist" aria-label="Näkymä">
       <button class="tab" role="tab" data-view="list">✨ Lista</button>
       <button class="tab" role="tab" data-view="month">📅 Kalenteri</button>
-      <button class="tab" role="tab" data-view="map">📍 Kartta</button>
     </div>
-    <input id="q" class="search" type="search" placeholder="Hae tapahtumaa tai baaria…" aria-label="Hae">
+    <input id="q" class="search" type="search" placeholder="Hae tapahtumaa…" aria-label="Hae">
   </div>
 
   <div class="toolbar" id="toolbar"></div>
   <main id="view"></main>
-  <footer>Tapahtumatiedot tulevat baarien omista ilmoituksista. Kartta © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMapin tekijät</a>.</footer>
+  <footer>Tapahtumatiedot tulevat baarin omista ilmoituksista.</footer>
 </div>
 
 <div class="ov" id="ov" role="dialog" aria-modal="true" aria-labelledby="mt"><div class="modal" id="modal"></div></div>
 
-<script src="assets/leaflet/leaflet.js"></script>
 <script>
 (function () {
 'use strict';
@@ -226,19 +203,18 @@ const rel = s => { const diff = Math.round((parse(s) - parse(today)) / 86400000)
 const timeText = e => e.start ? (e.end ? `${e.start}–${e.end}` : e.start) : '';
 const grad = t => { const g = (TYPES[t] || TYPES.other)[2]; return `linear-gradient(135deg,${g[0]},${g[1]})`; };
 
-let DATA = { pubs: [], events: [] }, PUB = {};
-const S = { view: 'list', month: today.slice(0, 7), sel: null, pubs: new Set(), types: new Set(), q: '', listRange: 'week', listLimit: 60, mapRange: 'all', city: '' };
+let DATA = { pub: null, events: [] }, PUB = null;   // PUB = baarin julkinen profiili
+const S = { view: 'list', month: today.slice(0, 7), sel: null, types: new Set(), q: '', listRange: 'week', listLimit: 60 };
 const LIST_RANGES = { week: ['Tulevat 7 päivää'], weekend: ['Viikonloppu'], month: ['30 päivää'], all: ['Kaikki tulevat'] };
 
 /* ---------- Tila <-> URL ---------- */
 function readHash() {
     const p = new URLSearchParams(location.hash.slice(1));
-    S.view = ['month', 'list', 'map'].includes(p.get('view')) ? p.get('view') : 'list';
+    S.view = ['month', 'list'].includes(p.get('view')) ? p.get('view') : 'list';
     if (/^\d{4}-\d{2}$/.test(p.get('m') || '')) S.month = p.get('m');
     if (LIST_RANGES[p.get('r')]) S.listRange = p.get('r');
-    S.pubs = new Set((p.get('pubs') || '').split(',').filter(Boolean));
     S.types = new Set((p.get('types') || '').split(',').filter(t => TYPES[t]));
-    S.q = p.get('q') || ''; S.city = p.get('city') || '';
+    S.q = p.get('q') || '';
     $('#q').value = S.q;
 }
 function writeHash() {
@@ -246,9 +222,8 @@ function writeHash() {
     if (S.view !== 'list') p.set('view', S.view);
     if (S.month !== today.slice(0, 7)) p.set('m', S.month);
     if (S.listRange !== 'week') p.set('r', S.listRange);
-    if (S.pubs.size) p.set('pubs', [...S.pubs].join(','));
     if (S.types.size) p.set('types', [...S.types].join(','));
-    if (S.q) p.set('q', S.q); if (S.city) p.set('city', S.city);
+    if (S.q) p.set('q', S.q);
     const h = p.toString(); history.replaceState(null, '', h ? '#' + h : location.pathname + location.search);
 }
 
@@ -256,11 +231,8 @@ function writeHash() {
 function filtered(extra) {
     const q = S.q.trim().toLowerCase();
     return DATA.events.filter(e => {
-        const pub = PUB[e.pub]; if (!pub) return false;
-        if (S.pubs.size && !S.pubs.has(e.pub)) return false;
         if (S.types.size && !S.types.has(e.type)) return false;
-        if (S.city && pub.city !== S.city) return false;
-        if (q && !(e.title + ' ' + pub.name + ' ' + (e.description || '')).toLowerCase().includes(q)) return false;
+        if (q && !(e.title + ' ' + (e.description || '')).toLowerCase().includes(q)) return false;
         return extra ? extra(e) : true;
     });
 }
@@ -273,30 +245,26 @@ async function load() {
     } catch (err) {
         $('#view').innerHTML = '<div class="empty"><div class="big">😕</div><h2>Tapahtumien lataus epäonnistui</h2>Yritä hetken kuluttua uudelleen.</div>'; return;
     }
-    PUB = {};
-    DATA.pubs.forEach((p, i) => { p.color = p.color || PALETTE[i % PALETTE.length]; PUB[p.id] = p; });
+    PUB = DATA.pub; if (PUB) PUB.color = PUB.color || PALETTE[0];
     const upcoming = DATA.events.filter(e => e.date >= today).length;
-    if (DATA.pubs.length) $('#subtitle').textContent = `${upcoming} tulevaa tapahtumaa ${DATA.pubs.length === 1 ? 'baarissa' : DATA.pubs.length + ' baarissa'} – valitse illan meno!`;
+    if (PUB) $('#subtitle').textContent = `${upcoming} tulevaa tapahtumaa – valitse illan meno!`;
     render();
 }
 
 /* ---------- Työkalurivi ---------- */
 function toggle(set, v) { set.has(v) ? set.delete(v) : set.add(v); S.listLimit = 60; render(); }
 function renderToolbar() {
-    const cities = [...new Set(DATA.pubs.map(p => p.city).filter(Boolean))].sort();
     const usedTypes = [...new Set(DATA.events.map(e => e.type))].filter(t => TYPES[t]);
     let h = '';
-    if (DATA.pubs.length > 1) h += `<div class="row"><span class="lbl">Baarit</span>${DATA.pubs.map(p => `<button class="chip" style="--c:${esc(p.color)}" data-pub="${esc(p.id)}" aria-pressed="${S.pubs.has(p.id)}"><span class="dot"></span>${esc(p.name)}</button>`).join('')}</div>`;
     if (usedTypes.length > 1) h += `<div class="row"><span class="lbl">Tyyppi</span>${usedTypes.map(t => `<button class="chip" style="--c:${TYPES[t][2][0]}" data-type="${t}" aria-pressed="${S.types.has(t)}">${TYPES[t][0]} ${TYPES[t][1]}</button>`).join('')}</div>`;
-    if (cities.length > 1) h += `<div class="row"><span class="lbl">Kaupunki</span><button class="chip" data-city="" aria-pressed="${!S.city}">Kaikki</button>${cities.map(c => `<button class="chip" data-city="${esc(c)}" aria-pressed="${S.city === c}">${esc(c)}</button>`).join('')}</div>`;
-    if (S.pubs.size || S.types.size || S.city || S.q) h += `<div class="row"><button class="btn sm" id="clear">✕ Tyhjennä suodattimet</button></div>`;
-    const active = S.pubs.size + S.types.size + (S.city ? 1 : 0);
+    if (S.types.size || S.q) h += `<div class="row"><button class="btn sm" id="clear">✕ Tyhjennä suodattimet</button></div>`;
+    const active = S.types.size;
     $('#toolbar').innerHTML = h ? `<button class="btn sm ftoggle" id="ftoggle" aria-expanded="${!!S.fOpen}">🎛️ Suodattimet${active ? ` (${active})` : ''} ${S.fOpen ? '▲' : '▼'}</button><div class="frows ${S.fOpen ? 'open' : ''}">${h}</div>` : '';
 }
 
 /* ---------- Lista: isot kortit (oletus) ---------- */
 function tile(e) {
-    const p = PUB[e.pub], img = imgUrl(e.image), t = TYPES[e.type] || TYPES.other, d = parse(e.date);
+    const p = PUB, img = imgUrl(e.image), t = TYPES[e.type] || TYPES.other, d = parse(e.date);
     return `<div role="button" tabindex="0" class="tile ${e.date === today ? 'today' : ''}" style="--c:${esc(p.color)};--g:${img ? cssUrl(img) : grad(e.type)}" data-ev="${e.id}" aria-label="${esc(e.title)}, ${esc(p.name)}, ${fmtShort(e.date)}">
         <div class="pic">${img ? '' : `<span class="em">${t[0]}</span>`}
             <div class="leaf"><small>${DOW[(d.getDay() + 6) % 7]}</small><b>${d.getDate()}</b><small class="mo">${MON3[d.getMonth()]}</small></div>
@@ -343,9 +311,9 @@ function renderList() {
 }
 
 /* ---------- Kuukausinäkymä ---------- */
-function pillHtml(e) { const p = PUB[e.pub]; return `<button class="pill" style="--c:${esc(p.color)}" data-ev="${e.id}" title="${esc(e.title)} – ${esc(p.name)}">${e.start ? `<b>${esc(e.start)}</b>` : ''}${esc(e.title)}</button>`; }
+function pillHtml(e) { const p = PUB; return `<button class="pill" style="--c:${esc(p.color)}" data-ev="${e.id}" title="${esc(e.title)} – ${esc(p.name)}">${e.start ? `<b>${esc(e.start)}</b>` : ''}${esc(e.title)}</button>`; }
 function evRow(e) {
-    const p = PUB[e.pub], t = TYPES[e.type] || TYPES.other;
+    const p = PUB, t = TYPES[e.type] || TYPES.other;
     return `<div role="button" tabindex="0" class="ev btn" style="--c:${esc(p.color)};justify-content:flex-start;width:100%;text-align:left;border-left:6px solid ${esc(p.color)}" data-ev="${e.id}">
         <span style="font-size:24px">${t[0]}</span><span><b>${esc(e.title)}</b><br><small style="color:var(--text2)">🕒 ${esc(timeText(e) || '–')} · ${esc(p.name)}</small></span></div>`;
 }
@@ -361,7 +329,7 @@ function renderMonth() {
         cells += `<div role="button" tabindex="0" class="day ${d.getMonth() !== m - 1 ? 'out' : ''} ${k === today ? 'today' : ''} ${S.sel === k ? 'sel' : ''}" data-day="${k}" aria-label="${fmtDate(k)}, ${list.length} tapahtumaa">
             <span class="n">${d.getDate()}</span>
             ${list.slice(0, 3).map(pillHtml).join('')}${list.length > 3 ? `<span class="more">+${list.length - 3} muuta</span>` : ''}
-            ${list.length ? `<span class="dots">${list.slice(0, 6).map(e => `<i style="--c:${esc(PUB[e.pub].color)}"></i>`).join('')}</span>` : ''}</div>`;
+            ${list.length ? `<span class="dots">${list.slice(0, 6).map(e => `<i style="--c:${esc(PUB.color)}"></i>`).join('')}</span>` : ''}</div>`;
     }
     const sel = S.sel && byDay[S.sel] ? byDay[S.sel] : null;
     return `<div class="card" style="margin-top:16px;overflow:hidden"><div class="cal-head"><h2 class="cal-title">${MONTHS[m - 1]} ${y}</h2>
@@ -371,55 +339,11 @@ function renderMonth() {
 }
 
 /* ---------- Karttanäkymä ---------- */
-let map = null, layer = null;
-const RANGES = { today: ['Tänään', 0], week: ['7 päivää', 6], month: ['30 päivää', 29], all: ['Kaikki tulevat', 9999] };
-function rangeEnd() { return addDays(today, RANGES[S.mapRange][1]); }
-function renderMapShell() {
-    return `<div class="row" style="margin:16px 0 0"><span class="lbl">Ajankohta</span>${Object.entries(RANGES).map(([k, v]) => `<button class="chip" data-range="${k}" aria-pressed="${S.mapRange === k}">${v[0]}</button>`).join('')}</div>
-    <div class="mapwrap"><div id="map" role="application" aria-label="Baarien sijainnit kartalla"></div><aside class="card side" id="side" aria-label="Baarit"></aside></div>`;
-}
-function mapData() {
-    const end = rangeEnd(), evs = filtered(e => e.date >= today && e.date <= end);
-    const byPub = {}; evs.forEach(e => (byPub[e.pub] = byPub[e.pub] || []).push(e));
-    Object.values(byPub).forEach(l => l.sort((a, b) => (a.date + (a.start || '')).localeCompare(b.date + (b.start || ''))));
-    let pubs = DATA.pubs.filter(p => (!S.pubs.size || S.pubs.has(p.id)) && (!S.city || p.city === S.city));
-    return { pubs, byPub };
-}
-function popupHtml(p, list) {
-    const web = safeUrl(p.website);
-    return `<div class="pp"><h4>${esc(p.name)}</h4><div style="color:#666">${esc([p.address, p.city].filter(Boolean).join(', '))}</div>
-        ${list.length ? `<ul>${list.slice(0, 4).map(e => `<li><button data-open="${e.id}">${esc(e.title)}</button><br><span style="color:#666">${fmtShort(e.date)} ${esc(timeText(e))}</span></li>`).join('')}</ul>${list.length > 4 ? `<div style="margin-top:6px;color:#666">+${list.length - 4} muuta</div>` : ''}` : '<div style="margin-top:8px;color:#666">Ei tapahtumia valitulla ajalla.</div>'}
-        ${web ? `<div style="margin-top:8px"><a href="${esc(web)}" target="_blank" rel="noopener noreferrer">Baarin sivut ↗</a></div>` : ''}</div>`;
-}
-function setupMap() {
-    const el = $('#map'); if (!el) return;
-    if (map) { map.remove(); map = null; }
-    map = L.map(el, { scrollWheelZoom: true }).setView([64.5, 26], 5);
-    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>' }).addTo(map);
-    layer = L.layerGroup().addTo(map);
-    const { pubs, byPub } = mapData(), located = pubs.filter(p => p.lat !== null && p.lng !== null), pts = [], markers = {};
-    located.forEach(p => {
-        const n = (byPub[p.id] || []).length;
-        const icon = L.divIcon({ className: '', iconSize: [36, 36], iconAnchor: [18, 36], popupAnchor: [0, -34],
-            html: `<div class="pin ${n ? '' : 'off'}" style="--c:${esc(p.color)}"><span>${n || '·'}</span></div>` });
-        const m = L.marker([p.lat, p.lng], { icon, title: p.name, alt: p.name }).addTo(layer).bindPopup(popupHtml(p, byPub[p.id] || []), { maxWidth: 300 });
-        markers[p.id] = m; pts.push([p.lat, p.lng]);
-    });
-    if (pts.length > 1) map.fitBounds(pts, { padding: [50, 50], maxZoom: 14 }); else if (pts.length === 1) map.setView(pts[0], 14);
-    const order = pubs.slice().sort((a, b) => ((byPub[b.id] || []).length ? 1 : 0) - ((byPub[a.id] || []).length ? 1 : 0) || a.name.localeCompare(b.name, 'fi'));
-    $('#side').innerHTML = order.length ? order.map(p => { const l = byPub[p.id] || [], nx = l[0], has = p.lat !== null && p.lng !== null;
-        return `<button class="bar-item ${l.length ? '' : 'off'}" style="--c:${esc(p.color)}" data-bar="${esc(p.id)}"><b>${esc(p.name)}</b><small>${esc([p.address, p.city].filter(Boolean).join(', ') || '–')}</small><br>
-            <small>${l.length ? `${l.length} tapahtumaa · seuraava ${fmtShort(nx.date)} ${esc(nx.start || '')}` : 'Ei tapahtumia valitulla ajalla'}${has ? '' : ' · ei sijaintia kartalla'}</small></button>`; }).join('')
-        : '<div style="padding:20px;text-align:center;color:var(--text3)">Ei baareja.</div>';
-    $('#side').onclick = ev => { const b = ev.target.closest('[data-bar]'); if (!b) return; const m = markers[b.dataset.bar]; if (m) { map.flyTo(m.getLatLng(), 16, { duration: .6 }); m.openPopup(); } };
-    map.on('popupopen', ev => ev.popup.getElement().querySelectorAll('[data-open]').forEach(b => b.onclick = () => openEvent(+b.dataset.open)));
-    window.__markers = markers;
-}
 
 /* ---------- Tapahtuman tiedot ---------- */
 function icsEscape(t) { return String(t || '').replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\r?\n/g, '\\n'); }
 function downloadIcs(e) {
-    const p = PUB[e.pub], d = e.date.replace(/-/g, ''), st = (e.start || '18:00').replace(':', '') + '00';
+    const p = PUB, d = e.date.replace(/-/g, ''), st = (e.start || '18:00').replace(':', '') + '00';
     let endDate = e.date, en = e.end ? e.end.replace(':', '') + '00' : null;
     if (e.end && e.end <= (e.start || '00:00')) endDate = addDays(e.date, 1);
     if (!en) { const h = Math.min(23, parseInt((e.start || '18:00').slice(0, 2)) + 3); en = pad(h) + (e.start || '18:00').slice(3, 5).replace(':', '') + '00'; }
@@ -487,7 +411,7 @@ function shareCard(e, p) {   // 1080x1080 PNG jaettavaksi someen: piirretään s
 let lastFocus = null;
 function openEvent(id) {
     const e = DATA.events.find(x => x.id === id); if (!e) return;
-    const p = PUB[e.pub], img = imgUrl(e.image), t = TYPES[e.type] || TYPES.other, web = safeUrl(p.website);
+    const p = PUB, img = imgUrl(e.image), t = TYPES[e.type] || TYPES.other, web = safeUrl(p.website);
     const dest = p.lat !== null && p.lng !== null ? `${p.lat},${p.lng}` : [p.name, p.address, p.city].filter(Boolean).join(' ');
     lastFocus = document.activeElement;
     $('#modal').innerHTML = `<div class="img" style="--g:${img ? cssUrl(img) : grad(e.type)}" role="img" aria-label="${img ? 'Tapahtuman kuva' : t[1]}">${img ? '' : t[0]}</div>
@@ -500,15 +424,14 @@ function openEvent(id) {
         ${e.description ? `<p style="white-space:pre-line;margin:0 0 6px;color:var(--text2)">${esc(e.description)}</p>` : ''}
         ${regHtml(e)}
         <div class="acts"><button class="btn primary" id="ics">📥 Lisää kalenteriin</button>
-        ${p.lat !== null ? `<button class="btn" id="onmap">🗺️ Kartalla</button>` : ''}
+        ${p.lat !== null && p.lng !== null ? `<a class="btn" href="https://www.openstreetmap.org/?mlat=${p.lat}&amp;mlon=${p.lng}#map=16/${p.lat}/${p.lng}" target="_blank" rel="noopener noreferrer">🗺️ Kartalla</a>` : ''}
         <a class="btn" href="https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(dest)}" target="_blank" rel="noopener noreferrer">🧭 Reittiohje</a>
-        ${p.features && p.features.bookings ? `<a class="btn" href="varaus.html?pub=${encodeURIComponent(p.id)}">🍽️ Varaa pöytä</a>` : ''}
+        ${p.features && p.features.bookings ? `<a class="btn" href="varaus.html">🍽️ Varaa pöytä</a>` : ''}
         <button class="btn" id="share">🖼️ Some-kortti</button>
         ${web ? `<a class="btn" href="${esc(web)}" target="_blank" rel="noopener noreferrer">Baarin sivut ↗</a>` : ''}</div></div>`;
     $('#ov').classList.add('open'); $('#xclose').focus();
     $('#xclose').onclick = closeModal; $('#ics').onclick = () => downloadIcs(e);
     $('#share').onclick = () => shareCard(e, p); wireReg(e);
-    const om = $('#onmap'); if (om) om.onclick = () => { closeModal(); S.view = 'map'; render(); const m = (window.__markers || {})[e.pub]; if (m) setTimeout(() => { map.flyTo(m.getLatLng(), 16, { duration: .6 }); m.openPopup(); }, 250); };
 }
 function closeModal() { $('#ov').classList.remove('open'); if (lastFocus && lastFocus.focus) lastFocus.focus(); }
 
@@ -516,22 +439,18 @@ function closeModal() { $('#ov').classList.remove('open'); if (lastFocus && last
 function render() {
     document.querySelectorAll('.tab').forEach(t => t.setAttribute('aria-selected', t.dataset.view === S.view));
     renderToolbar(); writeHash();
-    if (!DATA.pubs.length) { $('#view').innerHTML = '<div class="empty"><div class="big">🍻</div><h2>Tapahtumia ei ole vielä julkaistu</h2>Baarit voivat julkaista tapahtumansa hallintapaneelin Julkinen profiili -asetuksista.</div>'; return; }
+    if (!PUB) { $('#view').innerHTML = '<div class="empty"><div class="big">🍻</div><h2>Tapahtumia ei ole vielä julkaistu</h2>Baarit voivat julkaista tapahtumansa hallintapaneelin Julkinen profiili -asetuksista.</div>'; return; }
     const v = $('#view');
     if (S.view === 'month') v.innerHTML = renderMonth();
-    else if (S.view === 'list') v.innerHTML = renderList();
-    else { v.innerHTML = renderMapShell(); setupMap(); }
+    else v.innerHTML = renderList();
 }
 document.addEventListener('click', ev => {
     const t = ev.target;
     let el;
     if ((el = t.closest('.tab'))) { S.view = el.dataset.view; return render(); }
-    if ((el = t.closest('[data-pub]'))) return toggle(S.pubs, el.dataset.pub);
     if ((el = t.closest('[data-type]'))) return toggle(S.types, el.dataset.type);
-    if ((el = t.closest('[data-city]'))) { S.city = el.dataset.city; return render(); }
-    if ((el = t.closest('[data-range]'))) { S.mapRange = el.dataset.range; return render(); }
     if ((el = t.closest('[data-lrange]'))) { S.listRange = el.dataset.lrange; S.listLimit = 60; return render(); }
-    if (t.closest('#clear')) { S.pubs.clear(); S.types.clear(); S.city = ''; S.q = ''; $('#q').value = ''; return render(); }
+    if (t.closest('#clear')) { S.types.clear(); S.q = ''; $('#q').value = ''; return render(); }
     if (t.closest('#ftoggle')) { S.fOpen = !S.fOpen; return renderToolbar(); }
     if (t.closest('#more')) { S.listLimit += 60; return render(); }
     if ((el = t.closest('[data-nav]'))) {

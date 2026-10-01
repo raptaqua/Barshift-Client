@@ -99,7 +99,7 @@ Työntekijä merkitsee **toistuvat estepäivät** (*Oma profiili → Saatavuus*)
 
 **Asiakaspalvelut (baarikohtaisesti aktivoitavat, oletuksena pois):** *Hallinta → Baari → Asiakaspalvelut*.
 - *Ilmoittautuminen ja liput*: tapahtumalle ilmoittautuminen (paikkamäärä, hinta tiedoksi, maksu ovella) tai ulkoinen lippulinkki (https). BarShift ei käsittele maksuja. Kävijä saa vahvistuksen, peruutuslinkin ja muistutuksen sähköpostilla; ilmoittautuneet ja CSV *Tapahtumat*-sivulla. Julkisella sivulla myös jaettava **some-kortti** (PNG).
-- *Pöytävaraukset*: aukioloajat, paikkamäärä, ryhmäkoko, varauksen kesto, automaattinen tai manuaalinen vahvistus. Kävijän sivu `varaus.html?pub=TUNNISTE` (osoite näkyy *Hallinta → Varaukset*). Vahvistukset ja muistutukset sähköpostilla.
+- *Pöytävaraukset*: aukioloajat, paikkamäärä, ryhmäkoko, varauksen kesto, automaattinen tai manuaalinen vahvistus. Kävijän sivu `varaus.html` (osoite näkyy *Hallinta → Varaukset*). Vahvistukset ja muistutukset sähköpostilla.
 - Molemmat vaativat julkaistun julkisen profiilin ja toimivat parhaiten kun sähköposti on otettu käyttöön. Kävijöiden tiedot poistuvat 12 kk:n kuluttua (`cron.php`).
 
 **Analytiikka** (*Hallinta → Analytiikka*): tunnit, kuormituskartta, täsmällisyys ja sairauspoissaolot. Kyse on työntekijöiden seurannasta: kerro siitä henkilöstölle ja käytä tietoja harkiten.
@@ -158,20 +158,18 @@ Sivua ei ole linkitetty sovelluksesta muualle kuin admin-näkymän painikkeeseen
   sijainti osoitteesta, esittely, verkkosivu, väri). Lisäksi jokainen tapahtuma valitaan erikseen julkiseksi tapahtumalomakkeen
   valinnalla; vanhat tapahtumat pysyvät sisäisinä päivityksessä.
 - **Mitä julkaistaan:** vain profiilin tiedot ja julkiset tapahtumat (nimi, aika, tyyppi, kuvaus, kuva). Työntekijä- tai vuorotietoja
-  ja baarin sisäistä tunnusta (osa kirjautumistunnusta) ei paljasteta; baarille annetaan johdettu julkinen tunniste.
-  Jäädytetyt baarit eivät näy.
+  ei paljasteta. Julkinen sivu näkyy vain, kun baarin julkinen profiili on julkaistu.
 - **Rajapinta:** `api.php?action=public_events` (GET, ei istuntoa, CORS `*`, välimuisti 60 s). Kalenterin voi siirtää toiselle palvelimelle
   vaihtamalla tiedoston alun `BASE`-vakion.
 - **Sijainti osoitteesta:** admin kirjoittaa vain osoitteen ja kaupungin; palvelin hakee koordinaatit OpenStreetMapin Nominatim-palvelusta
   (haut vain adminille, max 1 haku/s, tunnistettava User-Agent; ks. Nominatimin käyttöehdot). Käsin asetus on lisäasetus. Hakupalvelun voi vaihtaa
   configin `geocoder_url`-asetuksella ja maan rajata asetuksella `geocode_countries` (esim. `fi`).
-- **Syötteet ja widget:** jokaisella julkisella baarilla on `api.php?action=public_ics&pub=TUNNISTE` (iCal-tilaus), `public_rss` (RSS 2.0) ja
-  upotettava `widget.html?pub=TUNNISTE&n=5&theme=dark&color=E14D2A` (iframe; `.htaccess` sallii vain tälle sivulle upottamisen). Osoitteet ja upotuskoodi
+- **Syötteet ja widget:** julkisella baarilla on `api.php?action=public_ics` (iCal-tilaus), `public_rss` (RSS 2.0) ja
+  upotettava `widget.html?n=5&theme=dark&color=E14D2A` (iframe; `.htaccess` sallii vain tälle sivulle upottamisen). Osoitteet ja upotuskoodi
   näkyvät adminille kohdassa *Julkinen profiili → Jaa ja upota*. Linkit käyttävät osoitetta, jolla sivua kutsutaan; kiinteän osoitteen voi asettaa configin `base_url`-asetuksella.
 - **Ulkoasu:** valoisa ja värikäs; oletusnäkymä Lista näyttää tulevan viikon tapahtumat korteissa (myös Viikonloppu, 30 päivää ja Kaikki tulevat).
-- **Kartta:** Leaflet (`assets/leaflet/`, BSD-2) isännöidään itse; karttalaatat tulevat OpenStreetMapista. OSM:n laattapalvelu on tarkoitettu
-  kohtuulliseen käyttöön: suuremmalla liikenteellä vaihda laattapalvelu (esim. MapTiler/Stadia) ja päivitä `.htaccess`-tiedoston CSP.
-- Demodata sisältää kaksi kuvitteellista esimerkkibaaria (`demo-satama`, `demo-kellari`) ja demobaarin julkisen profiilin.
+- **Usean baarin kalenteri ja kartta:** hoitaa keskuspalvelin (BarShift Hub); tämä sivu näyttää vain oman baarin tapahtumat.
+- Demodata sisältää demobaarin ja sen julkisen profiilin.
 
 ## Kehitys, testit ja ylläpito
 

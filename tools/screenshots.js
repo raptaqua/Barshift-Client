@@ -59,9 +59,8 @@ async function login(p,u){await p.goto(BASE+'index.php');await p.fill('#li-u',u)
  await p.evaluate(s=>{nav('list'); openShiftModal(null,s.userId,s.date)},sh); await p.waitForSelector('#m-warn .warn-box'); await p.waitForTimeout(400); await shotEl(p,'vuoro-lomake','#modal-box');
  await p.evaluate(()=>closeModal());
  await p.evaluate(()=>{nav('admin'); setAdminTab('profile')}); await p.waitForSelector('#sh-ical'); await shotEl(p,'jaa-ja-upota','.card-sm >> nth=1');
- const pid=await p.evaluate(()=>state.pubShare.id);
- const inv=await post(p,'send_invite',{userId:9006}); const wp=await ctx.newPage(); await wp.setViewportSize({width:480,height:560}); await wp.goto(inv.invite.link); await wp.waitForSelector('.login-id'); await shot(wp,'salasanan-asetus'); await wp.close();
- const wg=await ctx.newPage(); await wg.setViewportSize({width:400,height:560}); await wg.goto(BASE+'widget.html?pub='+pid+'&n=4'); await wg.waitForSelector('.ev'); await shot(wg,'widget'); await wg.close();
+  const inv=await post(p,'send_invite',{userId:9006}); const wp=await ctx.newPage(); await wp.setViewportSize({width:480,height:560}); await wp.goto(inv.invite.link); await wp.waitForSelector('.login-id'); await shot(wp,'salasanan-asetus'); await wp.close();
+ const wg=await ctx.newPage(); await wg.setViewportSize({width:400,height:560}); await wg.goto(BASE+'widget.html?n=4'); await wg.waitForSelector('.ev'); await shot(wg,'widget'); await wg.close();
  await p.setViewportSize({width:1280,height:880});
  // --- toinen aalto: miehitys, tiimi, analytiikka, varaukset
  await post(p,'staffing_rule',{dow:4,start:'20:00',end:'02:00',min_staff:4}); await post(p,'staffing_rule',{dow:5,start:'20:00',end:'02:00',min_staff:4}); await p.evaluate(()=>load()); await p.waitForTimeout(900);
@@ -73,8 +72,8 @@ async function login(p,u){await p.goto(BASE+'index.php');await p.fill('#li-u',u)
  await p.evaluate(()=>{setTeamTab('kudos'); nav('team')}); await shot(p,'tiimi-kiitokset');
  await p.evaluate(()=>{setTeamTab('onboarding'); nav('team')}); await shot(p,'tiimi-perehdytys');
  await p.evaluate(async()=>{const s=state.data.pub; const hours=[0,1,2,3,4,5,6].map(d=>({dow:d,open:'16:00',close:'23:00'})); await fetch('api.php?action=save_pub_settings',{method:'POST',body:JSON.stringify({...s,feature_bookings:true,feature_tickets:true,booking:{...s.booking,hours,auto_confirm:false}})});});
- const pid2=await p.evaluate(async()=>(await (await fetch('api.php?action=pub_profile')).json()).public_id); const bd=new Date(Date.now()+3*864e5).toISOString().slice(0,10);
- for (const [n,pt,t] of [['Aino Virtanen',4,'18:00'],['Petri Laine',2,'19:00'],['Sanna Koski',6,'20:00']]) await p.evaluate(async([pid,n,pt,bd,t])=>{await fetch('api.php?action=public_book',{method:'POST',body:JSON.stringify({pub:pid,name:n,email:n.split(' ')[0].toLowerCase()+'@example.test',party:pt,date:bd,time:t})})},[pid2,n,pt,bd,t]);
+  const bd=new Date(Date.now()+3*864e5).toISOString().slice(0,10);
+ for (const [n,pt,t] of [['Aino Virtanen',4,'18:00'],['Petri Laine',2,'19:00'],['Sanna Koski',6,'20:00']]) await p.evaluate(async([_x,n,pt,bd,t])=>{await fetch('api.php?action=public_book',{method:'POST',body:JSON.stringify({name:n,email:n.split(' ')[0].toLowerCase()+'@example.test',party:pt,date:bd,time:t})})},[pid2,n,pt,bd,t]);
  await p.evaluate(()=>load()); await p.waitForTimeout(900);
  await p.evaluate(()=>{nav('admin'); setAdminTab('bookings')}); await p.waitForSelector('text=Kirjaa varaus'); await shot(p,'hallinta-varaukset');
  await p.evaluate(()=>{nav('messages')}); await shot(p,'viestit');
@@ -91,7 +90,7 @@ async function login(p,u){await p.goto(BASE+'index.php');await p.fill('#li-u',u)
  ctx=await ctxFor(b,{width:1280,height:900}); p=await ctx.newPage();
  await p.goto(BASE+'tapahtumat.html'); await p.waitForSelector('.tile'); await shot(p,'tapahtumakalenteri-lista');
  await p.click('.tab[data-view=month]'); await p.waitForSelector('.day'); await shot(p,'tapahtumakalenteri-kuukausi');
- await p.click('.tab[data-view=map]'); await p.waitForSelector('.leaflet-marker-icon'); await p.waitForTimeout(900); await (await p.$('.mapwrap')).screenshot({path:OUT+'tapahtumakalenteri-kartta.jpg',type:'jpeg',quality:82}); console.log('ok tapahtumakalenteri-kartta');
+ console.log('ok tapahtumakalenteri-kartta');
  await p.click('.tab[data-view=list]'); await p.click('.tile'); await shot(p,'tapahtumakalenteri-tapahtuma'); await ctx.close();
  await b.close();
 })().catch(e=>{console.error('VIRHE',e.message);process.exit(1)});

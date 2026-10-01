@@ -1,4 +1,4 @@
-// Julkinen pöytävaraus (?pub=TUNNISTE) ja varauksen/ilmoittautumisen peruutus (#cancel=TOKEN). Kaikki teksti asetetaan textContentilla.
+// Julkinen pöytävaraus ja varauksen/ilmoittautumisen peruutus (#cancel=TOKEN). Kaikki teksti asetetaan textContentilla.
 (function () {
   var root = document.getElementById('root'), q = new URLSearchParams(location.search), hash = new URLSearchParams(location.hash.slice(1));
   function el(tag, attrs, text) { var e = document.createElement(tag); Object.keys(attrs || {}).forEach(function (k) { e.setAttribute(k, attrs[k]); }); if (text != null) e.textContent = text; return e; }
@@ -50,9 +50,7 @@
   }
 
   // ---- Varaus ----
-  var pub = q.get('pub') || '';
-  if (!/^p[0-9a-f]{12}$/.test(pub)) return show(el('h1', {}, 'Pöytävaraus'), el('p', { 'class': 'sub' }, 'Osoitteesta puuttuu baarin tunniste.'));
-  api('public_booking_info', {}, '&pub=' + pub).then(function (r) {
+  api('public_booking_info', {}).then(function (r) {
     if (!r.ok) return show(el('h1', {}, 'Pöytävaraus'), el('p', { 'class': 'sub' }, 'Tämän baarin pöytävaraukset eivät ole käytössä.'));
     var info = r.j, chosen = null, today = new Date(), iso = function (d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
     document.title = 'Pöytävaraus – ' + info.name;
@@ -70,7 +68,7 @@
     show(h);
     function loadSlots() {
       chosen = null; btn.disabled = true; slots.textContent = 'Haetaan aikoja…';
-      api('public_slots', {}, '&pub=' + pub + '&date=' + encodeURIComponent(date.value) + '&party=' + party.value).then(function (r) {
+      api('public_slots', {}, '&date=' + encodeURIComponent(date.value) + '&party=' + party.value).then(function (r) {
         slots.textContent = '';
         if (!r.ok) { slots.textContent = r.j.error || 'Aikoja ei voitu hakea'; return; }
         if (!r.j.slots.length) { slots.textContent = 'Ei vapaita aikoja tälle päivälle. Kokeile toista päivää tai pienempää ryhmää.'; return; }
@@ -84,7 +82,7 @@
     party.addEventListener('change', loadSlots); date.addEventListener('change', loadSlots); loadSlots();
     btn.addEventListener('click', function () {
       msg.textContent = ''; msg.className = 'msg'; btn.disabled = true;
-      post('public_book', { pub: pub, name: name.value, email: email.value, phone: phone.value, note: note.value, party: +party.value, date: date.value, time: chosen, website: hp.value }).then(function (r) {
+      post('public_book', { name: name.value, email: email.value, phone: phone.value, note: note.value, party: +party.value, date: date.value, time: chosen, website: hp.value }).then(function (r) {
         if (!r.ok) { msg.textContent = r.j.error || 'Varaus epäonnistui'; msg.className = 'msg err'; btn.disabled = false; if (/vapaana/.test(r.j.error || '')) loadSlots(); return; }
         show(el('h1', {}, r.j.status === 'confirmed' ? 'Varaus vahvistettu ✓' : 'Varauspyyntö vastaanotettu ✓'),
           el('p', { 'class': 'sub' }, (r.j.status === 'confirmed' ? 'Pöytäsi on varattu.' : 'Baari vahvistaa varauksen sähköpostilla.') + ' Varauskoodi: ' + r.j.code + '. Vahvistus ja peruutuslinkki on lähetetty sähköpostiisi.'));

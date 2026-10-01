@@ -107,7 +107,7 @@ function adminTabBookings() {
     if (!pubFeature('bookings')) return `<div class="card card-sm" style="max-width:640px;"><p style="margin:0; color:var(--text2);">Pöytävaraukset eivät ole käytössä. Ota ne käyttöön kohdassa <b>Hallinta → Baari → Asiakaspalvelut</b>.</p></div>`;
     const list = (state.data.bookings || []).filter(b => state.bkShowAll || !['cancelled', 'declined'].includes(b.status));
     const byDay = {}; list.forEach(b => (byDay[b.starts_at.slice(0, 10)] = byDay[b.starts_at.slice(0, 10)] || []).push(b));
-    const pid = state.pubShare && state.pubShare.id;
+    const bookUrl = state.pubShare && `${state.pubShare.base}/varaus.html`;
     if (!state.pubShare && !state.pubProfileLoading) loadPubProfile();
     return `<div class="card card-sm" style="max-width:760px; margin-bottom:14px;">
         <div class="section-header"><span class="section-title"><i class="bi bi-plus-circle"></i> Kirjaa varaus (puhelin / ovi)</span><div class="section-line"></div></div>
@@ -119,7 +119,7 @@ function adminTabBookings() {
             <div class="form-group"><label class="form-label">Puhelin</label><input id="nb-phone" class="form-input" maxlength="30"></div>
             <div class="form-group"><button class="btn btn-primary" onclick="createBooking()"><i class="bi bi-plus-lg"></i> Lisää</button></div>
         </div>
-        ${pid ? `<small style="color:var(--text3)">Kävijöiden varaussivu: <a href="varaus.html?pub=${pid}" target="_blank" rel="noopener">varaus.html?pub=${pid}</a></small>` : ''}
+        ${bookUrl ? `<small style="color:var(--text3)">Kävijöiden varaussivu: <a href="varaus.html" target="_blank" rel="noopener">${esc(bookUrl)}</a></small>` : ''}
     </div>
     <div style="display:flex; justify-content:flex-end; margin-bottom:8px;"><label style="font-size:12px; color:var(--text2);"><input type="checkbox" ${state.bkShowAll ? 'checked' : ''} onchange="state.bkShowAll=this.checked; render()"> Näytä perutut</label></div>
     ${Object.keys(byDay).sort().map(d => `<div class="card card-sm" style="max-width:760px; margin-bottom:12px;"><b>${formatDate(d)}</b> <small style="color:var(--text3)">· ${byDay[d].filter(b => !['cancelled', 'declined'].includes(b.status)).reduce((a, b) => a + b.party_size, 0)} hlö</small>
