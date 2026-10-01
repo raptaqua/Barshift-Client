@@ -288,6 +288,8 @@ function getPub($conn, string $slug, bool $adminView = false): array {
         'payments' => (bool)$p['feature_payments'], 'guests' => (bool)$p['feature_guests'],
         'hub_events' => (bool)$p['feature_hub_events'], 'hub_gigs' => (bool)$p['feature_hub_gigs']];
     $out['hub_available'] = hubConfigured($GLOBALS['cfg'] ?? []);
+    $hs = []; foreach (($GLOBALS['conn']->query("SELECT k, v FROM system_status WHERE k IN ('hub_last_sync', 'hub_last_error')") ?: []) as $r) $hs[$r['k']] = $r['v'];
+    $out['hub_status'] = ['last_sync' => $hs['hub_last_sync'] ?? null, 'last_error' => $hs['hub_last_error'] ?? null];
     $out['guest_reminder_hours'] = (int)$p['guest_reminder_hours']; $out['reminder_sms'] = (bool)$p['reminder_sms'];
     $bh = json_decode((string)($p['booking_hours'] ?? ''), true);
     $out['booking'] = ['capacity' => (int)$p['booking_capacity'], 'max_party' => (int)$p['booking_max_party'], 'slot_minutes' => (int)$p['booking_slot_minutes'], 'duration_minutes' => (int)$p['booking_duration_minutes'],
@@ -625,6 +627,22 @@ function storeDocumentUpload(string $key, string $pub, bool $imagesOnly = false)
 
 function accountUserIds($conn, int $uid): array { return [$uid]; }
 // Tämä asennus palvelee täsmälleen yhtä baaria. Kanta, jossa on useampi baari, hylätään (tietoturva: ei baarien välistä dataa samassa kannassa)
+function bsHubRecord($conn, bool $ok, string $err): void {
+    $now = date('c');
+    foreach ([['hub_last_sync', $now], ['hub_last_error', $ok ? '' : $err]] as [$k, $v]) { $st = $conn->prepare("INSERT INTO system_status (k, v) VALUES (?, ?) ON DUPLICATE KEY UPDATE v = VALUES(v)"); if ($st) { $st->bind_param('ss', $k, $v); $st->execute(); } }
+}
+// Muutoksen jälkeen synkronoidaan keskukseen heti vastauksen jälkeen (ei hidasta käyttäjää; cron on varmistus)
+function hubSyncAfterResponse($conn, array $cfg, string $pubSlug, array $vapid): void {
+    if (!hubConfigured($cfg)) return;
+    register_shutdown_function(function () use ($conn, $cfg, $pubSlug, $vapid) {
+        if (function_exists('fastcgi_finish_request')) @fastcgi_finish_request();
+        try {
+            $prow = fetchOne(prepareQuery2($conn, "SELECT slug, feature_hub_events, feature_hub_gigs FROM pubs WHERE slug = ?", $pubSlug));
+            if (!$prow || (!$prow['feature_hub_events'] && !$prow['feature_hub_gigs'])) return;
+            [$sent, $errs] = hubSync($conn, $cfg, $prow); bsHubRecord($conn, $errs === 0, $errs ? hubLastError() : '');
+        } catch (Throwable $e) { error_log('hub sync: ' . $e->getMessage()); }
+    });
+}
 function thePub($conn): string {
     static $slug = null;
     if ($slug !== null) return $slug;
@@ -1460,6 +1478,7 @@ thePub($conn);
 $me = requireLogin($conn);
 $myPub = $me['pub_name'];
 $myId = (int)$me['id'];
+if ($method !== 'GET' && (in_array($action, ['event', 'shift', 'publish_shifts', 'clear_shifts', 'apply_week_template', 'save_pub_settings', 'save_pub_profile'], true) || $method === 'DELETE')) hubSyncAfterResponse($conn, $cfg, $myPub, $vapid_auth);
 
 // Baarin aikavyöhyke: PHP:n ja tietokannan (NOW(), CURDATE()) aika vastaavat baarin paikallista aikaa (leimaukset, vuorot)
 if (true) {
@@ -2155,6 +2174,17 @@ if ($method === 'POST') {
         $up->bind_param("isi", $step, $json, $myId); run($up);
         audit($conn, $me, '2FA otettu käyttöön', $me['username']);
         jsonResponse(["success" => true, "recovery_codes" => $codes]);
+
+    } elseif ($action === 'hub_sync_now') {   // testaa yhteys ja synkronoi heti (ylläpito)
+        requireAdmin($me);
+        if (!hubConfigured($cfg)) fail('Keskuspalvelinta ei ole määritetty config.php:ssä (hub-lohko)', 409);
+        [$pc] = hubRequest($cfg, 'GET', '/v1/applications?since_id=999999999');
+        if ($pc !== 200) { bsHubRecord($conn, false, hubLastError()); fail(hubLastError() ?: 'Keskus ei vastannut', 502); }
+        $prow = fetchOne(prepareQuery2($conn, "SELECT slug, feature_hub_events, feature_hub_gigs FROM pubs WHERE slug = ?", $myPub));
+        [$sent, $errs] = hubSync($conn, $cfg, $prow); $new = hubPullApplications($conn, $cfg, $prow, $vapid_auth);
+        bsHubRecord($conn, $errs === 0, $errs ? hubLastError() : '');
+        jsonResponse(["success" => $errs === 0, "sent" => $sent, "errors" => $errs, "new_applications" => $new, "error" => $errs ? hubLastError() : null,
+            "note" => (empty($prow['feature_hub_events']) && empty($prow['feature_hub_gigs'])) ? 'Yhteys toimii, mutta kumpikaan keskusominaisuus ei ole päällä (Baari → Asetukset → Keskuspalvelin).' : null]);
 
     } elseif ($action === 'hub_applications') {   // keikkahakemukset keskuspalvelimen kautta (vain ylläpito)
         requireAdmin($me);
@@ -3157,7 +3187,11 @@ if ($method === 'POST') {
         $_SESSION['geo_n'] = ($_SESSION['geo_n'] ?? 0) + 1;
         if ($_SESSION['geo_n'] > 40) fail('Liian monta sijaintihakua tässä istunnossa. Yritä myöhemmin uudelleen.', 429);
         $g = geocodeAddress($cfg, $addr . ($city !== '' ? ', ' . $city : ''));
-        if (!$g) fail('Osoitetta ei löytynyt kartalta. Tarkista kirjoitusasu ja kaupunki.', 404);
+        if (!$g) {
+            $why = geocodeLastError();
+            if ($why !== '' && !str_contains($why, 'ei_tulosta') && !str_contains($why, 'ei tulosta')) fail('Sijaintipalvelu ei vastannut (' . $why . '). Palvelimen ulospäin suuntautuvat yhteydet voivat olla estettyssä; voit myös syöttää koordinaatit käsin.', 502);
+            fail('Osoitetta ei löytynyt kartalta. Tarkista kirjoitusasu ja kaupunki.', 404);
+        }
         jsonResponse(["success" => true, "lat" => $g['lat'], "lng" => $g['lng'], "label" => $g['label']]);
 
     } elseif ($action === 'create_trade') {

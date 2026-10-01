@@ -21,12 +21,15 @@ function hubRequest(array $cfg, string $method, string $path, ?array $body = nul
         CURLOPT_HTTPHEADER => ['Content-Type: application/json', 'X-Pub: ' . $h['pub_slug'], 'X-Timestamp: ' . $ts, 'X-Nonce: ' . $nonce, 'X-Signature: ' . $sig],
     ]);
     if ($raw !== '') curl_setopt($ch, CURLOPT_POSTFIELDS, $raw);
-    $res = curl_exec($ch); $code = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE); curl_close($ch);
-    if ($res === false) return [0, ['error' => 'Yhteys keskukseen epäonnistui']];
+    $res = curl_exec($ch); $code = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE); $err = curl_error($ch); curl_close($ch);
+    if ($res === false) { hubLastError('Yhteys keskukseen epäonnistui (' . $err . '). Tarkista hub.url.'); return [0, ['error' => 'Yhteys keskukseen epäonnistui']]; }
     $j = json_decode((string)$res, true);
+    if ($code !== 200) hubLastError('Keskus vastasi ' . $code . ': ' . (is_array($j) ? (string)($j['error'] ?? '') : mb_substr(strip_tags((string)$res), 0, 80)) . ($code === 404 ? ' (tarkista hub.url: osoitteen on osoitettava keskuksen asennuspolkuun)' : ($code === 401 ? ' (tarkista pub_slug ja private_key; avain pitää olla rekisteröity keskukseen)' : '')));
     return [$code, is_array($j) ? $j : []];
 }
 
+// Viimeisin epäonnistuneen pyynnön syy (näytetään ylläpitäjälle)
+function hubLastError(?string $set = null): string { static $e = ''; if ($set !== null) $e = $set; return $e; }
 function hubRows($conn, string $sql): array { $r = $conn->query($sql); return $r ? $r->fetch_all(MYSQLI_ASSOC) : []; }
 function hubTimeStr(?string $t): ?string { return $t ? substr($t, 0, 5) : null; }
 

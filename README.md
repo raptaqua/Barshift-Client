@@ -225,5 +225,5 @@ Lisää `config.php`:hen (avainpari luodaan palvelimella `php bin/keygen.php`, j
 ```
 Baarin ylläpitäjä ottaa osat käyttöön kohdassa *Baari → Asetukset → Keskuspalvelin* (oletuksena pois): **julkiset tapahtumat yhteiseen kalenteriin** ja **keikkatyöpörssi**
 (avoin vuoro merkitään keikkatyöksi vuoron muokkauksessa; hakemukset käsitellään välilehdellä *Keikkahakemukset*, hakijan yhteystiedot näkyvät vasta hyväksynnän jälkeen).
-Synkronointi ajetaan `cron.php`:ssä (vain lähtevä: client allekirjoittaa Ed25519:llä ja työntää; keskus ei koskaan kutsu clientia). Keskukseen lähtee vain julkisia tapahtumatietoja
+Muutokset (tapahtuma, vuoro, asetukset) lähtevät keskukseen automaattisesti heti tallennuksen jälkeen; `cron.php` on varmistus. Kohdassa *Baari → Asetukset → Keskuspalvelin* painike *Testaa yhteys ja synkronoi nyt* näyttää, jos osoite, baarin tunnus tai avain on väärin. `hub.url` on keskuksen osoite asennuspolkuineen (esim. `https://sivu.fi/hub`). Synkronointi ajetaan `cron.php`:ssä (vain lähtevä: client allekirjoittaa Ed25519:llä ja työntää; keskus ei koskaan kutsu clientia). Keskukseen lähtee vain julkisia tapahtumatietoja
 sekä keikkavuoron aika, rooli ja palkkateksti; työntekijä- ja asiakastietoja ei lähetetä.

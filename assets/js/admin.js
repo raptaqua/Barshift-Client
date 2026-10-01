@@ -128,11 +128,12 @@ async function findGeo() {
     if (!address) return showToast('Kirjoita osoite ensin', 'error');
     document.getElementById('pp-geo').innerHTML = '<div class="geo">Haetaan sijaintia…</div>';
     try {
-        const r = await (await fetch('api.php?action=geocode_address', { method: 'POST', body: JSON.stringify({ address, city }) })).json();
+        const res = await fetch('api.php?action=geocode_address', { method: 'POST', body: JSON.stringify({ address, city }) }); const raw = await res.text(); let r;
+        try { r = JSON.parse(raw); } catch (pe) { r = { error: `Palvelin vastasi virheellisesti (HTTP ${res.status}): ${raw.replace(/<[^>]*>/g, ' ').trim().slice(0, 140)}` }; }
         if (r.error) { state.pubGeo = null; document.getElementById('pp-geo').innerHTML = `<div class="geo bad">⚠️ ${esc(r.error)}</div>`; return; }
         state.pubGeo = { q: geoQuery(), lat: r.lat, lng: r.lng, label: r.label };
         document.getElementById('pp-geo').innerHTML = geoStatusHtml(true);
-    } catch (e) { document.getElementById('pp-geo').innerHTML = '<div class="geo bad">⚠️ Yhteysvirhe sijaintihaussa</div>'; }
+    } catch (e) { document.getElementById('pp-geo').innerHTML = `<div class="geo bad">⚠️ Yhteysvirhe sijaintihaussa: ${esc(String(e && e.message || e))}</div>`; }
 }
 function adminTabProfile() {
     if (state.pubProfileError) return `<div class="leave-box warn"><b>Julkista profiilia ei voitu avata.</b><br>${esc(state.pubProfileError)}<div class="acts" style="margin-top:10px;"><button class="btn btn-ghost btn-sm" onclick="state.pubProfileError=null; loadPubProfile()">Yritä uudelleen</button></div></div>`;

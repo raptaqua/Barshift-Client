@@ -24,3 +24,10 @@ async function hubDecide(id, decision) {
     if (r.error) return showToast(r.error, 'error');
     showToast('Päätös tallennettu'); state.gigApps = undefined; load();
 }
+async function hubSyncNow() {
+    const box = document.getElementById('hub-status'); if (box) box.textContent = 'Synkronoidaan…';
+    try {
+        const res = await fetch('api.php?action=hub_sync_now', { method: 'POST', body: '{}' }); const text = await res.text(); let r; try { r = JSON.parse(text); } catch (e) { r = { error: 'Palvelin vastasi virheellisesti (' + res.status + ')' }; }
+        if (box) box.textContent = r.error ? '⚠️ ' + r.error : `✓ Yhteys toimii. Lähetetty ${r.sent} muutosta, uusia hakemuksia ${r.new_applications}.${r.note ? ' ' + r.note : ''}`;
+    } catch (e) { if (box) box.textContent = '⚠️ Yhteysvirhe'; }
+}

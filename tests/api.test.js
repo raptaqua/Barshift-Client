@@ -664,7 +664,8 @@ const future = (days) => { const d = new Date(Date.now() + days * 864e5); return
   console.log('Kutsulinkit, salasanan palautus ja sähköposti');
   const mailbox = await smtp.start(parseInt(process.env.SMTP_PORT || '2599', 10));
   const smsLog = [], stripeLog = [];   // feikki-Twilio ja -Stripe: tallentavat pyynnöt
-  const smsServer = require('http').createServer((req, res) => { let b = ''; req.on('data', c => b += c); req.on('end', () => { smsLog.push({ url: req.url, auth: req.headers.authorization, form: Object.fromEntries(new URLSearchParams(b)) }); if (req.url.startsWith('/search')) { res.writeHead(200, { 'Content-Type': 'application/json' }); return res.end(JSON.stringify(/tuntematon/i.test(req.url) ? [] : [{ lat: '60.169900', lon: '24.938400', display_name: 'Testikatu 1, Helsinki' }])); }
+  const smsServer = require('http').createServer((req, res) => { let b = ''; req.on('data', c => b += c); req.on('end', () => { smsLog.push({ url: req.url, auth: req.headers.authorization, form: Object.fromEntries(new URLSearchParams(b)) }); if (req.url.startsWith('/search') && /palvelinvika/i.test(req.url)) { res.writeHead(500); return res.end('boom'); }
+        if (req.url.startsWith('/search')) { res.writeHead(200, { 'Content-Type': 'application/json' }); return res.end(JSON.stringify(/tuntematon/i.test(req.url) ? [] : [{ lat: '60.169900', lon: '24.938400', display_name: 'Testikatu 1, Helsinki' }])); }
     if (req.url.startsWith('/v1/checkout/sessions')) { smsLog.pop(); const f = Object.fromEntries(new URLSearchParams(b)); stripeLog.push({ auth: req.headers.authorization, form: f }); res.writeHead(200, { 'Content-Type': 'application/json' }); return res.end(JSON.stringify({ id: 'cs_test_' + stripeLog.length, url: 'https://checkout.stripe.test/pay/cs_test_' + stripeLog.length })); }
     res.writeHead(201, { 'Content-Type': 'application/json' }); res.end('{"sid":"SMtest"}'); }); });
   await new Promise(r => smsServer.listen(parseInt(process.env.SMS_PORT || '2699', 10), '127.0.0.1', r));
@@ -1140,6 +1141,12 @@ const future = (days) => { const d = new Date(Date.now() + days * 864e5); return
         assert.ok((await admin.post('save_pub_settings', { ...base, features_ext: { hub_events: true, hub_gigs: true } })).json.success);
         const pub = (await admin.get('')).json.pub; assert.strictEqual(pub.hub_available, true); assert.strictEqual(pub.features.hub_gigs, true);
         // vuoro keikkatyöksi
+        // tallennus synkronoi heti (ilman cronia)
+        const ev2 = (await admin.form('event', fdOf({ title: 'Heti-keikka', date: future(14), time_start: '21:00', type: 'music', is_public: '1', registration: 'none' }))).json; assert.ok(ev2.success);
+        for (let i = 0; i < 20 && !Object.values(hub.events).some(e => e.title === 'Heti-keikka'); i++) await sleep(100);
+        assert.ok(Object.values(hub.events).some(e => e.title === 'Heti-keikka'), 'tapahtuma ei lähtenyt heti tallennuksen jälkeen');
+        const now = (await admin.post('hub_sync_now', {})).json; assert.ok(now.success, JSON.stringify(now)); assert.strictEqual((await emp.post('hub_sync_now', {})).status, 403);
+        assert.ok((await admin.get('')).json.pub.hub_status.last_sync, 'synkronoinnin aika ei näy');
         const d = future(13);
         assert.ok((await admin.post('shift', { userId: null, date: d, start: '17:00', end: '23:00', role: 'Baarimestari', status: 'published', hub_gig: true, hub_pay: '16 €/h' })).json.success);
         const privShift = (await admin.post('shift', { userId: null, date: d, start: '10:00', end: '12:00', role: 'Ovi', status: 'published' })).json; assert.ok(privShift.success);
@@ -1218,6 +1225,7 @@ const future = (days) => { const d = new Date(Date.now() + days * 864e5); return
     assert.strictEqual((await admin.post('geocode_address', { address: '' })).status, 400);
     const g = await admin.post('geocode_address', { address: 'Testikatu 1', city: 'Helsinki' }); assert.ok(g.json.success, JSON.stringify(g.json)); assert.strictEqual(g.json.lat, 60.1699); assert.strictEqual(g.json.lng, 24.9384);
     assert.strictEqual((await admin.post('geocode_address', { address: 'tuntematon paikka' })).status, 404, 'ei löytynyt -> selkeä virhe');
+    const down = await admin.post('geocode_address', { address: 'palvelinvika' }); assert.strictEqual(down.status, 502); assert.match(down.json.error, /http_500/, 'palvelinvian syy ei näy ylläpitäjälle');
   });
 
   console.log('Tietoturvan kovennus');
