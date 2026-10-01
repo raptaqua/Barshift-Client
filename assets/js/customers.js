@@ -71,13 +71,27 @@ function customerSettingsHtml(p) {
             <label class="abs-choice"><input id="fx-sms" type="checkbox" ${p.reminder_sms ? 'checked' : ''}><span><b>Lähetä myös tekstiviesti</b> (vaatii palvelimen SMS-asetukset ja vieraan puhelinnumeron; tekstiviestit maksavat)</span></label>
         </div>
         <label class="abs-choice" style="margin-bottom:8px;"><input id="fx-pay" type="checkbox" ${p.features.payments ? 'checked' : ''}><span><b>Verkkomaksu lippuihin</b><br><small>Maksullisten tapahtumaliput maksetaan MobilePaylla ilmoittautumisen yhteydessä (vaatii Stripe-avaimet palvelimen asetuksissa ja MobilePayn käyttöönoton Stripessä).</small></span></label>
-        ${p.hub_available ? `<div class="section-header" style="margin-top:14px;"><span class="section-title"><i class="bi bi-diagram-3"></i> Keskuspalvelin (BarShift Hub)</span><div class="section-line"></div></div>
-        <p style="font-size:12px; color:var(--text3); margin:0 0 8px;">Valinnainen. Keskukseen lähtee vain se, minkä itse julkaiset: julkiset tapahtumat ja keikkatyöksi merkityt avoimet vuorot. Työntekijöiden tai asiakkaiden tietoja ei lähetetä.</p>
+        ${hubSettingsHtml(p)}
+        <label class="abs-choice" style="margin-bottom:8px;"><input id="fx-guests" type="checkbox" ${p.features.guests ? 'checked' : ''}><span><b>Vieraskortisto</b><br><small>Kanta-asiakkaat, VIP-merkinnät, allergiat ja käyntihistoria varauksista ja ilmoittautumisista. Vain henkilökunnan käyttöön.</small></span></label>`;
+}
+function hubSettingsHtml(p) {
+    const head = `<div class="section-header" style="margin-top:14px;"><span class="section-title"><i class="bi bi-diagram-3"></i> Keskuspalvelin (BarShift Hub)</span><div class="section-line"></div></div>`;
+    if (!p.hub_connected) return `${head}
+        <p style="font-size:12px; color:var(--text3); margin:0 0 8px;">Valinnainen. Keskuspalvelin hoitaa yhteisen julkisen tapahtumakalenterin ja keikkatyön välityksen baarien kesken. Pyydä keskuksen ylläpitäjältä <b>osoite</b> ja <b>liitoskoodi</b>, ja liitä baari tästä. Mitään ei tarvitse kirjoittaa tiedostoihin.</p>
+        <div class="form-row" style="flex-wrap:wrap; gap:8px; margin-bottom:8px;">
+            <div class="form-group" style="flex:2; min-width:200px;"><label class="form-label">Keskuksen osoite</label><input id="hub-url" class="form-input" placeholder="https://hub.example.com" autocomplete="off"></div>
+            <div class="form-group" style="flex:1; min-width:180px;"><label class="form-label">Liitoskoodi</label><input id="hub-code" class="form-input" placeholder="ABCDE-FGHJK-LMNPQ-RSTUV" autocomplete="off"></div>
+        </div>
+        <button type="button" class="btn btn-primary btn-sm" onclick="hubPair()"><i class="bi bi-plug"></i> Yhdistä keskukseen</button> <small id="hub-status" style="color:var(--text3);"></small>`;
+    const hs = p.hub_status || {};
+    return `${head}
+        <p style="font-size:13px; margin:0 0 8px;">✓ Liitetty: <b>${esc(p.hub_info.url)}</b> (baarin tunnus <b>${esc(p.hub_info.slug)}</b>)</p>
+        <p style="font-size:12px; color:var(--text3); margin:0 0 8px;">Keskukseen lähtee vain se, minkä itse julkaiset: julkiset tapahtumat ja keikkatyöksi merkityt avoimet vuorot. Työntekijöiden tai asiakkaiden tietoja ei lähetetä.</p>
         <label class="abs-choice" style="margin-bottom:8px;"><input id="fx-hubev" type="checkbox" ${p.features.hub_events ? 'checked' : ''}><span><b>Julkaise julkiset tapahtumat yhteiseen kalenteriin</b></span></label>
         <label class="abs-choice" style="margin-bottom:8px;"><input id="fx-hubgig" type="checkbox" ${p.features.hub_gigs ? 'checked' : ''}><span><b>Keikkatyöpörssi</b><br><small>Voit tarjota avoimia vuoroja keikkatyöläisille ja ottaa vastaan heidän hakemuksiaan. Hakijan yhteystiedot näkyvät vasta hyväksynnän jälkeen.</small></span></label>
         <div class="row" style="gap:8px; align-items:center; margin-bottom:8px; flex-wrap:wrap;"><button type="button" class="btn btn-ghost btn-sm" onclick="hubSyncNow()"><i class="bi bi-arrow-repeat"></i> Testaa yhteys ja synkronoi nyt</button>
-            <small id="hub-status" style="color:var(--text3);">${p.hub_status && p.hub_status.last_error ? '⚠️ ' + esc(p.hub_status.last_error) : (p.hub_status && p.hub_status.last_sync ? 'Viimeksi synkronoitu ' + esc(String(p.hub_status.last_sync).slice(0, 16).replace('T', ' ')) : 'Ei vielä synkronoitu. Muutokset lähtevät keskukseen automaattisesti tallennuksen jälkeen; cron toimii varmistuksena.')}</small></div>` : ''}
-        <label class="abs-choice" style="margin-bottom:8px;"><input id="fx-guests" type="checkbox" ${p.features.guests ? 'checked' : ''}><span><b>Vieraskortisto</b><br><small>Kanta-asiakkaat, VIP-merkinnät, allergiat ja käyntihistoria varauksista ja ilmoittautumisista. Vain henkilökunnan käyttöön.</small></span></label>`;
+            <button type="button" class="btn btn-ghost btn-sm" onclick="hubDisconnect()"><i class="bi bi-plug-fill"></i> Katkaise yhteys</button>
+            <small id="hub-status" style="color:var(--text3);">${hs.last_error ? '⚠️ ' + esc(hs.last_error) : (hs.last_sync ? 'Viimeksi synkronoitu ' + esc(String(hs.last_sync).slice(0, 16).replace('T', ' ')) : 'Muutokset lähtevät keskukseen automaattisesti tallennuksen jälkeen.')}</small></div>`;
 }
 function customerSettingsData() {
     const v = id => document.getElementById(id), hours = [];

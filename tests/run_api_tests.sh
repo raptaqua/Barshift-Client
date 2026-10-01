@@ -16,9 +16,7 @@ TMP="$(mktemp -d)"; trap '[ -n "${PHP_PID:-}" ] && kill $PHP_PID 2>/dev/null; rm
 MYSQL=(mysql -h "$DB_HOST" -u "$DB_USER" ${DB_PASS:+-p"$DB_PASS"} --default-character-set=utf8mb4)
 "${MYSQL[@]}" -e "DROP DATABASE IF EXISTS \`$DB_NAME\`; CREATE DATABASE \`$DB_NAME\` CHARACTER SET utf8mb4;"
 
-# Hub-testiavaimet (Ed25519): keskuksen väärennös tarkistaa allekirjoitukset julkisella avaimella
-read -r HUB_PUBKEY HUB_PRIVKEY < <(php -r '$k = sodium_crypto_sign_keypair(); echo base64_encode(sodium_crypto_sign_publickey($k)), " ", base64_encode(sodium_crypto_sign_secretkey($k)), "\n";')
-export HUB_PUBKEY HUB_PORT
+export HUB_PORT
 cat > "$TMP/config.php" <<PHP
 <?php return [
   'db_host' => '$DB_HOST', 'db_name' => '$DB_NAME', 'db_user' => '$DB_USER', 'db_pass' => '$DB_PASS',
@@ -27,7 +25,6 @@ cat > "$TMP/config.php" <<PHP
   'mail_from' => 'BarShift <noreply@example.test>', 'smtp' => ['host' => '127.0.0.1', 'port' => $SMTP_PORT, 'secure' => ''],
   'base_url' => 'http://127.0.0.1:$PORT', 'health_key' => 'testhealthkey', 'geocoder_url' => 'http://127.0.0.1:$SMS_PORT/search',
   'sms' => ['account_sid' => 'ACtest', 'auth_token' => 'tokentest', 'from' => '+358400000000', 'monthly_cap' => 3, 'api_base' => 'http://127.0.0.1:$SMS_PORT'],
-  'hub' => ['url' => 'http://127.0.0.1:$HUB_PORT', 'pub_slug' => 'demobaari', 'private_key' => '$HUB_PRIVKEY'],
   'stripe' => ['secret_key' => 'sk_test_x', 'webhook_secret' => 'whsec_test', 'api_base' => 'http://127.0.0.1:$SMS_PORT'],
 ];
 PHP

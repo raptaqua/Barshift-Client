@@ -2,6 +2,50 @@
 // Yhteys BarShift Hub -keskuspalvelimeen (barshift-server). Vain työntö: tämä asennus lähettää keskukseen vain sen, minkä baari on itse
 // julkaissut (julkiset tapahtumat, keikkatyönä tarjotut avoimet vuorot) ja hakee omat hakemuksensa. Keskus ei koskaan kutsu tätä asennusta.
 
+// Yhteys liitetään hallintapaneelista (taulu hub_connection); config.php:n 'hub'-lohko toimii edelleen vaihtoehtona.
+function hubSeal(array $cfg, string $plain): string {
+    $k = base64_decode((string)($cfg['message_key'] ?? ''), true); if ($k === false || strlen($k) !== 32) throw new RuntimeException('message_key puuttuu');
+    $iv = random_bytes(12); $ct = openssl_encrypt($plain, 'aes-256-gcm', $k, OPENSSL_RAW_DATA, $iv, $tag);
+    return 'v1:' . base64_encode($iv . $tag . $ct);
+}
+function hubUnseal(array $cfg, string $stored): ?string {
+    $k = base64_decode((string)($cfg['message_key'] ?? ''), true); $raw = base64_decode(substr($stored, 3), true);
+    if ($k === false || strlen($k) !== 32 || strncmp($stored, 'v1:', 3) !== 0 || $raw === false || strlen($raw) < 29) return null;
+    $pt = openssl_decrypt(substr($raw, 28), 'aes-256-gcm', $k, OPENSSL_RAW_DATA, substr($raw, 0, 12), substr($raw, 12, 16));
+    return $pt === false ? null : $pt;
+}
+function hubLoadConfig($conn, array &$cfg): void {
+    $r = $conn->query("SELECT url, pub_slug, private_key_enc FROM hub_connection WHERE id = 1");
+    $row = $r ? $r->fetch_assoc() : null;
+    if (!$row) return;
+    $key = hubUnseal($cfg, (string)$row['private_key_enc']);
+    if ($key !== null) $cfg['hub'] = ['url' => $row['url'], 'pub_slug' => $row['pub_slug'], 'private_key' => $key, 'source' => 'db'];
+}
+// Hallintapaneelista annettu osoite: https (http vain paikalliseen testaukseen), ei sisäverkon osoitteita
+function hubNormalizeUrl(string $url): ?string {
+    $url = rtrim(trim($url), '/'); $p = parse_url($url);
+    if (!$p || empty($p['host']) || !empty($p['query']) || !empty($p['fragment']) || !empty($p['user'])) return null;
+    $scheme = strtolower($p['scheme'] ?? ''); $host = strtolower($p['host']);
+    $loop = in_array($host, ['localhost', '127.0.0.1', '::1'], true);
+    if ($scheme !== 'https' && !($scheme === 'http' && $loop)) return null;
+    if (!$loop) { $ip = gethostbyname($host); if ($ip !== $host && !filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RES | FILTER_FLAG_NO_RES_RANGE)) return null; }
+    return $url;
+}
+// Liittäminen: luo oma Ed25519-avainpari, rekisteröi julkinen avain keskuksessa liitoskoodilla. Palauttaa [ok, virhe|tiedot]
+function hubPairWithCode(array $cfg, string $url, string $code): array {
+    $code = implode('-', str_split(strtoupper(preg_replace('/[^A-Za-z0-9]/', '', $code)), 5));
+    $kp = sodium_crypto_sign_keypair();
+    $ch = curl_init($url . '/v1/pair');
+    $raw = json_encode(['code' => $code, 'public_key' => base64_encode(sodium_crypto_sign_publickey($kp))]);
+    curl_setopt_array($ch, [CURLOPT_POST => true, CURLOPT_POSTFIELDS => $raw, CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 10, CURLOPT_CONNECTTIMEOUT => 5, CURLOPT_FOLLOWLOCATION => false,
+        CURLOPT_PROTOCOLS => CURLPROTO_HTTP | CURLPROTO_HTTPS, CURLOPT_HTTPHEADER => ['Content-Type: application/json']]);
+    $res = curl_exec($ch); $http = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE); $err = curl_error($ch); curl_close($ch);
+    if ($res === false) return [false, 'Yhteys keskukseen epäonnistui (' . ($err ?: 'ei yhteyttä') . '). Tarkista osoite.'];
+    $j = json_decode((string)$res, true);
+    if ($http !== 200 || !is_array($j) || empty($j['slug'])) return [false, ($http === 404 && is_array($j) && !empty($j['error']) ? $j['error'] : 'Keskus vastasi ' . $http . (is_array($j) && !empty($j['error']) ? ': ' . $j['error'] : ' (tarkista osoite: sen on osoitettava keskuksen asennuspolkuun)'))];
+    return [true, ['slug' => (string)$j['slug'], 'name' => (string)($j['name'] ?? ''), 'private_key' => base64_encode(sodium_crypto_sign_secretkey($kp))]];
+}
+
 function hubConfigured(array $cfg): bool {
     $h = $cfg['hub'] ?? null;
     return is_array($h) && !empty($h['url']) && !empty($h['pub_slug']) && !empty($h['private_key']);

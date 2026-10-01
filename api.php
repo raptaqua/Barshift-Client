@@ -100,6 +100,7 @@ $vapid_auth = ['VAPID' => [
 $conn = new mysqli($cfg['db_host'], $cfg['db_user'], $cfg['db_pass'], $cfg['db_name']);
 if ($conn->connect_error) { error_log('BarShift DB connect: ' . $conn->connect_error); fail('Palvelinvirhe', 500); }
 $conn->set_charset('utf8mb4');
+hubLoadConfig($conn, $cfg);   // keskusyhteys hallintapaneelista (tai config.php)
 
 function prepareQuery($conn, $sql) {
     $stmt = $conn->prepare($sql);
@@ -287,7 +288,8 @@ function getPub($conn, string $slug, bool $adminView = false): array {
     $out['features'] = ['tickets' => (bool)$p['feature_tickets'], 'bookings' => (bool)$p['feature_bookings'], 'bidding' => (bool)$p['feature_bidding'], 'autoschedule' => (bool)$p['feature_autoschedule'], 'reminders' => (bool)$p['feature_reminders'],
         'payments' => (bool)$p['feature_payments'], 'guests' => (bool)$p['feature_guests'],
         'hub_events' => (bool)$p['feature_hub_events'], 'hub_gigs' => (bool)$p['feature_hub_gigs']];
-    $out['hub_available'] = hubConfigured($GLOBALS['cfg'] ?? []);
+    $hc = $GLOBALS['cfg']['hub'] ?? null; $out['hub_connected'] = hubConfigured($GLOBALS['cfg'] ?? []);
+    $out['hub_info'] = $out['hub_connected'] ? ['url' => $hc['url'], 'slug' => $hc['pub_slug'], 'source' => $hc['source'] ?? 'config'] : null;
     $hs = []; foreach (($GLOBALS['conn']->query("SELECT k, v FROM system_status WHERE k IN ('hub_last_sync', 'hub_last_error')") ?: []) as $r) $hs[$r['k']] = $r['v'];
     $out['hub_status'] = ['last_sync' => $hs['hub_last_sync'] ?? null, 'last_error' => $hs['hub_last_error'] ?? null];
     $out['guest_reminder_hours'] = (int)$p['guest_reminder_hours']; $out['reminder_sms'] = (bool)$p['reminder_sms'];
@@ -2181,9 +2183,32 @@ if ($method === 'POST') {
         audit($conn, $me, '2FA otettu käyttöön', $me['username']);
         jsonResponse(["success" => true, "recovery_codes" => $codes]);
 
+    } elseif ($action === 'hub_pair') {   // liitä baari keskukseen keskuksen antamalla liitoskoodilla (ei config.php-muokkausta)
+        requireAdmin($me);
+        if (rateLimited($conn, 'hubpair:' . $myId, 6)) fail('Liian monta yritystä. Yritä myöhemmin uudelleen.', 429);
+        rateHit($conn, 'hubpair:' . $myId);
+        $url = hubNormalizeUrl((string)($data['url'] ?? '')); if ($url === null) fail('Keskuksen osoite: anna https://-osoite ilman polun jälkeistä osaa (esim. https://sivu.fi/hub)');
+        $code = (string)($data['code'] ?? ''); if (strlen(preg_replace('/[^A-Za-z0-9]/', '', $code)) !== 20) fail('Liitoskoodi on 20 merkkiä (esim. ABCDE-FGHJK-LMNPQ-RSTUV)');
+        [$ok, $res] = hubPairWithCode($cfg, $url, $code);
+        if (!$ok) fail($res, 502);
+        $enc = hubSeal($cfg, $res['private_key']);
+        $st = prepareQuery($conn, "INSERT INTO hub_connection (id, url, pub_slug, private_key_enc, hub_name) VALUES (1, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE url = VALUES(url), pub_slug = VALUES(pub_slug), private_key_enc = VALUES(private_key_enc), hub_name = VALUES(hub_name), connected_at = NOW()");
+        $st->bind_param("ssss", $url, $res['slug'], $enc, $res['name']); run($st);
+        $conn->query("DELETE FROM hub_sync");   // uusi yhteys: lähetetään kaikki uudelleen
+        audit($conn, $me, 'Keskuspalvelin liitetty', $url);
+        jsonResponse(["success" => true, "slug" => $res['slug'], "name" => $res['name']]);
+
+    } elseif ($action === 'hub_disconnect') {
+        requireAdmin($me);
+        $stF = prepareQuery($conn, "UPDATE pubs SET feature_hub_events = 0, feature_hub_gigs = 0 WHERE slug = ?"); $stF->bind_param("s", $myPub); run($stF);
+        if (hubConfigured($cfg)) { hubSync($conn, $cfg, ['slug' => $myPub, 'feature_hub_events' => 0, 'feature_hub_gigs' => 0]); }   // poistaa julkaistut tapahtumat ja vuorot keskuksesta (parhaansa mukaan)
+        $conn->query("DELETE FROM hub_connection WHERE id = 1"); $conn->query("DELETE FROM hub_sync");
+        audit($conn, $me, 'Keskuspalvelin irrotettu', null);
+        jsonResponse(["success" => true, "note" => isset($cfg['hub']['source']) && $cfg['hub']['source'] === 'config' ? 'Yhteys on määritelty myös config.php:ssä: poista hub-lohko sieltä' : null]);
+
     } elseif ($action === 'hub_sync_now') {   // testaa yhteys ja synkronoi heti (ylläpito)
         requireAdmin($me);
-        if (!hubConfigured($cfg)) fail('Keskuspalvelinta ei ole määritetty config.php:ssä (hub-lohko)', 409);
+        if (!hubConfigured($cfg)) fail('Baaria ei ole liitetty keskukseen: liitä se ensin liitoskoodilla', 409);
         [$pc] = hubRequest($cfg, 'GET', '/v1/applications?since_id=999999999');
         if ($pc !== 200) { bsHubRecord($conn, false, hubLastError()); fail(hubLastError() ?: 'Keskus ei vastannut', 502); }
         $prow = fetchOne(prepareQuery2($conn, "SELECT slug, feature_hub_events, feature_hub_gigs FROM pubs WHERE slug = ?", $myPub));
@@ -2197,11 +2222,11 @@ if ($method === 'POST') {
         if (hubConfigured($cfg)) { $prow = fetchOne(prepareQuery2($conn, "SELECT slug, feature_hub_events, feature_hub_gigs FROM pubs WHERE slug = ?", $myPub)); if ($prow) hubPullApplications($conn, $cfg, $prow, $vapid_auth); }
         $rows = fetchAllRows(prepareQuery2($conn, "SELECT a.id, a.shift_id, a.name, a.skills, a.city, a.message, a.status, a.email, a.phone, a.created_at, s.date, s.start, s.end, s.role
             FROM hub_applications a JOIN shifts s ON s.id = a.shift_id WHERE s.pub_name = ? ORDER BY a.status = 'pending' DESC, a.id DESC LIMIT 100", $myPub));
-        jsonResponse(["success" => true, "applications" => $rows, "hub_available" => hubConfigured($cfg)]);
+        jsonResponse(["success" => true, "applications" => $rows, "hub_connected" => hubConfigured($cfg)]);
 
     } elseif ($action === 'hub_decide') {
         requireAdmin($me);
-        if (!hubConfigured($cfg)) fail('Keskuspalvelinta ei ole määritetty', 409);
+        if (!hubConfigured($cfg)) fail('Baaria ei ole liitetty keskukseen', 409);
         $aid = (int)($data['id'] ?? 0); $dec = $data['decision'] ?? '';
         if (!in_array($dec, ['accepted', 'declined'], true)) fail('Virheellinen päätös');
         $a = fetchOne(prepareQuery($conn, "SELECT a.id, a.hub_id, a.shift_id, a.status FROM hub_applications a JOIN shifts s ON s.id = a.shift_id WHERE a.id = " . $aid . " AND s.pub_name = '" . $conn->real_escape_string($myPub) . "'"));

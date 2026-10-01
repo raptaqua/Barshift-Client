@@ -219,11 +219,12 @@ Kirjautuminen (baari `demobaari`): `admin@demobaari`, `mikko@demobaari`, `sari@d
 - Selainpuolella käyttäjän syöttämä data escapataan (`esc()`), CSP- ja muut tietoturvaotsakkeet `.htaccess`:ssä.
 
 ## Keskuspalvelin (BarShift Hub, valinnainen)
-Lisää `config.php`:hen (avainpari luodaan palvelimella `php bin/keygen.php`, julkinen avain rekisteröidään keskukseen `bin/add_pub.php`):
-```php
-'hub' => ['url' => 'https://hub.example.com', 'pub_slug' => 'oma-baari', 'private_key' => '<base64 yksityinen avain>'],
-```
-Baarin ylläpitäjä ottaa osat käyttöön kohdassa *Baari → Asetukset → Keskuspalvelin* (oletuksena pois): **julkiset tapahtumat yhteiseen kalenteriin** ja **keikkatyöpörssi**
-(avoin vuoro merkitään keikkatyöksi vuoron muokkauksessa; hakemukset käsitellään välilehdellä *Keikkahakemukset*, hakijan yhteystiedot näkyvät vasta hyväksynnän jälkeen).
-Muutokset (tapahtuma, vuoro, asetukset) lähtevät keskukseen automaattisesti heti tallennuksen jälkeen; `cron.php` on varmistus, ei vaatimus: myös ylläpitäjän sivulataus (enintään kerran 2 min välein) ja Keikkahakemukset-välilehden avaus hakevat uudet hakemukset ja lähettävät viivästyneet muutokset. Kohdassa *Baari → Asetukset → Keskuspalvelin* painike *Testaa yhteys ja synkronoi nyt* näyttää, jos osoite, baarin tunnus tai avain on väärin. `hub.url` on keskuksen osoite asennuspolkuineen (esim. `https://sivu.fi/hub`). Synkronointi ajetaan `cron.php`:ssä (vain lähtevä: client allekirjoittaa Ed25519:llä ja työntää; keskus ei koskaan kutsu clientia). Keskukseen lähtee vain julkisia tapahtumatietoja
-sekä keikkavuoron aika, rooli ja palkkateksti; työntekijä- ja asiakastietoja ei lähetetä.
+Liitos tehdään kokonaan hallintapaneelista, config.php:tä ei muokata:
+1. Keskuksen ylläpitäjä lisää baarin keskuksen hallintasivulla (`/admin → Baarit`) ja antaa sinulle **osoitteen** ja kertakäyttöisen **liitoskoodin**.
+2. Clientissa: *Baari → Asetukset → Keskuspalvelin*: syötä osoite ja koodi, paina *Yhdistä keskukseen*. Client luo itse Ed25519-avainparin ja rekisteröi vain julkisen avaimen keskukseen; yksityinen avain tallennetaan tietokantaan salattuna (`message_key`) eikä poistu clientista eikä näy käyttöliittymässä.
+3. Valitse, mitä julkaistaan: **julkiset tapahtumat yhteiseen kalenteriin** ja/tai **keikkatyöpörssi** (avoin vuoro merkitään keikkatyöksi vuoron muokkauksessa; hakemukset: välilehti *Keikkahakemukset*, yhteystiedot näkyvät vasta hyväksynnän jälkeen). Tallenna asetukset.
+4. *Testaa yhteys ja synkronoi nyt* kertoo, jos jokin on pielessä. *Katkaise yhteys* poistaa baarin julkaisemat tiedot keskuksesta.
+
+Muutokset (tapahtuma, vuoro, asetukset) lähtevät keskukseen automaattisesti heti tallennuksen jälkeen. `cron.php` on varmistus, ei vaatimus: myös ylläpitäjän sivulataus (enintään kerran 2 min välein) ja Keikkahakemukset-välilehden avaus hakevat uudet hakemukset ja lähettävät viivästyneet muutokset. Keskus ei koskaan kutsu clientia; keskukseen lähtee vain julkisia tapahtumatietoja sekä keikkavuoron aika, rooli ja palkkateksti.
+
+Vaihtoehtoinen tapa (edistyneille): `config.php`:n `'hub' => ['url' => …, 'pub_slug' => …, 'private_key' => …]` toimii edelleen; hallintapaneelista tehty liitos ohittaa sen.

@@ -122,7 +122,7 @@ foreach (fetchRows($conn, "SELECT u.id, u.name, u.pub_name, u.expiry_jv, u.cert_
 $conn->query("UPDATE event_registrations SET status = 'cancelled', expires_at = NULL WHERE status = 'pending' AND expires_at < NOW()");
 
 // Keskuspalvelin (BarShift Hub): julkiset tapahtumat ja keikkavuorot ulos, hakemukset sisään (vain jos config['hub'] on asetettu ja baari on ottanut ominaisuuden käyttöön)
-require_once __DIR__ . '/lib/hub.php';
+require_once __DIR__ . '/lib/hub.php'; hubLoadConfig($conn, $cfg);
 if (hubConfigured($cfg)) {
     foreach (fetchRows($conn, "SELECT slug, feature_hub_events, feature_hub_gigs FROM pubs") as $hp) {
         [$sent, $errs] = hubSync($conn, $cfg, $hp); $newApps = hubPullApplications($conn, $cfg, $hp, $vapid_auth);

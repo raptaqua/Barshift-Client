@@ -31,3 +31,19 @@ async function hubSyncNow() {
         if (box) box.textContent = r.error ? '⚠️ ' + r.error : `✓ Yhteys toimii. Lähetetty ${r.sent} muutosta, uusia hakemuksia ${r.new_applications}.${r.note ? ' ' + r.note : ''}`;
     } catch (e) { if (box) box.textContent = '⚠️ Yhteysvirhe'; }
 }
+async function hubPair() {
+    const box = document.getElementById('hub-status'); const url = document.getElementById('hub-url').value.trim(), code = document.getElementById('hub-code').value.trim();
+    if (!url || !code) return showToast('Anna keskuksen osoite ja liitoskoodi', 'error');
+    if (box) box.textContent = 'Liitetään…';
+    try {
+        const res = await fetch('api.php?action=hub_pair', { method: 'POST', body: JSON.stringify({ url, code }) }); const text = await res.text(); let r; try { r = JSON.parse(text); } catch (e) { r = { error: 'Palvelin vastasi virheellisesti (' + res.status + ')' }; }
+        if (r.error) { if (box) box.textContent = '⚠️ ' + r.error; return showToast(r.error, 'error'); }
+        showToast('Liitetty keskukseen' + (r.name ? ': ' + r.name : '') + '. Valitse alta, mitä julkaistaan, ja tallenna asetukset.'); await load();
+    } catch (e) { if (box) box.textContent = '⚠️ Yhteysvirhe'; }
+}
+async function hubDisconnect() {
+    if (!confirm('Katkaistaanko yhteys keskukseen? Baarin julkaisemat tapahtumat ja keikkavuorot poistetaan keskuksesta. Voit liittää baarin myöhemmin uudelleen uudella liitoskoodilla.')) return;
+    const r = await (await fetch('api.php?action=hub_disconnect', { method: 'POST', body: '{}' })).json();
+    if (r.error) return showToast(r.error, 'error');
+    showToast(r.note || 'Yhteys katkaistu'); load();
+}

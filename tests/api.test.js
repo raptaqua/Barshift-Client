@@ -1118,11 +1118,12 @@ const future = (days) => { const d = new Date(Date.now() + days * 864e5); return
     const sql = (q) => execFileP('mysql', ['-h', process.env.DB_HOST, '-u', process.env.DB_USER, ...(process.env.DB_PASS ? ['-p' + process.env.DB_PASS] : []), process.env.DB_NAME, '-e', q]);
     const hub = { events: {}, shifts: {}, apps: [], badSig: 0, calls: [], decisions: [] };
     const spki = (raw) => crypto.createPublicKey({ key: Buffer.concat([Buffer.from('302a300506032b6570032100', 'hex'), Buffer.from(raw, 'base64')]), format: 'der', type: 'spki' });
-    const hubKey = spki(process.env.HUB_PUBKEY), seen = new Set();
+    let hubKey = null; const seen = new Set();
     const srv = require('http').createServer((req, res) => { let b = ''; req.on('data', c => b += c); req.on('end', () => {
+        if (req.method === 'POST' && req.url === '/v1/pair') { const j = JSON.parse(b || '{}'); res.writeHead(j.code === 'ABCDE-FGHJK-LMNPQ-RSTUV' ? 200 : 404, { 'Content-Type': 'application/json' }); if (j.code !== 'ABCDE-FGHJK-LMNPQ-RSTUV') return res.end(JSON.stringify({ error: 'Liitoskoodi on väärä tai vanhentunut' })); hubKey = spki(j.public_key); return res.end(JSON.stringify({ success: true, slug: 'demobaari', name: 'Testihub' })); }
         const ts = req.headers['x-timestamp'], nonce = req.headers['x-nonce'];
         const msg = `${req.method}\n${req.url}\n${ts}\n${nonce}\n${crypto.createHash('sha256').update(b).digest('hex')}`;
-        const ok = req.headers['x-pub'] === 'demobaari' && crypto.verify(null, Buffer.from(msg), hubKey, Buffer.from(req.headers['x-signature'] || '', 'base64')) && !seen.has(nonce) && Math.abs(Date.now() / 1000 - Number(ts)) < 300;
+        const ok = req.headers['x-pub'] === 'demobaari' && hubKey && crypto.verify(null, Buffer.from(msg), hubKey, Buffer.from(req.headers['x-signature'] || '', 'base64')) && !seen.has(nonce) && Math.abs(Date.now() / 1000 - Number(ts)) < 300;
         seen.add(nonce);
         const send = (code, j) => { res.writeHead(code, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(j)); };
         if (!ok) { hub.badSig++; return send(401, { error: 'sig' }); }
@@ -1136,11 +1137,22 @@ const future = (days) => { const d = new Date(Date.now() + days * 864e5); return
     await new Promise(r => srv.listen(parseInt(process.env.HUB_PORT, 10), '127.0.0.1', r));
     try {
         const base = { ...settings };
+        // liittäminen hallintapaneelista (ei config.php-muokkausta): oma avainpari syntyy clientissa
+        assert.strictEqual((await admin.get('')).json.pub.hub_connected, false);
+        assert.strictEqual((await admin.post('hub_sync_now', {})).status, 409);
+        const hurl = 'http://127.0.0.1:' + process.env.HUB_PORT;
+        assert.strictEqual((await emp.post('hub_pair', { url: hurl, code: 'ABCDE-FGHJK-LMNPQ-RSTUV' })).status, 403);
+        assert.strictEqual((await admin.post('hub_pair', { url: 'http://example.com', code: 'ABCDE-FGHJK-LMNPQ-RSTUV' })).status, 400, 'salaamaton ulkoinen osoite hyväksyttiin');
+        assert.strictEqual((await admin.post('hub_pair', { url: hurl, code: 'lyhyt' })).status, 400);
+        const bad = await admin.post('hub_pair', { url: hurl, code: 'ZZZZZ-ZZZZZ-ZZZZZ-ZZZZZ' }); assert.strictEqual(bad.status, 502); assert.match(bad.json.error, /väärä tai vanhentunut/);
+        const okp = await admin.post('hub_pair', { url: hurl, code: 'abcde-fghjk-lmnpq-rstuv' }); assert.ok(okp.json.success, JSON.stringify(okp.json)); assert.strictEqual(okp.json.name, 'Testihub');
+        const info = (await admin.get('')).json.pub; assert.strictEqual(info.hub_connected, true); assert.strictEqual(info.hub_info.slug, 'demobaari'); assert.ok(!JSON.stringify(info).includes('private'), 'avain vuoti käyttöliittymälle');
+        assert.match((await sql("SELECT private_key_enc FROM hub_connection")).trim().split('\n').pop(), /^v1:/, 'yksityinen avain ei ole salattuna');
         // oletuksena pois päältä: mitään ei lähde
         const ev = (await admin.form('event', fdOf({ title: 'Hub-keikka', date: future(12), time_start: '20:00', type: 'music', is_public: '1', registration: 'none' }))).json; assert.ok(ev.success, JSON.stringify(ev));
         await runCron(); assert.strictEqual(Object.keys(hub.events).length, 0, 'tapahtuma lähti ilman suostumusta');
         assert.ok((await admin.post('save_pub_settings', { ...base, features_ext: { hub_events: true, hub_gigs: true } })).json.success);
-        const pub = (await admin.get('')).json.pub; assert.strictEqual(pub.hub_available, true); assert.strictEqual(pub.features.hub_gigs, true);
+        const pub = (await admin.get('')).json.pub; assert.strictEqual(pub.hub_connected, true); assert.strictEqual(pub.features.hub_gigs, true);
         // vuoro keikkatyöksi
         // tallennus synkronoi heti (ilman cronia)
         const ev2 = (await admin.form('event', fdOf({ title: 'Heti-keikka', date: future(14), time_start: '21:00', type: 'music', is_public: '1', registration: 'none' }))).json; assert.ok(ev2.success);
@@ -1175,6 +1187,12 @@ const future = (days) => { const d = new Date(Date.now() + days * 864e5); return
         assert.ok((await admin.post('save_pub_settings', { ...base, features_ext: { hub_events: false, hub_gigs: false } })).json.success);
         await runCron(); assert.strictEqual(Object.keys(hub.events).length, 0, 'tapahtuma jäi keskukseen'); assert.strictEqual(Object.keys(hub.shifts).length, 0, 'vuoro jäi keskukseen');
         assert.strictEqual((await admin.post('hub_applications', {})).json.applications.length, 1, 'paikallinen hakemushistoria poistui');
+        // katkaisu poistaa julkaistut tiedot keskuksesta ja yhteyden
+        assert.ok((await admin.post('save_pub_settings', { ...base, features_ext: { hub_events: true, hub_gigs: true } })).json.success); await runCron();
+        assert.ok(Object.keys(hub.events).length > 0);
+        assert.strictEqual((await emp.post('hub_disconnect', {})).status, 403);
+        assert.ok((await admin.post('hub_disconnect', {})).json.success); assert.strictEqual(Object.keys(hub.events).length, 0, 'tapahtumat jäivät keskukseen katkaisun jälkeen');
+        const afterD = (await admin.get('')).json.pub; assert.strictEqual(afterD.hub_connected, false); assert.strictEqual(afterD.features.hub_events, false);
     } finally { srv.close(); }
   });
   await t('verkkomaksu lippuihin (valinnainen, Stripe): kytkin, odotus, webhook, vanheneminen', async () => {
