@@ -67,7 +67,7 @@ try {
 {
   const core = require('fs').readFileSync(require('path').join(__dirname, '..', 'assets/js/core.js'), 'utf8');
   const builders = core.split('private_messages: data.private_messages || []').length - 1;
-  for (const k of ['hub_pending_apps']) {
+  for (const k of ['hub_pending_apps', 'my_outside_gigs']) {
     const n = core.split(k + ': data.' + k).length - 1;
     if (n !== builders) { console.log(`FAIL: ${k} puuttuu load()- tai loadSilent()-funktion tilasta (${n}/${builders})`); process.exit(1); }
   }

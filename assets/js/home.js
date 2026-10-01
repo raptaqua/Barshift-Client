@@ -300,6 +300,7 @@ function renderDashboard() {
     let html = `<div class="page-header"><div class="page-title">Hei, ${esc(state.user.name.split(' ')[0])} 👋</div></div>`;
     html += renderNotices();
     html += renderClockWidget();
+    html += renderOutsideGigs();
 
     html += `<div class="dash-grid">
         <div class="dash-col">

@@ -117,3 +117,13 @@ async function gigWithdraw(id) {
     if (r.error) return showToast(r.error, 'error');
     showToast('Hakemus peruttu'); state.gigFeed = undefined; loadGigFeed();
 }
+
+// Omat hyväksytyt keikat muissa baareissa (Koti ja Vuorot). Vain luku: tunnit ja palkka hoituvat vuoron tarjonneen baarin kautta.
+function renderOutsideGigs() {
+    const g = (state.data && state.data.my_outside_gigs) || [];
+    if (!g.length) return '';
+    return `<div class="card card-sm" style="margin-bottom:16px;"><div style="font-size:12px; color:var(--text3); font-weight:700; margin-bottom:10px; text-transform:uppercase;"><i class="bi bi-briefcase"></i> Keikkani muissa baareissa</div>
+        ${g.map(x => `<div class="att-row" style="flex-wrap:wrap; gap:6px;"><div style="flex:1; min-width:200px;"><b>${formatDate(x.date)}</b> klo ${esc(String(x.time_start).slice(0, 5))}–${esc(String(x.time_end).slice(0, 5))}<br>
+            <small>${esc(x.bar_name)}${x.city ? ', ' + esc(x.city) : ''}${x.role ? ' · ' + esc(x.role) : ''}${x.address ? '<br>📍 ' + esc(x.address) : ''}</small></div><span class="badge badge-green">Hyväksytty</span></div>`).join('')}
+        <small style="color:var(--text3); display:block; margin-top:8px;">Baari ottaa yhteyttä antamillasi yhteystiedoilla. Keikan tunnit ja palkka hoituvat kyseisen baarin kautta.</small></div>`;
+}
