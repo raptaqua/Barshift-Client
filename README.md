@@ -4,6 +4,8 @@ Yhden baarin työvuorojen hallinta (PHP + MySQL, PWA). **Tässä asennuksessa on
 kanta, jossa on useampi baari, hylätään (`thePub()`-vartija). Baarien väliset asiat (yhteinen tapahtumakalenteri, keikkatyön välitys) hoitaa erillinen
 [barshift-server](https://github.com/raptaqua/barshift-server) (BarShift Hub); yhteys on valinnainen ja vain työntö: ks. *Keskuspalvelin* alla.
 
+Demodatan poisto kannasta (säilyttää oman baarisi): `php bin/clear_demo.php` (kysyy varmistuksen; `--yes` ohittaa). Demobaari + oma baari samassa kannassa estää muuten toiminnan.
+
 Salasanan tai 2FA:n palautus palvelimelta: `php bin/admin.php reset-password <tunnus>` / `reset-2fa <tunnus>`.
 
 ## Käyttöönotto (asennusohjelma)
