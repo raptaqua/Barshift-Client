@@ -627,7 +627,6 @@ function storeDocumentUpload(string $key, string $pub, bool $imagesOnly = false)
 }
 
 
-function accountUserIds($conn, int $uid): array { return [$uid]; }
 // Tämä asennus palvelee täsmälleen yhtä baaria. Kanta, jossa on useampi baari, hylätään (tietoturva: ei baarien välistä dataa samassa kannassa)
 function bsHubRecord($conn, bool $ok, string $err): void {
     $now = date('c');
@@ -1538,18 +1537,6 @@ if ($method === 'GET') {
             exit;
         }
         jsonResponse(["success" => true, "registrations" => $rows, "waitlist" => fetchAllRows(prepareQuery($conn, "SELECT name, email, qty, notified_at FROM event_waitlist WHERE event_id = " . $eid . " ORDER BY id"))]);
-    }
-    if ($action === 'my_history') {   // oma työhistoria kaikissa yhdistetyissä baareissa
-        $ids = accountUserIds($conn, $myId); $rows = [];
-        foreach ($ids as $uid) {
-            $u = fetchOne(prepareQuery($conn, "SELECT u.pub_name, u.role, COALESCE(p.name, u.pub_name) AS pname FROM users u LEFT JOIN pubs p ON p.slug = u.pub_name WHERE u.id = " . $uid . ""));
-            if (!$u) continue;
-            $h = fetchOne(prepareQuery($conn, "SELECT MIN(clock_in) first_in, COALESCE(SUM(TIMESTAMPDIFF(MINUTE, clock_in, clock_out)), 0) / 60 AS total,
-                COALESCE(SUM(CASE WHEN clock_in >= DATE_SUB(CURDATE(), INTERVAL 12 MONTH) THEN TIMESTAMPDIFF(MINUTE, clock_in, clock_out) ELSE 0 END), 0) / 60 AS last12
-                FROM time_entries WHERE user_id = " . $uid . " AND clock_out IS NOT NULL"));
-            $rows[] = ['pub' => $u['pname'], 'first' => $h['first_in'] ? substr($h['first_in'], 0, 10) : null, 'hours_total' => round((float)$h['total'], 1), 'hours_12m' => round((float)$h['last12'], 1)];
-        }
-        jsonResponse(["success" => true, "history" => $rows]);
     }
     if ($action === 'hour_bank') {
         $months = max(1, min(24, (int)($_GET['months'] ?? 12)));

@@ -228,7 +228,7 @@ function adminTabPub() {
     if (!tzs.includes(p.timezone)) tzs.push(p.timezone);
     return `<div class="card card-sm" style="max-width:720px;">
         <div class="section-header"><span class="section-title"><i class="bi bi-shop"></i> Baarin asetukset</span><div class="section-line"></div></div>
-        <p style="font-size:13px; color:var(--text2); margin:0 0 14px;">Kirjautumistunnus <b>tunnus@${esc(state.user.pub_name)}</b> ei muutu, vaikka vaihdat nimen.</p>
+        <p style="font-size:13px; color:var(--text2); margin:0 0 14px;">Kirjautumistunnus <b>${esc(state.user.username)}</b> ei muutu, vaikka vaihdat nimen.</p>
         <div class="admin-tabs" role="tablist" aria-label="Baarin asetusten osiot" style="margin-bottom:16px;">${PUB_SET_TABS.map(t => `<button type="button" class="admin-tab ${t.id === psTab ? 'active' : ''}" role="tab" data-pstab="${t.id}" onclick="setPubSetTab('${t.id}')"><i class="bi ${t.icon}"></i><span>${t.label}</span></button>`).join('')}</div>
         <div class="ps-grp" data-g="general" style="${psTab === 'general' ? '' : 'display:none'}">
         <div class="form-row" style="margin-bottom:14px;">

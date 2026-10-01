@@ -96,7 +96,6 @@ Työntekijä merkitsee **toistuvat estepäivät** (*Oma profiili → Saatavuus*)
 
 **Tiimi** (*Tiimi*-sivu): kiitokset, dokumentit (PDF/kuva, valinnainen kuittaus; ladattavissa vain kirjautuneena), perehdytyslistat, nimettömät kyselyt (tulokset vasta ≥ 3 vastauksella; vastaajaa ei tallenneta). Puutelistaan ja vuorokirjaan voi liittää kuvan, puutteelle vastuuhenkilö ja tila. JV-kortin vanheneminen muistutetaan 30 ja 7 pv ennen (cron).
 
-**Keikkalaiset:** työntekijä voi itse ilmoittautua haettavaksi (*Oma profiili → Tiedot → Keikkatyö*). Muiden baarien admin näkee vain lyhennetyn nimen ja kuvauksen ja voi kutsua; hyväksyessään henkilö saa jäsenyyden kutsuvaan baariin samalla tunnuksella (ja mahdollisen avoimen vuoron). Ei arvosteluja baarien välillä.
 
 **Asiakaspalvelut (baarikohtaisesti aktivoitavat, oletuksena pois):** *Hallinta → Baari → Asiakaspalvelut*.
 - *Ilmoittautuminen ja liput*: tapahtumalle ilmoittautuminen (paikkamäärä, hinta tiedoksi, maksu ovella) tai ulkoinen lippulinkki (https). BarShift ei käsittele maksuja. Kävijä saa vahvistuksen, peruutuslinkin ja muistutuksen sähköpostilla; ilmoittautuneet ja CSV *Tapahtumat*-sivulla. Julkisella sivulla myös jaettava **some-kortti** (PNG).
