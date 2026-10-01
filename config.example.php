@@ -42,6 +42,9 @@ return [
     // 'backup_expected' => true,     // hälytä myös, jos varmuuskopiota ei ole koskaan tehty (muuten seuranta alkaa ensimmäisestä onnistuneesta)
     // 'backup_max_hours' => 48,
 
+    // Keskuspalvelin (BarShift Hub), valinnainen: julkiset tapahtumat ja keikkatyö. Avainpari: php bin/keygen.php (barshift-server)
+    // 'hub' => ['url' => 'https://hub.example.com', 'pub_slug' => 'oma-baari', 'private_key' => 'BASE64-YKSITYINEN-AVAIN'],
+
     // Sallitut origin-osoitteet API-kutsuille (tyhjä = vain sama isäntä)
     'allowed_origins' => [],
 ];

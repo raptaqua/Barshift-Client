@@ -71,13 +71,17 @@ function customerSettingsHtml(p) {
             <label class="abs-choice"><input id="fx-sms" type="checkbox" ${p.reminder_sms ? 'checked' : ''}><span><b>Lähetä myös tekstiviesti</b> (vaatii palvelimen SMS-asetukset ja vieraan puhelinnumeron; tekstiviestit maksavat)</span></label>
         </div>
         <label class="abs-choice" style="margin-bottom:8px;"><input id="fx-pay" type="checkbox" ${p.features.payments ? 'checked' : ''}><span><b>Verkkomaksu lippuihin</b><br><small>Maksullisten tapahtumaliput maksetaan MobilePaylla ilmoittautumisen yhteydessä (vaatii Stripe-avaimet palvelimen asetuksissa ja MobilePayn käyttöönoton Stripessä).</small></span></label>
+        ${p.hub_available ? `<div class="section-header" style="margin-top:14px;"><span class="section-title"><i class="bi bi-diagram-3"></i> Keskuspalvelin (BarShift Hub)</span><div class="section-line"></div></div>
+        <p style="font-size:12px; color:var(--text3); margin:0 0 8px;">Valinnainen. Keskukseen lähtee vain se, minkä itse julkaiset: julkiset tapahtumat ja keikkatyöksi merkityt avoimet vuorot. Työntekijöiden tai asiakkaiden tietoja ei lähetetä.</p>
+        <label class="abs-choice" style="margin-bottom:8px;"><input id="fx-hubev" type="checkbox" ${p.features.hub_events ? 'checked' : ''}><span><b>Julkaise julkiset tapahtumat yhteiseen kalenteriin</b></span></label>
+        <label class="abs-choice" style="margin-bottom:8px;"><input id="fx-hubgig" type="checkbox" ${p.features.hub_gigs ? 'checked' : ''}><span><b>Keikkatyöpörssi</b><br><small>Voit tarjota avoimia vuoroja keikkatyöläisille ja ottaa vastaan heidän hakemuksiaan. Hakijan yhteystiedot näkyvät vasta hyväksynnän jälkeen.</small></span></label>` : ''}
         <label class="abs-choice" style="margin-bottom:8px;"><input id="fx-guests" type="checkbox" ${p.features.guests ? 'checked' : ''}><span><b>Vieraskortisto</b><br><small>Kanta-asiakkaat, VIP-merkinnät, allergiat ja käyntihistoria varauksista ja ilmoittautumisista. Vain henkilökunnan käyttöön.</small></span></label>`;
 }
 function customerSettingsData() {
     const v = id => document.getElementById(id), hours = [];
     for (let d = 0; d < 7; d++) if (v('bh-on-' + d) && v('bh-on-' + d).checked) hours.push({ dow: d, open: v('bh-o-' + d).value, close: v('bh-c-' + d).value });
     return { feature_tickets: v('ps-ft').checked, feature_bookings: v('ps-fb').checked,
-        features_ext: { bidding: v('fx-bidding').checked, autoschedule: v('fx-auto').checked, reminders: v('fx-rem').checked, payments: v('fx-pay').checked, guests: v('fx-guests').checked, guest_reminder_hours: v('fx-remh').value, reminder_sms: v('fx-sms').checked },
+        features_ext: { bidding: v('fx-bidding').checked, autoschedule: v('fx-auto').checked, reminders: v('fx-rem').checked, payments: v('fx-pay').checked, guests: v('fx-guests').checked, hub_events: !!(v('fx-hubev') && v('fx-hubev').checked), hub_gigs: !!(v('fx-hubgig') && v('fx-hubgig').checked), guest_reminder_hours: v('fx-remh').value, reminder_sms: v('fx-sms').checked },
         booking: { capacity: v('bk-cap').value, max_party: v('bk-max').value, duration_minutes: v('bk-dur').value, slot_minutes: v('bk-slot').value, lead_hours: v('bk-lead').value, days_ahead: v('bk-days').value, auto_confirm: v('bk-auto').checked, hours } };
 }
 

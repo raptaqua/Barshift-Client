@@ -52,6 +52,8 @@ CREATE TABLE IF NOT EXISTS `shifts` (
   `status` enum('draft','published') NOT NULL DEFAULT 'published',   -- luonnos näkyy vain adminille
   `reminded_at` datetime DEFAULT NULL,               -- muistutus lähetetty
   `missed_alerted_at` datetime DEFAULT NULL,         -- "leimaus unohtui" -hälytys lähetetty
+  `hub_gig` tinyint(1) NOT NULL DEFAULT 0,           -- 1 = tarjolla keikkatyöläisille keskuksessa, 2 = täytetty keskuksen kautta
+  `hub_pay` varchar(80) DEFAULT NULL,
   PRIMARY KEY (`id`),
   KEY `userId` (`userId`),
   KEY `pub_date` (`pub_name`,`date`),
@@ -199,6 +201,8 @@ CREATE TABLE IF NOT EXISTS `pubs` (
   `feature_guests` tinyint(1) NOT NULL DEFAULT 0,
   `guest_reminder_hours` int(11) NOT NULL DEFAULT 24,
   `reminder_sms` tinyint(1) NOT NULL DEFAULT 0,
+  `feature_hub_events` tinyint(1) NOT NULL DEFAULT 0,
+  `feature_hub_gigs` tinyint(1) NOT NULL DEFAULT 0,
   PRIMARY KEY (`id`),
   UNIQUE KEY `slug` (`slug`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
@@ -676,5 +680,17 @@ CREATE TABLE IF NOT EXISTS `user_sessions` (
   UNIQUE KEY `uq_dev` (`dev_hash`),
   KEY `idx_user` (`user_id`, `created_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `hub_sync` (
+  `kind` enum('event','shift') NOT NULL, `local_id` int(11) NOT NULL, `hash` char(40) NOT NULL, `synced_at` datetime NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`kind`,`local_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+CREATE TABLE IF NOT EXISTS `hub_applications` (
+  `id` int(11) NOT NULL AUTO_INCREMENT, `hub_id` int(11) NOT NULL, `shift_id` int(11) NOT NULL,
+  `name` varchar(120) NOT NULL, `skills` varchar(300) NOT NULL DEFAULT '', `city` varchar(80) NOT NULL DEFAULT '', `message` varchar(500) DEFAULT NULL,
+  `status` enum('pending','accepted','declined') NOT NULL DEFAULT 'pending', `email` varchar(190) DEFAULT NULL, `phone` varchar(40) DEFAULT NULL,
+  `created_at` datetime NOT NULL DEFAULT current_timestamp(), `decided_at` datetime DEFAULT NULL,
+  PRIMARY KEY (`id`), UNIQUE KEY `uq_hub` (`hub_id`), KEY `shift_id` (`shift_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 SET FOREIGN_KEY_CHECKS = 1;

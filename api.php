@@ -89,6 +89,7 @@ require __DIR__ . '/lib/stripe.php';   // verkkomaksu (valinnainen)
 require __DIR__ . '/lib/geocode.php';  // osoitehaku (sijainti kartalle)
 require __DIR__ . '/lib/pdf.php';      // palkkaerittelyn PDF
 require __DIR__ . '/lib/waitlist.php'; // tapahtumien odotuslista
+require __DIR__ . '/lib/hub.php';      // keskuspalvelin (julkiset tapahtumat, keikkatyö)
 
 $vapid_auth = ['VAPID' => [
     'subject'    => $cfg['vapid_subject'],
@@ -284,7 +285,9 @@ function getPub($conn, string $slug, bool $adminView = false): array {
         'bonuses' => ['evening' => (float)$p['bonus_evening'], 'night' => (float)$p['bonus_night'], 'sat' => (float)$p['bonus_sat'], 'sun' => (float)$p['bonus_sun']],
     ];
     $out['features'] = ['tickets' => (bool)$p['feature_tickets'], 'bookings' => (bool)$p['feature_bookings'], 'bidding' => (bool)$p['feature_bidding'], 'autoschedule' => (bool)$p['feature_autoschedule'], 'reminders' => (bool)$p['feature_reminders'],
-        'payments' => (bool)$p['feature_payments'], 'guests' => (bool)$p['feature_guests']];
+        'payments' => (bool)$p['feature_payments'], 'guests' => (bool)$p['feature_guests'],
+        'hub_events' => (bool)$p['feature_hub_events'], 'hub_gigs' => (bool)$p['feature_hub_gigs']];
+    $out['hub_available'] = hubConfigured($GLOBALS['cfg'] ?? []);
     $out['guest_reminder_hours'] = (int)$p['guest_reminder_hours']; $out['reminder_sms'] = (bool)$p['reminder_sms'];
     $bh = json_decode((string)($p['booking_hours'] ?? ''), true);
     $out['booking'] = ['capacity' => (int)$p['booking_capacity'], 'max_party' => (int)$p['booking_max_party'], 'slot_minutes' => (int)$p['booking_slot_minutes'], 'duration_minutes' => (int)$p['booking_duration_minutes'],
@@ -804,15 +807,14 @@ function findAuthToken($conn, string $tok): ?array {
 function authLink($cfg, string $tok): string { $b = bsBaseUrl($cfg); return ($b !== '' ? $b : '') . '/setpassword.html#t=' . $tok; }
 // Lähettää kutsun/palautuslinkin jonoon. Palauttaa [linkki, lähetettiinkö sähköpostilla].
 function issueAuthLink($conn, $cfg, array $u, string $kind): array {
-    $ttl = $kind === 'reset' ? 3600 : ($kind === 'link' ? 14 * 86400 : 7 * 86400);
+    $ttl = $kind === 'reset' ? 3600 : 7 * 86400;
     $link = authLink($cfg, createAuthToken($conn, (int)$u['id'], $kind, $ttl));
     $emailed = false;
     if (!empty($u['email']) && bsMailConfigured($cfg)) {
-        $subject = $kind === 'reset' ? '[BarShift] Salasanan vaihto' : ($kind === 'link' ? '[BarShift] Sinut on kutsuttu uuteen baariin' : '[BarShift] Sinut on kutsuttu BarShiftiin');
+        $subject = $kind === 'reset' ? '[BarShift] Salasanan vaihto' : '[BarShift] Sinut on kutsuttu BarShiftiin';
         $intro = $kind === 'reset' ? "Pyysit salasanan vaihtoa. Aseta uusi salasana alla olevasta linkistä (voimassa 1 tunnin). Jos et pyytänyt tätä, voit jättää viestin huomiotta."
-               : ($kind === 'link' ? "Sinulle on luotu paikka baarissa {$u['pub_name']}. Jos sinulla on jo BarShift-tunnus toisessa baarissa, voit liittää tämän baarin siihen linkin kautta ja vaihtaa baarien välillä yhdellä kirjautumisella (linkki voimassa 14 päivää)."
-                                    : "Sinulle on luotu BarShift-tunnus. Aseta salasanasi alla olevasta linkistä (voimassa 7 päivää).");
-        bsEnqueueMail($conn, $u['email'], $subject, "Hei {$u['name']},\n\n$intro\n\n$link\n\nKirjautumistunnuksesi: {$u['username']}@{$u['pub_name']}\n");
+               : "Sinulle on luotu BarShift-tunnus. Aseta salasanasi alla olevasta linkistä (voimassa 7 päivää).";
+        bsEnqueueMail($conn, $u['email'], $subject, "Hei {$u['name']},\n\n$intro\n\n$link\n\nKirjautumistunnuksesi: {$u['username']}\n");
         $emailed = true;
     }
     return [$link, $emailed];
@@ -2033,7 +2035,11 @@ if ($method === 'POST') {
                     jsonResponse(["success" => true, "created" => $repeat + 1]);
                 }
             }
-            run($stmt);
+            run($stmt); $savedShiftId = $id ?: (int)$conn->insert_id;   // ennen getPubia: sen INSERT IGNORE nollaa insert_id:n
+            if (array_key_exists('hub_gig', $data) && getPub($conn, $myPub)['features']['hub_gigs']) {   // tarjolla keikkatyöläisille (vain avoin, julkaistu vuoro)
+                $sid = $savedShiftId; $hg = (!empty($data['hub_gig']) && $uId === null && $status === 'published') ? 1 : 0; $hp = limitStr($data['hub_pay'] ?? '', 80, 'hub_pay');
+                $hs = prepareQuery($conn, "UPDATE shifts SET hub_gig = ?, hub_pay = ? WHERE id = ? AND pub_name = ? AND hub_gig <> 2"); $hs->bind_param("isis", $hg, $hp, $sid, $myPub); run($hs);
+            }
         } else {
             // Työntekijä saa vain ottaa itselleen oman baarinsa avoimen vuoron
             if (!$id) fail('Ei oikeuksia', 403);
@@ -2149,6 +2155,34 @@ if ($method === 'POST') {
         $up->bind_param("isi", $step, $json, $myId); run($up);
         audit($conn, $me, '2FA otettu käyttöön', $me['username']);
         jsonResponse(["success" => true, "recovery_codes" => $codes]);
+
+    } elseif ($action === 'hub_applications') {   // keikkahakemukset keskuspalvelimen kautta (vain ylläpito)
+        requireAdmin($me);
+        $rows = fetchAllRows(prepareQuery2($conn, "SELECT a.id, a.shift_id, a.name, a.skills, a.city, a.message, a.status, a.email, a.phone, a.created_at, s.date, s.start, s.end, s.role
+            FROM hub_applications a JOIN shifts s ON s.id = a.shift_id WHERE s.pub_name = ? ORDER BY a.status = 'pending' DESC, a.id DESC LIMIT 100", $myPub));
+        jsonResponse(["success" => true, "applications" => $rows, "hub_available" => hubConfigured($cfg)]);
+
+    } elseif ($action === 'hub_decide') {
+        requireAdmin($me);
+        if (!hubConfigured($cfg)) fail('Keskuspalvelinta ei ole määritetty', 409);
+        $aid = (int)($data['id'] ?? 0); $dec = $data['decision'] ?? '';
+        if (!in_array($dec, ['accepted', 'declined'], true)) fail('Virheellinen päätös');
+        $a = fetchOne(prepareQuery($conn, "SELECT a.id, a.hub_id, a.shift_id, a.status FROM hub_applications a JOIN shifts s ON s.id = a.shift_id WHERE a.id = " . $aid . " AND s.pub_name = '" . $conn->real_escape_string($myPub) . "'"));
+        if (!$a) fail('Ei löydy', 404);
+        if ($a['status'] !== 'pending') fail('Hakemus on jo käsitelty', 409);
+        [$code, $res] = hubRequest($cfg, 'POST', '/v1/applications/' . (int)$a['hub_id'] . '/decision', ['decision' => $dec]);
+        if ($code !== 200) fail($res['error'] ?? 'Keskuspalvelin ei vastannut', $code === 0 ? 502 : 409);
+        $up = prepareQuery($conn, "UPDATE hub_applications SET status = ?, decided_at = NOW() WHERE id = ?"); $up->bind_param("si", $dec, $aid); run($up);
+        if ($dec === 'accepted') {   // vuoro täyttyi: muut hakemukset hylätään, ja hyväksytyn yhteystiedot haetaan keskuksesta
+            $conn->query("UPDATE hub_applications SET status = 'declined', decided_at = NOW() WHERE shift_id = " . (int)$a['shift_id'] . " AND status = 'pending'");
+            $conn->query("UPDATE shifts SET hub_gig = 2 WHERE id = " . (int)$a['shift_id']);
+            [$c2, $r2] = hubRequest($cfg, 'GET', '/v1/applications?since_id=' . ((int)$a['hub_id'] - 1));
+            foreach (($c2 === 200 ? ($r2['applications'] ?? []) : []) as $x) if ((int)$x['id'] === (int)$a['hub_id']) {
+                $em = isset($x['email']) ? mb_substr((string)$x['email'], 0, 190) : null; $ph = isset($x['phone']) ? mb_substr((string)$x['phone'], 0, 40) : null;
+                $cu = prepareQuery($conn, "UPDATE hub_applications SET email = ?, phone = ? WHERE id = ?"); $cu->bind_param("ssi", $em, $ph, $aid); run($cu);
+            }
+        }
+        jsonResponse(["success" => true]);
 
     } elseif ($action === 'my_sessions') {
         $cur = !empty($_SESSION['dev']) ? hash('sha256', (string)$_SESSION['dev']) : '';
@@ -3074,9 +3108,10 @@ if ($method === 'POST') {
         if (is_array($data['features_ext'] ?? null)) {   // valinnaiset ominaisuudet (vuorohaku, automaattinen suunnittelu, muistutukset, maksut, vieraskortisto)
             $fx = $data['features_ext']; $flag = fn($k) => !empty($fx[$k]) && !in_array((string)$fx[$k], ['0', 'false'], true) ? 1 : 0;
             $grh = max(2, min(72, (int)($fx['guest_reminder_hours'] ?? 24)));
-            $fe = prepareQuery($conn, "UPDATE pubs SET feature_bidding = ?, feature_autoschedule = ?, feature_reminders = ?, feature_payments = ?, feature_guests = ?, guest_reminder_hours = ?, reminder_sms = ? WHERE slug = ?");
+            $fe = prepareQuery($conn, "UPDATE pubs SET feature_bidding = ?, feature_autoschedule = ?, feature_reminders = ?, feature_payments = ?, feature_guests = ?, guest_reminder_hours = ?, reminder_sms = ?, feature_hub_events = ?, feature_hub_gigs = ? WHERE slug = ?");
             $f1 = $flag('bidding'); $f2 = $flag('autoschedule'); $f3 = $flag('reminders'); $f4 = $flag('payments'); $f5 = $flag('guests'); $f6 = $flag('reminder_sms');
-            $fe->bind_param("iiiiiiis", $f1, $f2, $f3, $f4, $f5, $grh, $f6, $myPub); run($fe);
+            $f7 = hubConfigured($cfg) ? $flag('hub_events') : 0; $f8 = hubConfigured($cfg) ? $flag('hub_gigs') : 0;
+            $fe->bind_param("iiiiiiiiis", $f1, $f2, $f3, $f4, $f5, $grh, $f6, $f7, $f8, $myPub); run($fe);
         }
         jsonResponse(["success" => true, "pub" => getPub($conn, $myPub, true)]);
 

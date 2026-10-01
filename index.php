@@ -48,6 +48,7 @@
 <script src="assets/js/cash.js?v=<?= (int)@filemtime(__DIR__ . '/assets/js/cash.js') ?>"></script>
 <script src="assets/js/eventguests.js?v=<?= (int)@filemtime(__DIR__ . '/assets/js/eventguests.js') ?>"></script>
 <script src="assets/js/team.js?v=<?= (int)@filemtime(__DIR__ . '/assets/js/team.js') ?>"></script>
+<script src="assets/js/hub.js?v=<?= (int)@filemtime(__DIR__ . '/assets/js/hub.js') ?>"></script>
 <script src="assets/js/customers.js?v=<?= (int)@filemtime(__DIR__ . '/assets/js/customers.js') ?>"></script>
 <script src="assets/js/main.js?v=<?= (int)@filemtime(__DIR__ . '/assets/js/main.js') ?>"></script>
 </body>

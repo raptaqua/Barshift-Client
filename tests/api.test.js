@@ -683,7 +683,7 @@ const future = (days) => { const d = new Date(Date.now() + days * 864e5); return
     const r = await c.post('request_reset', { username: 'sari', pub_name: 'demobaari' }); assert.ok(r.json.success);
     const mail = await waitMail(mailbox, m => m.to === 'sari@example.test' && /salasanan vaihto/i.test(m.subject)); assert.ok(mail, 'viesti ei saapunut');
     const tok = tokenFrom(mail); assert.ok(tok, mail.body);
-    assert.strictEqual((await c.get('token_info', `&token=${tok}`)).json.login, 'sari@demobaari');
+    assert.strictEqual((await c.get('token_info', `&token=${tok}`)).json.login, 'sari');
     assert.ok((await c.post('set_password', { token: tok, password: 'lyhyt' })).status >= 400);
     assert.ok((await c.post('set_password', { token: tok, password: 'UusiSalasana2026!' })).json.success);
     assert.strictEqual((await c.post('set_password', { token: tok, password: 'ToinenSalasana2026!' })).status, 404, 'linkki toimi kahdesti');
@@ -711,7 +711,7 @@ const future = (days) => { const d = new Date(Date.now() + days * 864e5); return
   await t('kutsu: uusi työntekijä asettaa salasanansa linkistä', async () => {
     const r = await admin.post('user', { name: 'Kutsuttu Kalle', username: 'kalle', invite: true, email: 'kalle@example.test', role: 'employee', hourly_wage: 11 });
     assert.ok(r.json.success && r.json.invite.emailed === true && /setpassword\.html#t=/.test(r.json.invite.link), JSON.stringify(r.json));
-    const mail = await waitMail(mailbox, m => m.to === 'kalle@example.test'); assert.ok(mail); assert.ok(/kalle@demobaari/.test(mail.body));
+    const mail = await waitMail(mailbox, m => m.to === 'kalle@example.test'); assert.ok(mail); assert.ok(/Kirjautumistunnuksesi: kalle/.test(mail.body));
     assert.ok((await new Client().login('kalle', 'demobaari', 'arvaus-arvaus-1')).status >= 400, 'kutsutulla ei saa olla arvattavaa salasanaa');
     const tok = tokenFrom(mail); assert.ok((await new Client().post('set_password', { token: tok, password: 'KalleSalasana2026!' })).json.success);
     assert.ok((await new Client().login('kalle', 'demobaari', 'KalleSalasana2026!')).json.success);
@@ -1111,6 +1111,63 @@ const future = (days) => { const d = new Date(Date.now() + days * 864e5); return
     assert.ok((await a.post('my_sessions', {})).json.some(x => x.current && !x.revoked), 'oma istunto katkesi');
     assert.strictEqual((await emp.post('revoke_session', { id: other.id })).json.success, true);   // vieraan rivin mitätöinti on no-op
     assert.strictEqual((await a.post('my_sessions', {})).json.length >= 3, true);
+  });
+  console.log('Keskuspalvelin (BarShift Hub)');
+  await t('hub: julkiset tapahtumat ja keikkavuorot lähtevät allekirjoitettuina, hakemukset tulevat takaisin', async () => {
+    const hub = { events: {}, shifts: {}, apps: [], badSig: 0, calls: [], decisions: [] };
+    const spki = (raw) => crypto.createPublicKey({ key: Buffer.concat([Buffer.from('302a300506032b6570032100', 'hex'), Buffer.from(raw, 'base64')]), format: 'der', type: 'spki' });
+    const hubKey = spki(process.env.HUB_PUBKEY), seen = new Set();
+    const srv = require('http').createServer((req, res) => { let b = ''; req.on('data', c => b += c); req.on('end', () => {
+        const ts = req.headers['x-timestamp'], nonce = req.headers['x-nonce'];
+        const msg = `${req.method}\n${req.url}\n${ts}\n${nonce}\n${crypto.createHash('sha256').update(b).digest('hex')}`;
+        const ok = req.headers['x-pub'] === 'demobaari' && crypto.verify(null, Buffer.from(msg), hubKey, Buffer.from(req.headers['x-signature'] || '', 'base64')) && !seen.has(nonce) && Math.abs(Date.now() / 1000 - Number(ts)) < 300;
+        seen.add(nonce);
+        const send = (code, j) => { res.writeHead(code, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(j)); };
+        if (!ok) { hub.badSig++; return send(401, { error: 'sig' }); }
+        hub.calls.push(req.method + ' ' + req.url);
+        let m; const body = b ? JSON.parse(b) : {};
+        if ((m = req.url.match(/^\/v1\/(events|shifts)\/([A-Za-z0-9_.-]+)$/))) { if (req.method === 'PUT') hub[m[1]][m[2]] = body; else delete hub[m[1]][m[2]]; return send(200, { success: true }); }
+        if (req.method === 'GET' && req.url.startsWith('/v1/applications')) { const since = +(req.url.match(/since_id=(\d+)/) || [0, 0])[1]; return send(200, { applications: hub.apps.filter(a => a.id > since).map(a => ({ ...a, email: a.status === 'accepted' ? a.email : null, phone: a.status === 'accepted' ? a.phone : null })) }); }
+        if ((m = req.url.match(/^\/v1\/applications\/(\d+)\/decision$/))) { const a = hub.apps.find(x => x.id === +m[1]); a.status = body.decision; hub.decisions.push(body.decision); return send(200, { success: true }); }
+        send(404, { error: 'ei' });
+    }); });
+    await new Promise(r => srv.listen(parseInt(process.env.HUB_PORT, 10), '127.0.0.1', r));
+    try {
+        const base = { ...settings };
+        // oletuksena pois päältä: mitään ei lähde
+        const ev = (await admin.form('event', fdOf({ title: 'Hub-keikka', date: future(12), time_start: '20:00', type: 'music', is_public: '1', registration: 'none' }))).json; assert.ok(ev.success, JSON.stringify(ev));
+        await runCron(); assert.strictEqual(Object.keys(hub.events).length, 0, 'tapahtuma lähti ilman suostumusta');
+        assert.ok((await admin.post('save_pub_settings', { ...base, features_ext: { hub_events: true, hub_gigs: true } })).json.success);
+        const pub = (await admin.get('')).json.pub; assert.strictEqual(pub.hub_available, true); assert.strictEqual(pub.features.hub_gigs, true);
+        // vuoro keikkatyöksi
+        const d = future(13);
+        assert.ok((await admin.post('shift', { userId: null, date: d, start: '17:00', end: '23:00', role: 'Baarimestari', status: 'published', hub_gig: true, hub_pay: '16 €/h' })).json.success);
+        const privShift = (await admin.post('shift', { userId: null, date: d, start: '10:00', end: '12:00', role: 'Ovi', status: 'published' })).json; assert.ok(privShift.success);
+        await runCron();
+        const evs = Object.values(hub.events); assert.ok(evs.some(e => e.title === 'Hub-keikka' && e.date === future(12)), JSON.stringify(hub.events));
+        const sh = Object.entries(hub.shifts); assert.strictEqual(sh.length, 1, 'vain keikkatyöksi merkitty vuoro lähtee'); const [sext, sbody] = sh[0];
+        assert.deepStrictEqual(Object.keys(sbody).sort(), ['date', 'pay_text', 'role', 'status', 'time_end', 'time_start'], 'lähtevässä vuorossa on muutakin kuin sallitut kentät');
+        assert.strictEqual(sbody.status, 'open'); assert.strictEqual(sbody.pay_text, '16 €/h');
+        assert.strictEqual(hub.badSig, 0, 'allekirjoitus ei kelvannut');
+        const n = hub.calls.length; await runCron(); assert.strictEqual(hub.calls.filter(c => c.startsWith('PUT')).length, hub.calls.slice(0, n).filter(c => c.startsWith('PUT')).length, 'muuttumaton data lähetettiin uudelleen');
+        // hakemus tulee keskuksesta; yhteystiedot piilossa kunnes hyväksytty
+        const localId = +sext.slice(1);
+        hub.apps.push({ id: 1, shift: sext, status: 'pending', name: 'Aino Keikka', skills: 'baarimestari', city: 'Turku', message: 'Voin tulla', email: 'aino@example.test', phone: '0401234567' });
+        hub.apps.push({ id: 2, shift: 's99999', status: 'pending', name: 'Vieras', skills: '', city: '', message: null, email: null, phone: null });
+        await runCron();
+        const apps = (await admin.post('hub_applications', {})).json.applications; assert.strictEqual(apps.length, 1, 'toisen baarin/tuntemattoman vuoron hakemus tuli sisään'); assert.strictEqual(apps[0].email, null);
+        assert.strictEqual((await emp.post('hub_applications', {})).status, 403);
+        assert.strictEqual((await emp.post('hub_decide', { id: apps[0].id, decision: 'accepted' })).status, 403);
+        assert.ok((await admin.post('hub_decide', { id: apps[0].id, decision: 'accepted' })).json.success); assert.deepStrictEqual(hub.decisions, ['accepted']);
+        const after = (await admin.post('hub_applications', {})).json.applications[0]; assert.strictEqual(after.status, 'accepted'); assert.strictEqual(after.email, 'aino@example.test'); assert.strictEqual(after.phone, '0401234567');
+        assert.strictEqual((await admin.post('hub_decide', { id: apps[0].id, decision: 'declined' })).status, 409, 'käsitelty hakemus muuttui');
+        // täytetty vuoro merkitään keskuksessa täytetyksi (ei poisteta)
+        await runCron(); assert.strictEqual(hub.shifts[sext].status, 'filled');
+        // tapahtuman poisto ja ominaisuuden sammutus poistaa keskuksesta
+        assert.ok((await admin.post('save_pub_settings', { ...base, features_ext: { hub_events: false, hub_gigs: false } })).json.success);
+        await runCron(); assert.strictEqual(Object.keys(hub.events).length, 0, 'tapahtuma jäi keskukseen'); assert.strictEqual(Object.keys(hub.shifts).length, 0, 'vuoro jäi keskukseen');
+        assert.strictEqual((await admin.post('hub_applications', {})).json.applications.length, 1, 'paikallinen hakemushistoria poistui');
+    } finally { srv.close(); }
   });
   await t('verkkomaksu lippuihin (valinnainen, Stripe): kytkin, odotus, webhook, vanheneminen', async () => {
     const base = { ...settings, feature_tickets: true, feature_bookings: true, booking: { capacity: 10, max_party: 6, slot_minutes: 60, duration_minutes: 120, lead_hours: 0, days_ahead: 60, auto_confirm: false, hours: ALLDAYS } };

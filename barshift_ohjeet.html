@@ -551,12 +551,12 @@
             <div class="card">
                 <div class="card-title"><i class="bi bi-person-badge"></i> Käyttäjätunnus</div>
                 <p style="font-size:14px; color:var(--text2); margin-bottom:12px; line-height:1.5;">
-                    Kirjaudu sisään käyttäjätunnuksella muodossa <strong>tunnus@baarinnimi</strong>. Baarin nimi on se tunniste, jonka admin on teille antanut.
+                    Kirjaudu sisään käyttäjätunnuksellasi ja salasanallasi. Tunnuksen ja ensimmäisen salasanan saat baarin ylläpitäjältä.
                 </p>
                 <div class="login-demo">
                     Esimerkki: <code>mikko@demobaari</code> &nbsp;tai&nbsp; <code>sari@demobaari</code>
                 </div>
-                <figure class="shot small"><img src="assets/ohjeet/kirjautuminen.jpg" alt="Kirjautumisnäkymä" loading="lazy"><figcaption>Kirjautuminen: käyttäjätunnus muodossa tunnus@baari</figcaption></figure>
+                <figure class="shot small"><img src="assets/ohjeet/kirjautuminen.jpg" alt="Kirjautumisnäkymä" loading="lazy"><figcaption>Kirjautuminen: käyttäjätunnus ja salasana</figcaption></figure>
                 <ul class="feature-list" style="margin-top:14px;">
                     <li>Kirjautuminen pysyy voimassa, kunnes kirjaudut ulos (ylärivin uloskirjautumispainike).</li>
                     <li>Väärillä tunnuksilla kirjautuminen on rajoitettu: usean virheyrityksen jälkeen kirjautuminen estetään hetkeksi.</li>
@@ -564,7 +564,6 @@
                 </ul>
                 <div class="note"><i class="bi bi-info-circle"></i> <strong>Unohtuiko salasana?</strong> Paina kirjautumissivun linkkiä, anna tunnuksesi ja saat sähköpostiin linkin uuden salasanan asettamiseen (jos olet tallentanut sähköpostiosoitteen profiiliisi). Muuten admin voi lähettää sinulle linkin tai asettaa salasanan Hallinta → Työntekijät -sivulta.</div>
                 <div class="note"><i class="bi bi-shield-lock"></i> <strong>Kaksivaiheinen tunnistautuminen:</strong> jos olet ottanut sen käyttöön, salasanan jälkeen kysytään todennussovelluksen 6-numeroinen koodi (tai kertakäyttöinen palautuskoodi).</div>
-                <div class="note"><i class="bi bi-building"></i> <strong>Useassa baarissa töissä?</strong> Jos työskentelet usean baarin keikkalaisena, uuden baarin admin lähettää sinulle yhdistämislinkin. Kun liität baarin nykyiseen tunnukseesi, ylälaidan valikosta vaihdat baarien välillä ilman uutta kirjautumista. Kunkin baarin vuorot, palkka ja tiedot pysyvät erillään.</div>
                 <div class="note"><i class="bi bi-envelope"></i> <strong>Kutsulinkki:</strong> uusi työntekijä saa adminilta linkin, jolla hän asettaa salasanansa itse. Linkki on kertakäyttöinen ja vanhenee 7 päivässä.</div>
                 <figure class="shot small"><img src="assets/ohjeet/salasanan-asetus.jpg" alt="Salasanan asettaminen kutsulinkistä" loading="lazy"><figcaption>Salasanan asettaminen kutsulinkistä</figcaption></figure>
             </div>
@@ -611,7 +610,7 @@
                         <tr><td><i class="bi bi-chat-dots" style="color:var(--accent)"></i> Viestit</td><td>Yksityisviestit työkavereille</td></tr>
                         <tr><td><i class="bi bi-graph-up" style="color:var(--accent)"></i> Tilastot</td><td>Työtunnit ja niiden vahvistus; oikeuksien mukaan myynti, tilitykset, raportti ja palkka-ajo, tuntien hyväksyntä ja työaikapankki</td></tr>
                         <tr><td><i class="bi bi-calendar-x" style="color:var(--accent)"></i> Poissaolot</td><td>Sairasloma-, loma- ja muut poissaolot</td></tr>
-                        <tr><td><i class="bi bi-people" style="color:var(--accent)"></i> Hallinta</td><td>Työntekijät, ilmoitukset, rutiinit, kassa, osaaminen, miehitys, varaukset, vieraskortisto, baarin asetukset (välilehdillä), oikeudet, järjestelmän tila, julkinen profiili ja työvoimapyynnöt. Ylläpitäjä näkee kaiken; muille näkyvät vain heidän oikeuksiinsa kuuluvat välilehdet</td></tr>
+                        <tr><td><i class="bi bi-people" style="color:var(--accent)"></i> Hallinta</td><td>Työntekijät, ilmoitukset, rutiinit, kassa, osaaminen, miehitys, varaukset, vieraskortisto, baarin asetukset (välilehdillä), oikeudet, järjestelmän tila, julkinen profiili ja keikkahakemukset. Ylläpitäjä näkee kaiken; muille näkyvät vain heidän oikeuksiinsa kuuluvat välilehdet</td></tr>
                     </tbody>
                 </table>
                 <div class="shots">
@@ -650,7 +649,6 @@
                         <tr><td><span class="badge badge-red">Luvat vanhenemassa</span></td><td>JV-kortit, jotka vanhenevat 60 päivän sisällä (vain admin)</td></tr>
                         <tr><td><span class="badge badge-amber">Poissaolopyynnöt</span></td><td>Käsittelyä odottavat poissaolot; "Käsittele pyynnöt" vie Poissaolot-sivulle (vain admin)</td></tr>
                         <tr><td><span class="badge badge-red">Vuoronvaihdot</span></td><td>Kollegan tarjoama vuoro (Ota vuoro) tai pyyntö sinun vuorostasi (Hyväksy / Hylkää)</td></tr>
-                        <tr><td><span class="badge badge-amber">Työvoimapyynnöt</span></td><td>Toisen baarin työvoimapyyntö, jonka admin hyväksyy tai hylkää</td></tr>
                         <tr><td><span class="badge badge-amber">Avoimet vuorot</span></td><td>Kolme seuraavaa avointa vuoroa "Ota vuoro" -painikkeella; "Näytä kaikki" avaa Vuorot-listan suodatettuna avoimiin</td></tr>
                         <tr><td><span class="badge badge-teal">Vuoroja muissa baareissa</span></td><td>Yhteistyöbaarien avoimet vuorot yhteystietoineen</td></tr>
                     </tbody>
@@ -990,11 +988,11 @@
             </div>
             <div class="card">
                 <div class="role-pills"><span class="role-pill all"><i class="bi bi-people-fill"></i> Kaikki</span></div>
-                <div class="card-title"><i class="bi bi-briefcase"></i> Keikkalaiset useassa baarissa</div>
+                <div class="card-title"><i class="bi bi-briefcase"></i> Keikkatyöpörssi ja yhteinen kalenteri (keskuspalvelin)</div>
                 <ul class="feature-list">
-                    <li>Kohdassa <em>Oma profiili → Tiedot → Keikkatyö</em> voit ilmoittautua haettavaksi keikkatöihin. Muiden baarien ylläpito näkee vain nimesi lyhennettynä ja kuvauksesi.</li>
-                    <li>Kun saat kutsun (etusivun <em>Keikkakutsut</em>), voit hyväksyä tai hylätä sen. Hyväksyttäessä sinulle luodaan jäsenyys kutsuneeseen baariin samalla tunnuksella; vaihdat baaria ylälaidan valinnasta.</li>
-                    <li>Näet oman työhistoriasi (tunnit baareittain) samalla sivulla.</li>
+                    <li>Jos baarin ylläpitäjä on ottanut ominaisuuden käyttöön (<em>Baari → Asetukset → Keskuspalvelin</em>), baari voi julkaista julkiset tapahtumansa yhteiseen kalenteriin ja tarjota avoimia vuoroja keikkatyöläisille.</li>
+                    <li>Keskukseen lähtee vain se, minkä baari itse julkaisee: tapahtuman julkiset tiedot sekä keikkavuoron aika, rooli ja palkkateksti. Työntekijöiden ja asiakkaiden tietoja ei lähetetä.</li>
+                    <li>Ylläpitäjä merkitsee avoimen vuoron keikkatyöksi vuoron muokkauksessa ja käsittelee hakemukset välilehdellä <em>Keikkahakemukset</em>. Hakijan yhteystiedot näkyvät vasta hyväksynnän jälkeen.</li>
                 </ul>
             </div>
         </section>
@@ -1018,10 +1016,9 @@
                         <tr><td><i class="bi bi-globe" style="color:var(--accent)"></i> Julkinen profiili</td><td>Baarin tiedot julkiseen tapahtumakalenteriin (ks. <a href="#julkinen" style="color:var(--accent)">Julkinen kalenteri</a>)</td></tr>
                         <tr><td><i class="bi bi-people" style="color:var(--accent)"></i> Miehitys</td><td>Miehityssäännöt, kattavuus 14 päivälle ja vuoroehdotukset puutteisiin</td></tr>
                         <tr><td><i class="bi bi-calendar2-check" style="color:var(--accent)"></i> Varaukset</td><td>Pöytävaraukset (jos otettu käyttöön)</td></tr>
-                        <tr><td><i class="bi bi-person-lines-fill" style="color:var(--accent)"></i> Keikkalaiset</td><td>Muiden baarien haettavissa olevat keikkalaiset ja lähetetyt kutsut</td></tr>
+                        <tr><td><i class="bi bi-person-lines-fill" style="color:var(--accent)"></i> Keikkahakemukset</td><td>Keskuspalvelimen kautta tulleet hakemukset keikkavuoroihin (jos keikkatyöpörssi on käytössä)</td></tr>
                         <tr><td><i class="bi bi-bar-chart-line" style="color:var(--accent)"></i> Analytiikka</td><td>Tunnit, kuormituskartta, täsmällisyys, sairauspoissaolot</td></tr>
                         <tr><td><i class="bi bi-journal-text" style="color:var(--accent)"></i> Auditloki</td><td>Lista viimeisistä admin-toimista (kuka, mitä, milloin): työntekijöiden muutokset, asetukset, poissaolojen käsittely, palkka-ajon lataus</td></tr>
-                        <tr><td><i class="bi bi-briefcase" style="color:var(--accent)"></i> Työvoimapyynnöt</td><td>Hätähuuto muille baareille</td></tr>
                     </tbody>
                 </table>
                 <p style="font-size:13px; color:var(--text3); margin-top:10px;">Numero välilehden nimen vieressä kertoo kohteiden määrän. Valittu välilehti muistetaan.</p>
@@ -1036,7 +1033,7 @@
                     <li>Tiedot: nimi, käyttäjätunnus, salasana (muokattaessa tyhjä = ei muuteta), tuntipalkka, tavoitetunnit, rooli (Työntekijä / Admin).</li>
                     <li><strong>Aloittanut työssä (aloituspäivä)</strong> ja <strong>Työsuhteen tyyppi</strong> (Vakituinen / Keikkalainen) – tarvitaan vuosiloman laskentaan.</li>
                     <li>Luvat: <strong>JV-kortin</strong> vanhenemispäivä, hygieniapassi ja anniskelupassi. Etusivu varoittaa, kun JV-kortti on vanhenemassa.</li>
-                    <li>Uusi käyttäjä kirjautuu muodossa <code style="background:rgba(225,77,42,0.1);color:var(--accent);padding:2px 7px;border-radius:4px;font-size:12px;">tunnus@baarinnimi</code>. Kerro tunnus ja salasana henkilökohtaisesti.</li>
+                    <li>Uusi käyttäjä kirjautuu muodossa <code style="background:rgba(225,77,42,0.1);color:var(--accent);padding:2px 7px;border-radius:4px;font-size:12px;">tunnus</code>. Kerro tunnus ja salasana henkilökohtaisesti.</li>
                     <li><strong>Salasanan nollaus:</strong> muokkaa työntekijää ja kirjoita uusi salasana kenttään.</li>
                     <li><strong>Kutsulinkki:</strong> uutta työntekijää lisätessä rastita <em>Lähetä kutsulinkki</em> (salasanaa ei tarvita). Linkki lähtee sähköpostilla, jos osoite on annettu; muuten saat linkin jaettavaksi itse. Rivin <i class="bi bi-envelope"></i>-painike luo uuden linkin myöhemmin (myös salasanan palautukseen).</li>
                     <li><i class="bi bi-shield-x"></i>-painike (näkyy, kun työntekijällä on 2FA) nollaa kaksivaiheisen tunnistautumisen, jos puhelin on kadonnut.</li>
@@ -1058,7 +1055,6 @@
                     <li><strong>Tuntien vahvistus:</strong> kuun lopussa työntekijä vahvistaa tuntinsa (Tilastot → Tunnit tai etusivun huomio). Ylläpito hyväksyy ne Tilastot → Tuntien hyväksyntä -välilehdellä.</li>
                     <li><strong>Haku:</strong> Ctrl+K tai yläpalkin suurennuslasi hakee työntekijöitä, vuoroja, tapahtumia, viestejä ja (oikeuksien mukaan) kassaa, varauksia ja vieraita.</li>
                     <li><strong>Kieli:</strong> yläpalkin kielipainike (FI / EN / SV) tai kirjautumissivun linkit.</li>
-                    <li><strong>Työvoimapyynnöt:</strong> "Uusi hätähuuto muille baareille" lähettää kuvauksen ja yhteystiedon yhteistyöbaarien admineille. Kun heidän adminsa hyväksyy ilmoituksen, se näkyy heidän työntekijöilleen etusivulla. Kuittaa valmiiksi, kun apu on löytynyt.</li>
                 </ul>
                 <figure class="shot "><img src="assets/ohjeet/hallinta-ilmoitustaulu.jpg" alt="Hallinta: Ilmoitustaulu" loading="lazy"><figcaption>Ilmoitustaulu-välilehti</figcaption></figure>
             </div>

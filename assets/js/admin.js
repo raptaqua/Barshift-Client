@@ -333,6 +333,7 @@ const ADMIN_TABS = [
     { id: 'skills', perm: 'shifts.manage', label: 'Osaaminen',  icon: 'bi-award', render: () => adminTabSkills(), count: () => 0 },
     { id: 'coverage', perm: 'shifts.manage', label: 'Miehitys',         icon: 'bi-people',        render: () => adminTabCoverage(), count: () => (state.data.coverage || []).filter(c => c.shortage > 0).length },
     { id: 'bookings', perm: 'events.manage', label: 'Varaukset',        icon: 'bi-calendar2-check', render: () => adminTabBookings(), count: () => (state.data.bookings || []).filter(b => b.status === 'pending').length },
+    { id: 'gigapps', perm: 'shifts.manage', feature: 'hub_gigs', label: 'Keikkahakemukset', icon: 'bi-person-lines-fill', render: () => adminTabGigApps(), count: () => (state.gigApps || []).filter(a => a.status === 'pending').length },
     { id: 'pub',     label: 'Baari',            icon: 'bi-shop',          render: adminTabPub,     count: () => 0 },
     { id: 'profile', label: 'Julkinen profiili', icon: 'bi-globe', render: adminTabProfile, count: () => (state.pubProfile && state.pubProfile.is_public == 1) ? '✓' : 0 },
     { id: 'analytics', perm: 'payroll.view', label: 'Analytiikka',   icon: 'bi-bar-chart-line', render: () => adminTabAnalytics(), count: () => 0 },
@@ -609,7 +610,8 @@ async function saveShift() {
     if (warns.length && !confirm('Huomioitavaa:\n\n• ' + warns.map(w => w.msg).join('\n• ') + '\n\nTallennetaanko silti?')) return;
     const rep = document.getElementById('m-repeat');
     const data = { id: state.editingShift?.id || null, userId: userId, date: date, start: start, end: document.getElementById('m-end').value, role: document.getElementById('m-role').value, pub_name: state.user.pub_name,
-        status: document.getElementById('m-draft').checked ? 'draft' : 'published', repeat_weeks: rep ? parseInt(rep.value) || 0 : 0 }; 
+        status: document.getElementById('m-draft').checked ? 'draft' : 'published', repeat_weeks: rep ? parseInt(rep.value) || 0 : 0 };
+    if (document.getElementById('m-hub')) { data.hub_gig = document.getElementById('m-hub').checked; data.hub_pay = document.getElementById('m-hubpay').value; }
     const r = await (await fetch('api.php?action=shift', { method:'POST', body: JSON.stringify(data) })).json();
     if (r.error) return showToast(r.error, 'error');
     closeModal(); showToast(r.created ? `${r.created} vuoroa luotu` : "Tallennettu!"); load(); 

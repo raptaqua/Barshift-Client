@@ -1,6 +1,10 @@
-# BarShift Pro
+# BarShift Client
 
-Työvuorojen hallinta (PHP + MySQL, PWA).
+Yhden baarin työvuorojen hallinta (PHP + MySQL, PWA). **Tässä asennuksessa on täsmälleen yksi baari:** kannassa ei ole muiden baarien dataa, ja
+kanta, jossa on useampi baari, hylätään (`thePub()`-vartija). Baarien väliset asiat (yhteinen tapahtumakalenteri, keikkatyön välitys) hoitaa erillinen
+[barshift-server](https://github.com/raptaqua/barshift-server) (BarShift Hub); yhteys on valinnainen ja vain työntö: ks. *Keskuspalvelin* alla.
+
+Salasanan tai 2FA:n palautus palvelimelta: `php bin/admin.php reset-password <tunnus>` / `reset-2fa <tunnus>`.
 
 ## Käyttöönotto (asennusohjelma)
 
@@ -8,22 +12,22 @@ Työvuorojen hallinta (PHP + MySQL, PWA).
 2. Luo tyhjä MySQL/MariaDB-tietokanta ja käyttäjä (cPanel: *MySQL Databases*) ja anna käyttäjälle oikeudet kantaan.
 3. Avaa selaimessa `https://SIVUSI/install.php`. Sivu tarkistaa vaatimukset ja pyytää **asennustunnisteen**:
    avaa palvelimella tiedosto `install_token.php` (File Manager/FTP) ja kopioi `TOKEN:`-sanan jälkeinen teksti.
-4. Täytä tietokannan tiedot (voit painaa *Testaa yhteys*), superadminin tunnus, sähköposti ja salasana (väh. 12 merkkiä)
+4. Täytä tietokannan tiedot (voit painaa *Testaa yhteys*), baarin nimi, ylläpitäjän nimi, tunnus, sähköposti ja salasana (väh. 12 merkkiä)
    ja paina *Asenna BarShift*.
 
 Asennusohjelma luo tietokantataulut, `config.php`:n (oikeudet 640), push-ilmoitusten VAPID-avaimet, viestien salausavaimen
-ja superadmin-tunnuksen. Salaisuuksia ei näytetä selaimessa. Lopuksi se lukitsee itsensä (`install.lock`) ja poistaa
+ja baarin ylläpitäjän tunnuksen. Salaisuuksia ei näytetä selaimessa. Lopuksi se lukitsee itsensä (`install.lock`) ja poistaa
 `install.php`:n ja tunnisteen; jos poisto ei onnistu, poista ne käsin. Ilman tunnistetta asennusta ei voi ajaa,
 eikä se toimi lainkaan kun `config.php` on olemassa.
 
-Superadminilla kirjaudutaan tunnuksella `superadmin` (tai `tunnus@SYSTEM`, jos valitsit toisen tunnuksen).
+Kirjautuminen: ylläpitäjän tunnus ja salasana (baaria ei valita; asennus palvelee täsmälleen yhtä baaria).
 
 ### Käsin (ilman asennusohjelmaa)
 
 1. Kopioi `config.example.php` -> `config.php` ja täytä tiedot. Avaimet: `php -r "echo base64_encode(random_bytes(32));"`
    (`message_key`); VAPID: `vendor/bin/web-push generate:vapid-keys` (tai asennusohjelma).
    Sijoita mieluiten www-juuren ulkopuolelle ja osoita siihen ympäristömuuttujalla `BARSHIFT_CONFIG`.
-2. `php migrate.php` (tuo `db/schema.sql`:n ja päivittää vanhat kannat), sitten `php create_superadmin.php`.
+2. `php migrate.php` (tuo `db/schema.sql`:n ja päivittää vanhat kannat), sitten luo baari ja ylläpitäjä asennusohjelmalla tai lisää ylläpitäjä komennolla `php bin/admin.php create-admin <tunnus> "<nimi>"` (baari on luotava ensin asennusohjelmalla).
 3. Tietokantakäyttäjälle riittävät SELECT/INSERT/UPDATE/DELETE-oikeudet (ei ALTER/CREATE) kun asennus on tehty.
 4. Palvelimella on oltava HTTPS.
 
@@ -43,7 +47,7 @@ Jos tietokanta on päivittämättä, API kertoo sen virheilmoituksessa ("Tietoka
 
 ## Baari ja sen asetukset
 
-Baari on oma entiteettinsä (`pubs`-taulu): kirjautumistunnus (`slug`, osa `tunnus@baari`-tunnusta) pysyy samana, mutta
+Baari on oma entiteettinsä (`pubs`-taulu): sisäinen tunniste (`slug`) pysyy samana, mutta
 näyttönimeä voi vaihtaa. Admin muokkaa kohdassa *Hallinta → Baari*: nimi, aikavyöhyke, vuororoolit, työaikasäännöt
 (vähimmäislepo, viikkotuntiraja), palkkalisät (ilta, yö, la, su + ilta-/yörajat) ja laskutustiedot.
 Puuttuvat `pubs`-rivit luodaan automaattisesti olemassa oleville baareille (`php migrate.php` / `db/upgrade.sql`).
@@ -74,7 +78,6 @@ Palvelin laskee tunnit leimauksista (jos niitä ei ole, jo toteutuneista vuorois
 - **Kaksivaiheinen tunnistautuminen (TOTP):** *Oma profiili → Kaksivaiheinen tunnistautuminen* (kaikille, suositeltu adminille). Sovellus näyttää avaimen syötettäväksi
   todennussovellukseen (Google/Microsoft Authenticator, Aegis, 1Password …) ja 8 kertakäyttöistä palautuskoodia. Salaisuus tallennetaan salattuna (`message_key`), koodin
   uudelleenkäyttö estetään ja yritykset on rajoitettu. Kadonneen laitteen 2FA:n nollaa admin (työntekijä) tai ylläpito (admin).
-- **Yksi tunnus, monta baaria (keikkalaiset):** jokaisella baarilla on oma käyttäjärivinsä (oma palkka, rooli, vuorot), ja saman henkilön rivit yhdistetään (`users.account_key`).
   Admin lisää työntekijän valinnalla *Henkilöllä on jo tunnus toisessa baarissa* (vaatii sähköpostin); henkilö avaa linkin, todistaa vanhan tunnuksensa (salasana + tarvittaessa 2FA)
   ja liittää baarin siihen. Sen jälkeen ylälaidassa on baarinvalitsin (`switch_pub`). Baarit eivät näe toistensa tietoja; vaihto ei ohita 2FA:ta. Jäsenyyden poistaa baarin admin poistamalla/anonymisoimalla rivin.
 - **Ilmoitukset:** push (*Oma profiili → Salli ilmoitukset tähän laitteeseen*, testipainike) ja sähköposti varakanavana silloin, kun käyttäjällä ei ole toimivaa push-tilausta
@@ -212,3 +215,13 @@ Kirjautuminen (baari `demobaari`): `admin@demobaari`, `mikko@demobaari`, `sari@d
 - Yksityisviestit salataan tallennuksessa (AES-256-GCM, avain `message_key` configissa). Se ei ole päästä-päähän-salaus: palvelin voi purkaa viestit.
 - Kuvien lataus: vain kuvatyypit (sisällön mukaan), max 5 MB, satunnainen tiedostonimi, ei skriptien suoritusta `uploads/`-hakemistossa.
 - Selainpuolella käyttäjän syöttämä data escapataan (`esc()`), CSP- ja muut tietoturvaotsakkeet `.htaccess`:ssä.
+
+## Keskuspalvelin (BarShift Hub, valinnainen)
+Lisää `config.php`:hen (avainpari luodaan palvelimella `php bin/keygen.php`, julkinen avain rekisteröidään keskukseen `bin/add_pub.php`):
+```php
+'hub' => ['url' => 'https://hub.example.com', 'pub_slug' => 'oma-baari', 'private_key' => '<base64 yksityinen avain>'],
+```
+Baarin ylläpitäjä ottaa osat käyttöön kohdassa *Baari → Asetukset → Keskuspalvelin* (oletuksena pois): **julkiset tapahtumat yhteiseen kalenteriin** ja **keikkatyöpörssi**
+(avoin vuoro merkitään keikkatyöksi vuoron muokkauksessa; hakemukset käsitellään välilehdellä *Keikkahakemukset*, hakijan yhteystiedot näkyvät vasta hyväksynnän jälkeen).
+Synkronointi ajetaan `cron.php`:ssä (vain lähtevä: client allekirjoittaa Ed25519:llä ja työntää; keskus ei koskaan kutsu clientia). Keskukseen lähtee vain julkisia tapahtumatietoja
+sekä keikkavuoron aika, rooli ja palkkateksti; työntekijä- ja asiakastietoja ei lähetetä.

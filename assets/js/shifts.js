@@ -453,6 +453,8 @@ function openShiftModal(shiftId = null, prefillUserId = null, prefillDate = null
         ${es && !es.userId && pubFeature('bidding') && shiftBidsOf(es.id).length ? `<button class="btn btn-primary btn-sm" style="margin-bottom:10px;" onclick="closeModal(); openShiftBids(${es.id})"><i class="bi bi-people"></i> Hakijat (${shiftBidsOf(es.id).length})</button>` : ''}
         <div id="m-warn"></div>
         <label class="abs-choice" style="margin-bottom:8px;"><input id="m-draft" type="checkbox" ${es && es.status === 'draft' ? 'checked' : ''}><span><b>Luonnos</b> – ei näy työntekijöille ennen julkaisua</span></label>
+        ${pubFeature('hub_gigs') && !(es && es.hub_gig == 2) ? `<label class="abs-choice" style="margin-bottom:8px;"><input id="m-hub" type="checkbox" ${es && es.hub_gig == 1 ? 'checked' : ''}><span><b>Tarjolla keikkatyöläisille</b> (avoin vuoro näkyy keskuspalvelimessa; vain aika, rooli ja palkkateksti)</span></label>
+        <div class="form-group" style="margin-bottom:8px;"><label class="form-label">Palkkateksti (valinnainen)</label><input id="m-hubpay" class="form-input" maxlength="80" placeholder="esim. 16 €/h" value="${esc((es && es.hub_pay) || '')}"></div>` : ''}
         ${!es ? `<div class="form-group" style="margin-bottom:8px;"><label class="form-label">Toista viikoittain (lisäviikkoja)</label><input id="m-repeat" type="number" min="0" max="52" value="0" class="form-input"><small style="color:var(--text3)">0 = vain tämä vuoro. Esim. 7 luo saman vuoron seuraaville 7 viikolle.</small></div>` : ''}
     `;
     
