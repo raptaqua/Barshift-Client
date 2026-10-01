@@ -136,6 +136,13 @@ function renderAttention(today, isAdmin) {
         st.system_alerts.map(a => `<div class="att-row"><div>${esc(a.text)}</div></div>`).join('')
         + `<button class="btn btn-primary btn-sm att-cta" onclick="setAdminTab('system'); nav('admin')">Avaa järjestelmän tila →</button>`, false));
 
+    if (can('shifts.manage') && (st.hub_pending_apps || []).length) {   // keikkahakemukset muista baareista / keskuksesta
+        const ga = st.hub_pending_apps;
+        groups.push(attGroup('gig', 'bi-person-lines-fill', 'Keikkahakemukset', ga.length, '#2563EB',
+            ga.slice(0, 5).map(a => `<div class="att-row" onclick="setAdminTab('gigapps'); nav('admin')" style="cursor:pointer;"><div><b>${esc(a.name)}</b> hakee vuoroa<br><small>${formatDate(a.date)} ${esc(String(a.start).slice(0, 5))}–${esc(String(a.end).slice(0, 5))} ${esc(a.role || '')}</small></div></div>`).join('')
+            + `<button class="btn btn-primary btn-sm att-cta" onclick="setAdminTab('gigapps'); nav('admin')">Käsittele hakemukset →</button>`, ga.length <= 2));
+    }
+
     if (can('shifts.manage')) {   // miehityspuutteet seuraavan viikon aikana
         const lim = getLocalDateString(new Date(Date.now() + 6 * 864e5));
         const gaps = (st.coverage || []).filter(c => c.shortage > 0 && c.date <= lim);
