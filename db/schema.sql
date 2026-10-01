@@ -682,7 +682,7 @@ CREATE TABLE IF NOT EXISTS `user_sessions` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `hub_sync` (
-  `kind` enum('event','shift') NOT NULL, `local_id` int(11) NOT NULL, `hash` char(40) NOT NULL, `synced_at` datetime NOT NULL DEFAULT current_timestamp(),
+  `kind` enum('event','shift','profile') NOT NULL, `local_id` int(11) NOT NULL, `hash` char(40) NOT NULL, `synced_at` datetime NOT NULL DEFAULT current_timestamp(),
   PRIMARY KEY (`kind`,`local_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 CREATE TABLE IF NOT EXISTS `hub_applications` (

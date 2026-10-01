@@ -87,7 +87,7 @@ function hubSync($conn, array $cfg, array $pub): array {
         $hash = sha1(json_encode($payload));
         if (($known[$kind][$id] ?? null) === $hash) return;
         $ext = ($kind === 'event' ? 'e' : 's') . $id;
-        [$code] = hubRequest($cfg, 'PUT', '/v1/' . ($kind === 'event' ? 'events' : 'shifts') . '/' . $ext, $payload);
+        [$code] = hubRequest($cfg, 'PUT', $kind === 'profile' ? '/v1/profile' : '/v1/' . ($kind === 'event' ? 'events' : 'shifts') . '/' . $ext, $payload);
         if ($code === 200) {
             $st = $conn->prepare("INSERT INTO hub_sync (kind, local_id, hash) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE hash = VALUES(hash), synced_at = NOW()");
             $st->bind_param("sis", $kind, $id, $hash); $st->execute(); $known[$kind][$id] = $hash; $sent++;
@@ -100,6 +100,15 @@ function hubSync($conn, array $cfg, array $pub): array {
             $st = $conn->prepare("DELETE FROM hub_sync WHERE kind = ? AND local_id = ?"); $st->bind_param("si", $kind, $id); $st->execute(); unset($known[$kind][$id]);
         } else $errs++;
     };
+
+    // Baarin julkinen osoite ja sijainti kartalle (vain jos baarin julkinen profiili on julkaistu)
+    if (!empty($pub['feature_hub_events'])) {
+        $pq = $conn->prepare("SELECT address, city, lat, lng, website FROM pub_profiles WHERE pub_name = ? AND is_public = 1"); $pq->bind_param("s", $slug); $pq->execute();
+        if ($pr = $pq->get_result()->fetch_assoc()) {
+            $push('profile', 0, array_filter(['address' => $pr['address'] ?: null, 'city' => $pr['city'] ?: null, 'lat' => $pr['lat'] !== null && $pr['lng'] !== null ? (float)$pr['lat'] : null,
+                'lng' => $pr['lat'] !== null && $pr['lng'] !== null ? (float)$pr['lng'] : null, 'website' => ($pr['website'] && preg_match('#^https?://#i', $pr['website'])) ? $pr['website'] : null], fn($v) => $v !== null));
+        }
+    }
 
     // Julkiset tapahtumat (valinnainen)
     $want = [];

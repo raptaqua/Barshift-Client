@@ -533,3 +533,4 @@ CREATE TABLE IF NOT EXISTS `hub_connection` (
   `hub_name` varchar(120) DEFAULT NULL, `connected_at` datetime NOT NULL DEFAULT current_timestamp(),
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+ALTER TABLE `hub_sync` MODIFY `kind` enum('event','shift','profile') NOT NULL;

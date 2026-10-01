@@ -1128,6 +1128,7 @@ const future = (days) => { const d = new Date(Date.now() + days * 864e5); return
         const send = (code, j) => { res.writeHead(code, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(j)); };
         if (!ok) { hub.badSig++; return send(401, { error: 'sig' }); }
         hub.calls.push(req.method + ' ' + req.url);
+        if (req.method === 'PUT' && req.url === '/v1/profile') { hub.profile = b ? JSON.parse(b) : {}; return send(200, { success: true }); }
         let m; const body = b ? JSON.parse(b) : {};
         if ((m = req.url.match(/^\/v1\/(events|shifts)\/([A-Za-z0-9_.-]+)$/))) { if (req.method === 'PUT') hub[m[1]][m[2]] = body; else delete hub[m[1]][m[2]]; return send(200, { success: true }); }
         if (req.method === 'GET' && req.url.startsWith('/v1/applications')) { const since = +(req.url.match(/since_id=(\d+)/) || [0, 0])[1]; return send(200, { applications: hub.apps.filter(a => a.id > since).map(a => ({ ...a, email: a.status === 'accepted' ? a.email : null, phone: a.status === 'accepted' ? a.phone : null })) }); }
@@ -1154,6 +1155,12 @@ const future = (days) => { const d = new Date(Date.now() + days * 864e5); return
         assert.ok((await admin.post('save_pub_settings', { ...base, features_ext: { hub_events: true, hub_gigs: true } })).json.success);
         const pub = (await admin.get('')).json.pub; assert.strictEqual(pub.hub_connected, true); assert.strictEqual(pub.features.hub_gigs, true);
         // vuoro keikkatyöksi
+        // baarin julkinen sijainti kartalle: vain julkaistusta profiilista, ei muita kenttiä
+        assert.ok((await admin.post('save_pub_profile', { display_name: 'Demo', is_public: 0, city: 'Helsinki', address: 'Salainen 9', lat: 1.5, lng: 2.5, description: 'Salainen kuvaus' })).json.success);
+        await runCron(); assert.ok(!hub.profile || hub.profile.address !== 'Salainen 9', 'julkaisematon profiili lähti keskukseen');
+        assert.ok((await admin.post('save_pub_profile', { display_name: 'Demo', is_public: 1, city: 'Helsinki', address: 'Testikatu 1', lat: 60.1699, lng: 24.9384, description: 'Julkinen kuvaus', website: 'https://demo.example' })).json.success);
+        await runCron(); assert.deepStrictEqual(hub.profile, { address: 'Testikatu 1', city: 'Helsinki', lat: 60.1699, lng: 24.9384, website: 'https://demo.example' }, JSON.stringify(hub.profile));
+        assert.ok((await admin.post('save_pub_profile', { display_name: 'Demo', is_public: 1, city: 'Helsinki', address: 'Testikatu 1' })).json.success);   // palautetaan alkuperäinen
         // tallennus synkronoi heti (ilman cronia)
         const ev2 = (await admin.form('event', fdOf({ title: 'Heti-keikka', date: future(14), time_start: '21:00', type: 'music', is_public: '1', registration: 'none' }))).json; assert.ok(ev2.success);
         for (let i = 0; i < 20 && !Object.values(hub.events).some(e => e.title === 'Heti-keikka'); i++) await sleep(100);
