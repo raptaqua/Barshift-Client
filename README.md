@@ -1,6 +1,6 @@
 # BarShift Client
 
-Yhden baarin työvuorojen hallinta (PHP + MySQL, PWA). **Tässä asennuksessa on täsmälleen yksi baari:** kannassa ei ole muiden baarien dataa, ja
+Yhden baarin työvuorojen hallinta (PHP + SQLite tai MariaDB, PWA). **Tässä asennuksessa on täsmälleen yksi baari:** kannassa ei ole muiden baarien dataa, ja
 kanta, jossa on useampi baari, hylätään (`thePub()`-vartija). Baarien väliset asiat (yhteinen tapahtumakalenteri, keikkatyön välitys) hoitaa erillinen
 [barshift-server](https://github.com/raptaqua/barshift-server) (BarShift Hub); yhteys on valinnainen ja vain työntö: ks. *Keskuspalvelin* alla.
 
@@ -10,16 +10,15 @@ Salasanan tai 2FA:n palautus palvelimelta: `php bin/admin.php reset-password <tu
 
 ## Käyttöönotto (asennusohjelma)
 
-1. Lataa tiedostot palvelimelle ja aja siellä `composer install --no-dev` (luo `vendor/`-kansion).
-2. Luo tyhjä MySQL/MariaDB-tietokanta ja käyttäjä (cPanel: *MySQL Databases*) ja anna käyttäjälle oikeudet kantaan.
-3. Avaa selaimessa `https://SIVUSI/install.php`. Sivu tarkistaa vaatimukset ja pyytää **asennustunnisteen**:
-   avaa palvelimella tiedosto `install_token.php` (File Manager/FTP) ja kopioi `TOKEN:`-sanan jälkeinen teksti.
-4. Täytä tietokannan tiedot (voit painaa *Testaa yhteys*), baarin nimi, ylläpitäjän nimi, tunnus, sähköposti ja salasana (väh. 12 merkkiä)
+1. Lataa tiedostot palvelimelle (File Manager/FTP): joko `git clone`, GitHubin *Download ZIP* tai valmis julkaisupaketti `barshift-client.zip` (*Releases*). Riippuvuudet (`vendor/`) ovat mukana repossa, joten SSH:ta ja composeria ei tarvita. (Kehittäjä: `vendor/` päivitetään komennolla `tools/update_vendor.sh`, kun `composer.json` muuttuu.)
+2. Tietokantaa ei tarvitse luoda: oletuksena käytetään **SQLitea**, jolloin kaikki tallentuu yhteen tiedostoon kansiossa `data/` (kansion on oltava PHP:lle kirjoitettava; PHP:n `pdo_sqlite` on lähes aina valmiina). Haluatko MariaDB/MySQL:n, luo tyhjä tietokanta ja käyttäjä (cPanel: *MySQL Databases*) ja valitse asennuksessa MariaDB.
+3. Avaa selaimessa `https://SIVUSI/install.php`. Sivu tarkistaa vaatimukset eikä vaadi erillistä tunnistetta: **asenna heti tiedostojen lataamisen jälkeen**, koska ensimmäinen asennuksen suorittaja saa luotua ylläpitäjän. Haluatko lisäsuojan, luo palvelimelle tiedosto `install_token.php` sisällöllä `<?php // TOKEN: <32 satunnaista heksamerkkiä>`; silloin asennus pyytää tunnisteen.
+4. Valitse tietokanta (SQLite: ei lisätietoja; MariaDB: osoite, nimi, käyttäjä ja salasana, voit painaa *Testaa tietokanta*), baarin nimi, ylläpitäjän nimi, tunnus, sähköposti ja salasana (väh. 12 merkkiä)
    ja paina *Asenna BarShift*.
 
 Asennusohjelma luo tietokantataulut, `config.php`:n (oikeudet 640), push-ilmoitusten VAPID-avaimet, viestien salausavaimen
 ja baarin ylläpitäjän tunnuksen. Salaisuuksia ei näytetä selaimessa. Lopuksi se lukitsee itsensä (`install.lock`) ja poistaa
-`install.php`:n ja tunnisteen; jos poisto ei onnistu, poista ne käsin. Ilman tunnistetta asennusta ei voi ajaa,
+`install.php`:n; jos poisto ei onnistu, poista ne käsin. 
 eikä se toimi lainkaan kun `config.php` on olemassa.
 
 Kirjautuminen: ylläpitäjän tunnus ja salasana (baaria ei valita; asennus palvelee täsmälleen yhtä baaria).
@@ -30,7 +29,7 @@ Kirjautuminen: ylläpitäjän tunnus ja salasana (baaria ei valita; asennus palv
    (`message_key`); VAPID: `vendor/bin/web-push generate:vapid-keys` (tai asennusohjelma).
    Sijoita mieluiten www-juuren ulkopuolelle ja osoita siihen ympäristömuuttujalla `BARSHIFT_CONFIG`.
 2. `php migrate.php` (tuo `db/schema.sql`:n ja päivittää vanhat kannat), sitten luo baari ja ylläpitäjä asennusohjelmalla tai lisää ylläpitäjä komennolla `php bin/admin.php create-admin <tunnus> "<nimi>"` (baari on luotava ensin asennusohjelmalla).
-3. Tietokantakäyttäjälle riittävät SELECT/INSERT/UPDATE/DELETE-oikeudet (ei ALTER/CREATE) kun asennus on tehty.
+3. MariaDB: tietokantakäyttäjälle riittävät SELECT/INSERT/UPDATE/DELETE-oikeudet (ei ALTER/CREATE) kun asennus on tehty. SQLite: PHP:n on voitava kirjoittaa `data/`-kansioon, ja kansio ei saa olla ladattavissa selaimella (`data/.htaccess` hoitaa Apachen; nginx: `location ^~ /data/ { deny all; }`). Asennusohjelma tarkistaa tämän ja varoittaa.
 4. Palvelimella on oltava HTTPS.
 
 ## Käyttöohje
@@ -180,21 +179,27 @@ CSP sallii vain omat skriptitiedostot (`script-src 'self'`; ei inline-`<script>`
 - `node tests/leave.test.js`: vuosilomalaskenta.
 - `node tests/js_handlers.test.js`: varmistaa, että kaikki HTML-käsittelijöissä (`onclick=…`) kutsutut funktiot on määritelty.
 - `tests/run_api_tests.sh`: API-integraatiotestit (kirjautuminen, roolit, baarieristys, CSRF, palkka-ajo, vuorosuunnittelu, GDPR, kutsut, salasanan palautus, 2FA, sähköposti (fake SMTP), cron-muistutukset, kirjautumisraja).
-  Vaatii MariaDB/MySQL:n ja `composer install`in; **tyhjentää** kannan `TEST_DB_NAME` (oletus `barshift_test`):
+  Vaatii `composer install`in. SQLite (ei palvelinta): `TEST_DB=sqlite tests/run_api_tests.sh`. MariaDB/MySQL **tyhjentää** kannan `TEST_DB_NAME` (oletus `barshift_test`):
   `TEST_DB_HOST=localhost TEST_DB_USER=root tests/run_api_tests.sh`.
+- `php tests/sqlite_ddl.test.php`: MySQL→SQLite-käännös (skeema, migraatiot, erikoissyntaksit). `tests/run_install_test.sh`: SQLite-asennus selaimen tavoin (curl).
 - GitHub Actions (`.github/workflows/ci.yml`) ajaa syntaksitarkistukset, salaisuustarkistuksen ja molemmat testit jokaisesta pushista ja pull requestista.
 
 **Tietokantamigraatiot:** `db/schema.sql` on koko rakenne tuoreeseen asennukseen; yksittäiset muutokset lisätään tiedostoina
 `db/migrations/NNNN_kuvaus.sql`. `php migrate.php` ajaa ne kerran järjestyksessä (kirjaus tauluun `schema_migrations`); tuoreessa asennuksessa ne
 merkitään ajetuiksi. Kun lisäät migraation, päivitä myös `schema.sql`.
+SQLitellä sama MySQL-muotoinen SQL käännetään lennossa (`lib/sqlite_ddl.php`: CREATE TABLE, ALTER … ADD/DROP COLUMN, indeksit, DML). Jos migraatiota ei voi kääntää (esim. `MODIFY`), lisää rinnalle käsin kirjoitettu `NNNN_kuvaus.sqlite.sql`; sitä käytetään SQLitellä MySQL-version sijaan.
 
-**Varmuuskopiot:** `tools/backup.sh /polku/varmuuskopiot` (cron, esim. `17 2 * * *`) tallentaa tietokannan (mysqldump, gzip) ja `uploads/`-kuvat
+**Varmuuskopiot:** `tools/backup.sh /polku/varmuuskopiot` (cron, esim. `17 2 * * *`) tallentaa tietokannan (SQLite: eheä kopio `VACUUM INTO`; MariaDB: mysqldump; gzip) ja `uploads/`-kuvat
 ja poistaa yli 30 päivää vanhat (`KEEP_DAYS`). Kopiot sisältävät henkilötietoja: siirrä ne palvelimen ulkopuolelle salattuna.
-Palautus: `gunzip -c barshift-db-….sql.gz | mysql TIETOKANTA` ja `tar -xzf barshift-uploads-….tar.gz`.
+Palautus: MariaDB `gunzip -c barshift-db-….sql.gz | mysql TIETOKANTA`; SQLite `gunzip barshift-db-….sqlite.gz` ja kopioi tiedosto `db_file`-polkuun (sovellus pois käytöstä kopioinnin ajaksi); kuvat `tar -xzf barshift-uploads-….tar.gz`.
+
+**MariaDB → SQLite:** olemassa olevan asennuksen voi siirtää komennolla `php tools/mysql_to_sqlite.php --file=data/barshift.sqlite` (kopioi kaikki taulut, vanha kanta ei muutu). Vaihda sen jälkeen `config.php`:ssä `'db_driver' => 'sqlite', 'db_file' => 'data/barshift.sqlite'` ja poista `db_host`/`db_name`/`db_user`/`db_pass`.
+
+**SQLite vai MariaDB?** SQLite sopii yhden baarin kuormalle (käyttäjiä kymmeniä, kirjoituksia satunnaisesti) ja on selvästi helpompi asentaa ja varmuuskopioida. Valitse MariaDB, jos tietokantapalvelin on jo olemassa tai kuormaa on poikkeuksellisen paljon. Jos hosting käyttää verkkolevyä (NFS), SQLiten tiedostolukitus voi olla epäluotettava: käytä silloin MariaDB:tä.
 
 ## Demodata (vain kehitys/esittely)
 
-`mysql TIETOKANTA < db/seed_demo.sql` luo baarin `demobaari` ja kaksi kuukautta dataa
+`mysql TIETOKANTA < db/seed_demo.sql` (SQLite: `php tests/sqlcli.php "$(cat db/seed_demo.sql)" -N`; asennusohjelmassa demodata on valinta) luo baarin `demobaari` ja kaksi kuukautta dataa
 (-30 ... +30 päivää ajohetkestä): vuorot, leimaukset, tapahtumat, poissaolot, vuoronvaihdot,
 ilmoitukset, tehtävät, ostoslista ja saatavuudet. Ajo on toistettava (poistaa vain demobaarin datan).
 

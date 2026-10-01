@@ -5,10 +5,9 @@
 //   php bin/admin.php create-admin <tunnus> "<nimi>"
 if (PHP_SAPI !== 'cli') { http_response_code(404); exit; }
 $cfg = require (getenv('BARSHIFT_CONFIG') ?: __DIR__ . '/../config.php');
-mysqli_report(MYSQLI_REPORT_OFF);
-$conn = new mysqli($cfg['db_host'], $cfg['db_user'], $cfg['db_pass'], $cfg['db_name']);
+require_once __DIR__ . '/../lib/db.php';
+$conn = bsConnect($cfg);
 if ($conn->connect_error) { fwrite(STDERR, "Yhteys epäonnistui\n"); exit(1); }
-$conn->set_charset('utf8mb4');
 [$cmd, $user] = [$argv[1] ?? '', $argv[2] ?? ''];
 function askPassword(): string {
     echo "Uusi salasana (väh. 12 merkkiä): ";
@@ -21,7 +20,7 @@ if ($cmd === 'reset-password') {
     $h = askPassword();
     $st = $conn->prepare("UPDATE users SET password = ? WHERE username = ?"); $st->bind_param('ss', $h, $user); $st->execute();
     echo $st->affected_rows ? "Salasana vaihdettu\n" : "Tunnusta ei löytynyt\n";
-    $conn->query("UPDATE user_sessions s JOIN users u ON u.id = s.user_id SET s.revoked_at = NOW() WHERE u.username = '" . $conn->real_escape_string($user) . "' AND s.revoked_at IS NULL");
+    $conn->query("UPDATE user_sessions SET revoked_at = NOW() WHERE revoked_at IS NULL AND user_id IN (SELECT id FROM users WHERE username = '" . $conn->real_escape_string($user) . "')");
 } elseif ($cmd === 'reset-2fa') {
     $st = $conn->prepare("UPDATE users SET totp_enabled = 0, totp_secret = NULL, recovery_codes = NULL, totp_last_step = 0 WHERE username = ?"); $st->bind_param('s', $user); $st->execute();
     echo $st->affected_rows ? "2FA nollattu\n" : "Tunnusta ei löytynyt tai 2FA ei ollut käytössä\n";

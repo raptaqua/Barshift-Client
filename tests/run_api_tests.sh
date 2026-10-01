@@ -13,13 +13,20 @@ DB_USER="${TEST_DB_USER:-root}"; DB_PASS="${TEST_DB_PASS:-}"
 HUB_PORT="${TEST_HUB_PORT:-2799}"; PORT="${TEST_PORT:-8399}"; SMTP_PORT="${TEST_SMTP_PORT:-2599}"; SMS_PORT="${TEST_SMS_PORT:-2699}"
 TMP="$(mktemp -d)"; trap '[ -n "${PHP_PID:-}" ] && kill $PHP_PID 2>/dev/null; rm -rf "$TMP"' EXIT
 
+# TEST_DB=sqlite ajaa testit SQLite-kantaa vasten (ei palvelinta); oletus on MariaDB
+DRIVER="${TEST_DB:-mysql}"
 MYSQL=(mysql -h "$DB_HOST" -u "$DB_USER" ${DB_PASS:+-p"$DB_PASS"} --default-character-set=utf8mb4)
-"${MYSQL[@]}" -e "DROP DATABASE IF EXISTS \`$DB_NAME\`; CREATE DATABASE \`$DB_NAME\` CHARACTER SET utf8mb4;"
+if [ "$DRIVER" = sqlite ]; then
+  DBCFG="'db_driver' => 'sqlite', 'db_file' => '$TMP/test.sqlite',"
+else
+  "${MYSQL[@]}" -e "DROP DATABASE IF EXISTS \`$DB_NAME\`; CREATE DATABASE \`$DB_NAME\` CHARACTER SET utf8mb4;"
+  DBCFG="'db_host' => '$DB_HOST', 'db_name' => '$DB_NAME', 'db_user' => '$DB_USER', 'db_pass' => '$DB_PASS',"
+fi
 
 export HUB_PORT
 cat > "$TMP/config.php" <<PHP
 <?php return [
-  'db_host' => '$DB_HOST', 'db_name' => '$DB_NAME', 'db_user' => '$DB_USER', 'db_pass' => '$DB_PASS',
+  $DBCFG
   'vapid_subject' => 'mailto:test@example.com', 'vapid_public_key' => 'test', 'vapid_private_key' => 'test',
   'message_key' => '$(head -c 32 /dev/urandom | base64)', 'allowed_origins' => [],
   'mail_from' => 'BarShift <noreply@example.test>', 'smtp' => ['host' => '127.0.0.1', 'port' => $SMTP_PORT, 'secure' => ''],
@@ -31,9 +38,9 @@ PHP
 export BARSHIFT_CONFIG="$TMP/config.php"
 
 php migrate.php > "$TMP/migrate.log" || { cat "$TMP/migrate.log"; exit 1; }
-"${MYSQL[@]}" "$DB_NAME" < db/seed_demo.sql
+if [ "$DRIVER" = sqlite ]; then php tests/sqlcli.php "$(cat db/seed_demo.sql)" -N; else "${MYSQL[@]}" "$DB_NAME" < db/seed_demo.sql; fi
 php -S "127.0.0.1:$PORT" > "$TMP/server.log" 2>&1 &
 PHP_PID=$!
 for i in $(seq 1 30); do curl -s -o /dev/null "http://127.0.0.1:$PORT/api.php" && break; sleep 0.2; done
 
-BASE="http://127.0.0.1:$PORT" SMTP_PORT="$SMTP_PORT" SMS_PORT="$SMS_PORT" DB_HOST="$DB_HOST" DB_NAME="$DB_NAME" DB_USER="$DB_USER" DB_PASS="$DB_PASS" node tests/api.test.js || { echo "--- palvelinloki ---"; tail -20 "$TMP/server.log"; exit 1; }
+DB_DRIVER="$DRIVER" BASE="http://127.0.0.1:$PORT" SMTP_PORT="$SMTP_PORT" SMS_PORT="$SMS_PORT" DB_HOST="$DB_HOST" DB_NAME="$DB_NAME" DB_USER="$DB_USER" DB_PASS="$DB_PASS" node tests/api.test.js || { echo "--- palvelinloki ---"; tail -20 "$TMP/server.log"; exit 1; }

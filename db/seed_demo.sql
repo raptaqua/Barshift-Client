@@ -510,9 +510,8 @@ INSERT IGNORE INTO `task_completions` (`date`,`task_id`) SELECT `date`, 9005 FRO
 -- Sisäinen vieraslista: viskimaistelu, 25 paikkaa
 INSERT INTO `events` (`title`,`date`,`type`,`time`,`time_start`,`time_end`,`description`,`is_public`,`guest_capacity`) VALUES
 ('🥃 Viskimaistelu (ennakkoilmoittautuneet)',DATE_ADD(CURDATE(), INTERVAL 9 DAY),'theme','18:00:00','18:00:00','21:30:00','Seitsemän viskiä, rajattu osallistujamäärä. Nimet kirjataan sisäiseen vieraslistaan.',0,25);
-SET @wt = LAST_INSERT_ID();
 INSERT INTO `event_guests` (`event_id`,`name`,`note`,`added_by`) VALUES
-(@wt,'Pekka Partanen','',9002),(@wt,'Anna ja Jussi Korhonen','2 henkeä',9003),(@wt,'Sirpa Laakso','Ei alkuruokaa (allergia)',9003),(@wt,'Timo Nieminen','',9001),(@wt,'Hanna Mäkelä','Syntymäpäivälahja',9005),(@wt,'Olli Virtanen','',9002);
+((SELECT MAX(id) FROM events),'Pekka Partanen','',9002),((SELECT MAX(id) FROM events),'Anna ja Jussi Korhonen','2 henkeä',9003),((SELECT MAX(id) FROM events),'Sirpa Laakso','Ei alkuruokaa (allergia)',9003),((SELECT MAX(id) FROM events),'Timo Nieminen','',9001),((SELECT MAX(id) FROM events),'Hanna Mäkelä','Syntymäpäivälahja',9005),((SELECT MAX(id) FROM events),'Olli Virtanen','',9002);
 
 -- Osaamismatriisi
 INSERT INTO `skills` (`id`,`name`,`for_role`) VALUES
