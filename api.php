@@ -610,14 +610,19 @@ function bsHubRecord($conn, bool $ok, string $err): void {
     foreach ([['hub_last_sync', $now], ['hub_last_error', $ok ? '' : $err]] as [$k, $v]) { $st = $conn->prepare("INSERT INTO system_status (k, v) VALUES (?, ?) ON DUPLICATE KEY UPDATE v = VALUES(v)"); if ($st) { $st->bind_param('ss', $k, $v); $st->execute(); } }
 }
 // Hyväksytylle keikkahakemukselle luodaan keikkalaistunnus (työsuhdetyyppi casual) ja hakija asetetaan vuoroon.
-// Jos hakijan sähköposti vastaa jo olemassa olevaa tunnusta, käytetään sitä. Palauttaa tiedot ylläpitäjälle tai null.
+// Jos hakijan nimi ja sähköposti vastaavat jo olemassa olevaa tunnusta, käytetään sitä. Palauttaa tiedot ylläpitäjälle tai null.
 function hubCreateGigWorker($conn, $cfg, int $appId, int $shiftId): ?array {
     $app = fetchOne(prepareQuery($conn, "SELECT name, email, phone FROM hub_applications WHERE id = " . $appId));
     if (!$app) return null;
     $name = mb_substr(trim((string)$app['name']), 0, 100); $email = trim((string)($app['email'] ?? '')); $email = ($email !== '' && filter_var($email, FILTER_VALIDATE_EMAIL)) ? $email : null;
     $phone = mb_substr((string)($app['phone'] ?? ''), 0, 20);
+    // Olemassa olevaa tunnusta käytetään vain, jos sekä sähköposti että nimi täsmäävät: sama sähköposti ei yksin riitä (useampi henkilö voi käyttää esim. baarin yhteistä osoitetta)
     $existing = null;
-    if ($email !== null) { $q = prepareQuery($conn, "SELECT id, name, username FROM users WHERE LOWER(email) = LOWER(?) AND anonymized_at IS NULL AND status <> 'frozen' LIMIT 1"); $q->bind_param("s", $email); $existing = fetchOne($q); }
+    $norm = fn(string $n) => preg_replace('/\s+/u', ' ', mb_strtolower(trim($n)));
+    if ($email !== null) {
+        $q = prepareQuery($conn, "SELECT id, name, username FROM users WHERE LOWER(email) = LOWER(?) AND anonymized_at IS NULL AND status <> 'frozen'"); $q->bind_param("s", $email);
+        foreach (fetchAllRows($q) as $cand) if ($norm((string)$cand['name']) === $norm($name)) { $existing = $cand; break; }
+    }
     $link = null; $emailed = false;
     if ($existing) { $uid = (int)$existing['id']; $username = $existing['username']; $name = $existing['name']; }
     else {

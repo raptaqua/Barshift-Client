@@ -1189,13 +1189,26 @@ const future = (days) => { const d = new Date(Date.now() + days * 864e5); return
         assert.strictEqual(pay2.shifts.find(x => x.id === localId).userId, au.id, 'hakija ei päätynyt vuoroon'); assert.strictEqual(pay2.hub_pending_apps.length, 0, 'käsitelty hakemus jäi Huomio-listaan');
         const after = (await admin.post('hub_applications', {})).json.applications[0]; assert.strictEqual(after.status, 'accepted'); assert.strictEqual(after.email, 'aino@example.test'); assert.strictEqual(after.phone, '0401234567');
         assert.strictEqual((await admin.post('hub_decide', { id: apps[0].id, decision: 'declined' })).status, 409, 'käsitelty hakemus muuttui');
+        // Toinen hakija, jolla on sama sähköposti mutta eri nimi (esim. baarin yhteinen osoite): saa oman tunnuksen eikä ohita ensimmäistä
+        const d2 = future(15); const mkGig = async (role) => { assert.ok((await admin.post('shift', { userId: null, date: d2, start: '18:00', end: '23:00', role, status: 'published', hub_gig: true })).json.success); return (await admin.get('')).json.shifts.find(x => x.date === d2 && x.role === role); };
+        const g2 = await mkGig('Tarjoilija'); const g3 = await mkGig('Narikka'); await runCron();
+        hub.apps.push({ id: 3, shift: 's' + g2.id, status: 'pending', name: 'Bertta Keikka', skills: '', city: 'Turku', message: null, email: 'aino@example.test', phone: '0407777777' });
+        hub.apps.push({ id: 4, shift: 's' + g3.id, status: 'pending', name: '  aino   KEIKKA ', skills: '', city: 'Turku', message: null, email: 'AINO@example.test', phone: '0401234567' });
+        const apps2 = (await admin.post('hub_applications', {})).json.applications; const bApp = apps2.find(a => a.name === 'Bertta Keikka'), aApp = apps2.find(a => a.name.trim().toLowerCase().startsWith('aino') && a.id !== apps[0].id);
+        const decB = (await admin.post('hub_decide', { id: bApp.id, decision: 'accepted' })).json.worker;
+        assert.ok(decB && decB.existing === false && decB.username === 'bertta.keikka' && decB.assigned, 'eri nimellä haki sama sähköposti: ' + JSON.stringify(decB));
+        const decA = (await admin.post('hub_decide', { id: aApp.id, decision: 'accepted' })).json.worker;
+        assert.ok(decA && decA.existing === true && decA.username === 'aino.keikka' && decA.assigned && !decA.link, 'sama nimi ja sähköposti pitää käyttää olemassa olevaa tunnusta: ' + JSON.stringify(decA));
+        const pay3 = (await admin.get('')).json; const ainoU = pay3.users.find(u => u.username === 'aino.keikka'), berttaU = pay3.users.find(u => u.username === 'bertta.keikka');
+        assert.strictEqual(pay3.shifts.find(x => x.id === g2.id).userId, berttaU.id, 'Bertta ei päätynyt omaan vuoroonsa'); assert.strictEqual(pay3.shifts.find(x => x.id === g3.id).userId, ainoU.id);
+        assert.strictEqual(pay3.shifts.find(x => x.id === localId).userId, ainoU.id, 'ensimmäisen hakijan vuoro muuttui');
         // täytetty vuoro merkitään keskuksessa täytetyksi (ei poisteta); ylläpitäjän sivulataus synkronoi ilman croniakin
         await sql("DELETE FROM system_status WHERE k = 'hub_last_attempt'"); await admin.get('');
         for (let i = 0; i < 20 && hub.shifts[sext].status !== 'filled'; i++) await sleep(100); assert.strictEqual(hub.shifts[sext].status, 'filled');
         // tapahtuman poisto ja ominaisuuden sammutus poistaa keskuksesta
         assert.ok((await admin.post('save_pub_settings', { ...base, features_ext: { hub_events: false, hub_gigs: false } })).json.success);
         await runCron(); assert.strictEqual(Object.keys(hub.events).length, 0, 'tapahtuma jäi keskukseen'); assert.strictEqual(Object.keys(hub.shifts).length, 0, 'vuoro jäi keskukseen');
-        assert.strictEqual((await admin.post('hub_applications', {})).json.applications.length, 1, 'paikallinen hakemushistoria poistui');
+        assert.strictEqual((await admin.post('hub_applications', {})).json.applications.length, 3, 'paikallinen hakemushistoria poistui');
         // katkaisu poistaa julkaistut tiedot keskuksesta ja yhteyden
         assert.ok((await admin.post('save_pub_settings', { ...base, features_ext: { hub_events: true, hub_gigs: true } })).json.success); await runCron();
         assert.ok(Object.keys(hub.events).length > 0);
