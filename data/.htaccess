@@ -1,0 +1,6 @@
+# SQLite-tietokanta ja muut data-kansion tiedostot eivät saa olla ladattavissa selaimella
+Require all denied
+<IfModule !mod_authz_core.c>
+Order allow,deny
+Deny from all
+</IfModule>

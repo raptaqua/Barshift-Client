@@ -2,7 +2,6 @@
 error_reporting(0);
 ini_set('display_errors', 0);
 ini_set('log_errors', 1);
-mysqli_report(MYSQLI_REPORT_OFF);
 
 // Odottamaton PHP-virhe (poikkeus tai kuolettava virhe) palautetaan aina JSON-muodossa; yksityiskohdat vain kirjautuneelle ylläpitäjälle ja lokiin
 function bsFatalJson(string $msg, string $where): void {
@@ -26,9 +25,10 @@ function setupError(string $msg) {
 }
 if (!is_readable($cfgPath)) { error_log("BarShift: config puuttuu: $cfgPath"); setupError('Asennus kesken: avaa install.php selaimessa (tai kopioi config.example.php -> config.php)'); }
 if (!is_readable(__DIR__ . '/vendor/autoload.php')) { error_log('BarShift: vendor/ puuttuu'); setupError('Asennus kesken: aja "composer install --no-dev"'); }
-if (!extension_loaded('mysqli')) { error_log('BarShift: mysqli puuttuu'); setupError('Asennus kesken: PHP:n mysqli-laajennus puuttuu'); }
+require_once __DIR__ . '/lib/db.php';
 $cfg = require $cfgPath;
-foreach (['db_host', 'db_name', 'db_user', 'db_pass', 'vapid_subject', 'vapid_public_key', 'vapid_private_key'] as $k) {
+if (($missingExt = bsDbMissingExtension($cfg)) !== null) { error_log("BarShift: $missingExt"); setupError("Asennus kesken: $missingExt"); }
+foreach (array_merge(bsDbDriver($cfg) === 'mysql' ? ['db_host', 'db_name', 'db_user', 'db_pass'] : [], ['vapid_subject', 'vapid_public_key', 'vapid_private_key']) as $k) {
     if (!isset($cfg[$k])) { error_log("BarShift: config-avain puuttuu: $k"); setupError("Asennus kesken: config.php:stä puuttuu '$k'"); }
 }
 
@@ -97,9 +97,8 @@ $vapid_auth = ['VAPID' => [
     'privateKey' => $cfg['vapid_private_key'],
 ]];
 
-$conn = new mysqli($cfg['db_host'], $cfg['db_user'], $cfg['db_pass'], $cfg['db_name']);
+$conn = bsConnect($cfg);
 if ($conn->connect_error) { error_log('BarShift DB connect: ' . $conn->connect_error); fail('Palvelinvirhe', 500); }
-$conn->set_charset('utf8mb4');
 hubLoadConfig($conn, $cfg);   // keskusyhteys hallintapaneelista (tai config.php)
 
 function prepareQuery($conn, $sql) {

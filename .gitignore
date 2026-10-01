@@ -17,3 +17,8 @@ uploads/*
 *.log
 error_log
 .DS_Store
+
+# SQLite-tietokanta (kansio ja suojaus versionhallinnassa, sisältö ei)
+data/*
+!data/.htaccess
+!data/index.html

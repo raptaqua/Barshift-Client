@@ -4,10 +4,17 @@
 // Vielä parempi: sijoita config.php julkisen www-hakemiston ULKOPUOLELLE
 // ja aseta sen polku ympäristömuuttujaan BARSHIFT_CONFIG.
 return [
-    'db_host' => 'localhost',
-    'db_name' => 'tietokannan_nimi',
-    'db_user' => 'tietokannan_kayttaja',
-    'db_pass' => 'VAIHDA_TÄMÄ',
+    // Tietokanta. SQLite (oletus) ei tarvitse palvelinta: kaikki tallentuu yhteen tiedostoon.
+    // Tiedoston polku on joko absoluuttinen tai suhteessa sovelluksen kansioon. Kansion data/ pitää olla kirjoitettava
+    // eikä se saa olla ladattavissa selaimella (data/.htaccess estää sen Apachella; nginx: location ^~ /data/ { deny all; }).
+    'db_driver' => 'sqlite',
+    'db_file'   => 'data/barshift.sqlite',
+    // Vaihtoehto: MariaDB/MySQL (poista yllä olevat kaksi riviä ja ota nämä käyttöön)
+    // 'db_driver' => 'mysql',
+    // 'db_host' => 'localhost',
+    // 'db_name' => 'tietokannan_nimi',
+    // 'db_user' => 'tietokannan_kayttaja',
+    // 'db_pass' => 'VAIHDA_TÄMÄ',
 
     // Luo avaimet: vendor/bin/web-push generate:vapid-keys (tai: npx web-push generate-vapid-keys)
     'vapid_subject'     => 'mailto:sinun@osoite.fi',

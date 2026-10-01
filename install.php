@@ -93,14 +93,22 @@ function makeVapidKeys(): ?array {
     return ['public' => b64url("\x04" . $pad($d['ec']['x']) . $pad($d['ec']['y'])), 'private' => b64url($pad($d['ec']['d']))];
 }
 
-function requirements(string $root): array {
+function requirements(string $root, string $driver = 'sqlite'): array {
     $r = [];
     $r[] = ['PHP-versio 8.1 tai uudempi', version_compare(PHP_VERSION, '8.1.0', '>='), PHP_VERSION, true];
-    foreach (['mysqli' => 'mysqli', 'openssl' => 'openssl', 'mbstring' => 'mbstring', 'json' => 'json', 'curl' => 'curl'] as $ext => $label) {
+    $r[] = $driver === 'sqlite'
+        ? ['PHP-laajennus: pdo_sqlite (SQLite-tietokanta)', extension_loaded('pdo_sqlite'), extension_loaded('pdo_sqlite') ? 'ok' : 'puuttuu: valitse MariaDB/MySQL tai pyydä hostingilta', true]
+        : ['PHP-laajennus: mysqli (MariaDB/MySQL)', extension_loaded('mysqli'), extension_loaded('mysqli') ? 'ok' : 'puuttuu', true];
+    foreach (['openssl' => 'openssl', 'mbstring' => 'mbstring', 'json' => 'json', 'curl' => 'curl'] as $ext => $label) {
         $r[] = ["PHP-laajennus: $label", extension_loaded($ext), extension_loaded($ext) ? 'ok' : 'puuttuu', true];
     }
     $r[] = ['Riippuvuudet asennettu (vendor/)', is_file($root . '/vendor/autoload.php'),
             is_file($root . '/vendor/autoload.php') ? 'ok' : 'aja: composer install --no-dev', true];
+    if ($driver === 'sqlite') {
+        $d = $root . '/data';
+        $okd = is_dir($d) ? is_writable($d) : is_writable($root);
+        $r[] = ['Kansio data/ kirjoitettava (SQLite-tiedosto)', $okd, $okd ? (is_dir($d) ? 'ok' : 'luodaan') : 'ei kirjoitusoikeutta', true];
+    }
     $r[] = ['Tietokantarakenne (db/schema.sql)', is_file($root . '/db/schema.sql'), is_file($root . '/db/schema.sql') ? 'ok' : 'puuttuu', true];
     $r[] = ['Kansio kirjoitettava (config.php)', is_writable($root), is_writable($root) ? 'ok' : 'ei kirjoitusoikeutta', true];
     $up = $root . '/uploads';
@@ -110,14 +118,39 @@ function requirements(string $root): array {
     return $r;
 }
 
-function runSql(mysqli $c, string $sql): ?string {
+function bsTableExistsSafe($c, string $t): bool {
+    require_once __DIR__ . '/db/migrate_lib.php';
+    return bsTableExists($c, $t);
+}
+
+function runSql($c, string $sql): ?string {
+    if (bsIsSqlite($c)) {
+        foreach (bsSqlStatements($sql) as $stmt) {
+            if (!$c->query($stmt)) return $c->error . ' (' . substr($stmt, 0, 60) . ')';
+        }
+        return null;
+    }
     if (!$c->multi_query($sql)) return $c->error;
     do { if ($res = $c->store_result()) $res->free(); } while ($c->more_results() && $c->next_result());
     return $c->errno ? $c->error : null;
 }
 
+// Varmistaa, ettei data/-kansion tiedostoja voi ladata selaimella. true = suojattu, false = AVOIN, null = ei voitu tarkistaa.
+function dataFolderProtected(string $root, string $file): ?bool {
+    if (!function_exists('curl_init')) return null;
+    $https = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') || (($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https');
+    $base = rtrim(dirname($_SERVER['SCRIPT_NAME'] ?? '/'), '/\\');
+    $url = ($https ? 'https://' : 'http://') . ($_SERVER['HTTP_HOST'] ?? 'localhost') . $base . '/data/' . rawurlencode(basename($file));
+    $ch = curl_init($url);
+    curl_setopt_array($ch, [CURLOPT_NOBODY => true, CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 6, CURLOPT_FOLLOWLOCATION => false, CURLOPT_SSL_VERIFYPEER => false]);
+    $ok = curl_exec($ch); $code = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE); curl_close($ch);
+    if ($ok === false || $code === 0) return null;
+    return $code !== 200;
+}
+
 // ---------- Lomakkeen tiedot ----------
 $in = [
+    'db_driver' => (($_POST['db_driver'] ?? '') === 'mysql' || (!isset($_POST['db_driver']) && !extension_loaded('pdo_sqlite') && extension_loaded('mysqli'))) ? 'mysql' : 'sqlite',
     'db_host' => trim((string)($_POST['db_host'] ?? 'localhost')),
     'db_name' => trim((string)($_POST['db_name'] ?? '')),
     'db_user' => trim((string)($_POST['db_user'] ?? '')),
@@ -134,7 +167,7 @@ $saved = $_SESSION['db_saved'] ?? null;   // palvelimen istunnossa, ei koskaan s
 $matchesSaved = function (array $i): bool { $sv = $_SESSION['db_saved'] ?? null; return is_array($sv) && $sv['host'] === $i['db_host'] && $sv['name'] === $i['db_name'] && $sv['user'] === $i['db_user']; };
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && $in['db_pass'] === '' && $matchesSaved($in)) $in['db_pass'] = (string)$saved['pass'];
 $errors = []; $notes = []; $done = null;
-$reqs = requirements($root);
+$reqs = requirements($root, $in['db_driver']);
 $blocking = array_filter($reqs, fn($x) => $x[3] && !$x[1]);
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -150,28 +183,43 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $errors[] = 'Korjaa ensin vaatimukset, joissa on punainen merkintä.';
     } else {
         // Kenttien tarkistus
-        if (!preg_match('/^[A-Za-z0-9._:\-]{1,120}$/', $in['db_host'])) $errors[] = 'Tietokannan osoite on virheellinen.';
-        if (!preg_match('/^[A-Za-z0-9_$\-]{1,64}$/', $in['db_name'])) $errors[] = 'Tietokannan nimi on virheellinen (sallitut: kirjaimet, numerot, _ $ -).';
-        if ($in['db_user'] === '' || strlen($in['db_user']) > 80) $errors[] = 'Tietokantakäyttäjä puuttuu.';
+        $isSqlite = $in['db_driver'] === 'sqlite';
+        if (!$isSqlite) {
+            if (!preg_match('/^[A-Za-z0-9._:\-]{1,120}$/', $in['db_host'])) $errors[] = 'Tietokannan osoite on virheellinen.';
+            if (!preg_match('/^[A-Za-z0-9_$\-]{1,64}$/', $in['db_name'])) $errors[] = 'Tietokannan nimi on virheellinen (sallitut: kirjaimet, numerot, _ $ -).';
+            if ($in['db_user'] === '' || strlen($in['db_user']) > 80) $errors[] = 'Tietokantakäyttäjä puuttuu.';
+        }
 
-        $conn = null;
+        $conn = null; $sqliteRel = null;
+        require_once $root . '/lib/db.php';
+        require_once $root . '/lib/sqlite_ddl.php';
         if (!$errors) {
-            mysqli_report(MYSQLI_REPORT_OFF);
-            $conn = @new mysqli($in['db_host'], $in['db_user'], $in['db_pass'], $in['db_name']);
-            if ($conn->connect_errno) {
-                $errors[] = 'Tietokantayhteys epäonnistui (virhe ' . (int)$conn->connect_errno . '). Tarkista osoite, nimi, käyttäjä ja salasana sekä että käyttäjällä on oikeus kantaan.';
-                $conn = null;
+            if ($isSqlite) {
+                $sqliteRel = $_SESSION['sqlite_rel'] ?? ($_SESSION['sqlite_rel'] = 'data/barshift-' . bin2hex(random_bytes(8)) . '.sqlite');
+                $dataDir = $root . '/data';
+                if (!is_dir($dataDir) && !@mkdir($dataDir, 0750, true)) { $errors[] = 'Kansiota data/ ei voi luoda: anna asennuskansiolle kirjoitusoikeus.'; }
+                else {
+                    @file_put_contents($dataDir . '/.htaccess', "# Tietokanta ei saa olla ladattavissa selaimella\nRequire all denied\n<IfModule !mod_authz_core.c>\nOrder allow,deny\nDeny from all\n</IfModule>\n");
+                    @file_put_contents($dataDir . '/index.html', '');
+                    @file_put_contents($dataDir . '/web.config', '<?xml version="1.0"?><configuration><system.webServer><security><requestFiltering><fileExtensions><add fileExtension=".sqlite" allowed="false" /></fileExtensions></requestFiltering></security></system.webServer></configuration>');
+                    $conn = bsConnect(['db_driver' => 'sqlite', 'db_file' => $sqliteRel]);
+                    if ($conn->connect_error) { $errors[] = 'SQLite-tietokannan avaus epäonnistui. Tarkista kansion data/ oikeudet.'; $conn = null; }
+                }
             } else {
-                $conn->set_charset('utf8mb4');
-                $_SESSION['db_saved'] = ['host' => $in['db_host'], 'name' => $in['db_name'], 'user' => $in['db_user'], 'pass' => $in['db_pass']];
-                $saved = $_SESSION['db_saved'];
+                $conn = bsConnect(['db_driver' => 'mysql', 'db_host' => $in['db_host'], 'db_user' => $in['db_user'], 'db_pass' => $in['db_pass'], 'db_name' => $in['db_name']]);
+                if ($conn->connect_errno) {
+                    $errors[] = 'Tietokantayhteys epäonnistui (virhe ' . (int)$conn->connect_errno . '). Tarkista osoite, nimi, käyttäjä ja salasana sekä että käyttäjällä on oikeus kantaan.';
+                    $conn = null;
+                } else {
+                    $_SESSION['db_saved'] = ['host' => $in['db_host'], 'name' => $in['db_name'], 'user' => $in['db_user'], 'pass' => $in['db_pass']];
+                    $saved = $_SESSION['db_saved'];
+                }
             }
         }
 
         if ($act === 'test' && $conn) {
-            $notes[] = 'Tietokantayhteys toimii.';
-            $res = $conn->query("SELECT COUNT(*) c FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = 'users'");
-            if ($res && (int)$res->fetch_assoc()['c'] > 0) $notes[] = 'Kannassa on jo <code>users</code>-taulu: rakenne päivitetään turvallisesti, olemassa olevaa dataa ei poisteta.';
+            $notes[] = $isSqlite ? 'SQLite-tietokanta voidaan luoda kansioon <code>data/</code>.' : 'Tietokantayhteys toimii.';
+            if (bsTableExistsSafe($conn, 'users')) $notes[] = 'Kannassa on jo <code>users</code>-taulu: rakenne päivitetään turvallisesti, olemassa olevaa dataa ei poisteta.';
         }
 
         if ($act === 'install') {
@@ -186,8 +234,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 // 1) Rakenne
                 require_once $root . '/db/migrate_lib.php';
                 $freshDb = !bsTableExists($conn, 'users');
-                $schema = (string)file_get_contents($root . '/db/schema.sql');
-                if ($e = runSql($conn, $schema)) { $errors[] = 'Taulujen luonti epäonnistui: ' . h($e) . ' (tarvitseeko käyttäjä CREATE-oikeuden?)'; }
+                if ($e = bsApplySchema($conn, $root . '/db/schema.sql')) { $errors[] = 'Taulujen luonti epäonnistui: ' . h($e) . ' (tarvitseeko käyttäjä CREATE-oikeuden?)'; }
             }
             if (!$errors && $conn) {
                 [, $migErr] = bsRunMigrations($conn, $root . '/db/migrations', $freshDb);
@@ -218,8 +265,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $vapid = makeVapidKeys();
                 if (!$vapid) { $errors[] = 'VAPID-avainten luonti epäonnistui (openssl ei tue P-256-käyrää).'; }
                 else {
-                    $cfg = [
-                        'db_host' => $in['db_host'], 'db_name' => $in['db_name'], 'db_user' => $in['db_user'], 'db_pass' => $in['db_pass'],
+                    $cfg = ($isSqlite ? ['db_driver' => 'sqlite', 'db_file' => $sqliteRel]
+                                      : ['db_driver' => 'mysql', 'db_host' => $in['db_host'], 'db_name' => $in['db_name'], 'db_user' => $in['db_user'], 'db_pass' => $in['db_pass']]) + [
                         'vapid_subject' => 'mailto:' . $in['email'], 'vapid_public_key' => $vapid['public'], 'vapid_private_key' => $vapid['private'],
                         'message_key' => base64_encode(random_bytes(32)),
                         'allowed_origins' => [],
@@ -230,10 +277,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     else {
                         fwrite($fh, $php); fclose($fh); @chmod($configPath, 0640);
                         if (!is_dir($root . '/uploads')) @mkdir($root . '/uploads', 0755, true);
+                        $protected = $isSqlite ? dataFolderProtected($root, $sqliteRel) : true;
                         @file_put_contents($lockPath, 'Asennettu ' . date('c') . "\n");
                         @unlink($tokenPath);
                         $selfDeleted = @unlink(__FILE__);
-                        $done = ['user' => $in['su_user'], 'deleted' => $selfDeleted, 'demo' => $in['demo']];
+                        $done = ['user' => $in['su_user'], 'deleted' => $selfDeleted, 'demo' => $in['demo'], 'dataOpen' => $isSqlite && $protected === false];
                         $_SESSION = [];
                         session_destroy();
                     }
@@ -248,6 +296,7 @@ if ($done) {
     $login = $done['user'];
     $body = '<div class="card"><div class="msg good"><b>Asennus valmis.</b></div>'
         . '<p>Kirjaudu sovellukseen tunnuksella <code>' . h($login) . '</code> ja valitsemallasi salasanalla.</p>'
+        . (!empty($done['dataOpen']) ? '<div class="msg err"><b>Varoitus:</b> kansio <code>data/</code> näyttää olevan ladattavissa selaimella. Estä pääsy (Apache: <code>data/.htaccess</code> on luotu, mutta palvelin ei ehkä lue sitä; nginx: <code>location ^~ /data/ { deny all; }</code>) tai siirrä tietokanta www-juuren ulkopuolelle ja muuta config.php:n <code>db_file</code>.</div>' : '')
         . ($done['demo'] ? '<div class="msg note">Demodata on tuotu. Demobaarin käyttäjien salasana on julkinen (ks. README), joten <b>älä käytä demodataa tuotannossa</b>.</div>' : '')
         . ($done['deleted'] ? '<p class="ok">✓ install.php ja asennustunniste poistettiin palvelimelta.</p>'
                             : '<div class="msg err"><b>Poista nyt käsin</b> tiedostot <code>install.php</code> ja <code>install_token.php</code> palvelimelta. (Asennusohjelma on lukittu, mutta poisto on silti suositeltavaa.)</div>')
@@ -278,12 +327,13 @@ if (!empty($_SESSION['token_ok'])) {
 }
 
 $body .= '<div class="card"><h2>3. Tietokanta</h2>'
-       . '<p style="margin:0;font-size:14px;color:var(--muted)">Luo tyhjä tietokanta ja käyttäjä esim. cPanelin MySQL Databases -työkalulla ja anna käyttäjälle oikeudet siihen tietokantaan.</p>'
-       . '<div class="row"><div><label for="db_host">Osoite</label><input type="text" id="db_host" name="db_host" value="' . h($in['db_host']) . '" required></div>'
-       . '<div><label for="db_name">Tietokannan nimi</label><input type="text" id="db_name" name="db_name" value="' . h($in['db_name']) . '" required></div></div>'
-       . '<div class="row"><div><label for="db_user">Käyttäjä</label><input type="text" id="db_user" name="db_user" value="' . h($in['db_user']) . '" required></div>'
+       . '<label class="chk" style="font-weight:400;margin-top:6px"><input type="radio" name="db_driver" value="sqlite"' . ($in['db_driver'] === 'sqlite' ? ' checked' : '') . '><span><b>SQLite (suositus)</b>: ei erillistä tietokantapalvelinta, ei tunnuksia. Tiedot tallennetaan yhteen tiedostoon kansiossa <code>data/</code>.</span></label>'
+       . '<label class="chk" style="font-weight:400;margin-top:8px"><input type="radio" name="db_driver" value="mysql"' . ($in['db_driver'] === 'mysql' ? ' checked' : '') . '><span><b>MariaDB / MySQL</b>: isompiin asennuksiin tai jos tietokantapalvelin on jo olemassa. Luo tyhjä tietokanta ja käyttäjä esim. cPanelin MySQL Databases -työkalulla ja täytä tiedot alle.</span></label>'
+       . '<div class="row"><div><label for="db_host">Osoite (vain MariaDB)</label><input type="text" id="db_host" name="db_host" value="' . h($in['db_host']) . '"></div>'
+       . '<div><label for="db_name">Tietokannan nimi</label><input type="text" id="db_name" name="db_name" value="' . h($in['db_name']) . '"></div></div>'
+       . '<div class="row"><div><label for="db_user">Käyttäjä</label><input type="text" id="db_user" name="db_user" value="' . h($in['db_user']) . '"></div>'
        . '<div><label for="db_pass">Salasana</label><input type="password" id="db_pass" name="db_pass" autocomplete="new-password"' . ($matchesSaved($in) ? ' placeholder="•••••••• (tallennettu, jätä tyhjäksi)"' : '') . '></div></div>'
-       . '<div class="actions"><button type="submit" name="act" value="test" class="ghost" formnovalidate>Testaa yhteys</button></div></div>';
+       . '<div class="actions"><button type="submit" name="act" value="test" class="ghost" formnovalidate>Testaa tietokanta</button></div></div>';
 
 $body .= '<div class="card"><h2>4. Baari ja ylläpitäjä</h2>'
        . '<label for="pub_name">Baarin nimi</label><input type="text" id="pub_name" name="pub_name" value="' . h($in['pub_name']) . '" required maxlength="100"><small>Tämä asennus palvelee vain tätä yhtä baaria.</small>'

@@ -21,7 +21,7 @@ jobs:
       - uses: shivammathur/setup-php@v2
         with:
           php-version: '8.2'
-          extensions: mysqli, curl, mbstring, gmp, sodium
+          extensions: mysqli, pdo_sqlite, curl, mbstring, gmp, sodium
           tools: composer
       - uses: actions/setup-node@v4
         with:
@@ -51,7 +51,13 @@ jobs:
         run: php tests/hub_url.test.php
       - name: Kielitiedostot
         run: node tests/i18n.test.js
-      - name: API-integraatiotestit
+      - name: SQLite-käännös ja asennusohjelma
+        run: |
+          php tests/sqlite_ddl.test.php
+          tests/run_install_test.sh
+      - name: API-integraatiotestit (SQLite)
+        run: TEST_DB=sqlite tests/run_api_tests.sh
+      - name: API-integraatiotestit (MariaDB)
         env:
           TEST_DB_HOST: 127.0.0.1
           TEST_DB_USER: root

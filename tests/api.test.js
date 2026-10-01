@@ -4,6 +4,11 @@ const assert = require('assert');
 const crypto = require('crypto');
 const { execFile } = require('child_process');
 const execFileP = (cmd, args, opts) => new Promise((res, rej) => execFile(cmd, args, opts, (e, out, err) => e ? rej(new Error((err || e.message).toString())) : res(out.toString())));
+const SQLITE = process.env.DB_DRIVER === 'sqlite';
+// SQL-lauseet suoraan testikantaan (SQLite: tests/sqlcli.php, MariaDB: mysql-asiakas)
+const sqlCli = (sqlText, noHeader = false) => SQLITE
+  ? execFileP('php', [require('path').join(__dirname, 'sqlcli.php'), sqlText, ...(noHeader ? ['-N'] : [])], { env: process.env })
+  : execFileP('mysql', ['-h', process.env.DB_HOST, '-u', process.env.DB_USER, ...(process.env.DB_PASS ? ['-p' + process.env.DB_PASS] : []), process.env.DB_NAME, ...(noHeader ? ['-N'] : []), '-e', sqlText]);
 const smtp = require('./fake_smtp');
 const BASE = process.env.BASE || 'http://127.0.0.1:8399';
 const PW = 'DemoBaari2026!';
@@ -74,8 +79,8 @@ const future = (days) => { const d = new Date(Date.now() + days * 864e5); return
     assert.strictEqual(r.json.user.memberships, undefined);
     for (const a of ['gig_pool', 'switch_pub', 'toggle_pub', 'gig_invite', 'create_job_listing', 'accept_link']) assert.ok((await admin.post(a, {})).status >= 400, a + ' on yhä käytössä');
     const d = (await admin.get('')).json; for (const k of ['memberships', 'job_listings', 'gig_incoming', 'gig_outgoing']) assert.strictEqual(d[k], undefined, k);
-    const q = (sqlText) => execFileP('mysql', ['-h', process.env.DB_HOST, '-u', process.env.DB_USER, ...(process.env.DB_PASS ? ['-p' + process.env.DB_PASS] : []), process.env.DB_NAME, '-N', '-e', sqlText]);
-    assert.strictEqual((await q("SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND (column_name IN ('pub_name', 'from_pub', 'slug') OR column_name LIKE '%gig_avail%')")).trim(), '0', 'monibaarisarakkeita jäi kantaan');
+    const q = (sqlText) => sqlCli(sqlText, true);
+    assert.strictEqual((await q(SQLITE ? "SELECT COUNT(*) FROM sqlite_master m, pragma_table_info(m.name) c WHERE m.type = 'table' AND (c.name IN ('pub_name', 'from_pub', 'slug') OR c.name LIKE '%gig_avail%')" : "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND (column_name IN ('pub_name', 'from_pub', 'slug') OR column_name LIKE '%gig_avail%')")).trim(), '0', 'monibaarisarakkeita jäi kantaan');
     assert.strictEqual((await q("SELECT COUNT(*) FROM pubs")).trim(), '1');
   });
   await t('työntekijä ei näe kollegoiden palkkaa', async () => {
@@ -808,8 +813,7 @@ const future = (days) => { const d = new Date(Date.now() + days * 864e5); return
     const uid = (await admin.get('')).json.users.find(u => u.username === 'sari').id;
     const [d1, t1] = helsinki(-300), [d2, t2] = helsinki(-120);   // vuoro 5 h sitten -> 2 h sitten
     await admin.post('shift', { userId: uid, date: d1, start: t1.slice(0, 5), end: t2.slice(0, 5), role: 'Ovi' });
-    await execFileP('mysql', ['-h', process.env.DB_HOST, '-u', process.env.DB_USER, ...(process.env.DB_PASS ? ['-p' + process.env.DB_PASS] : []), process.env.DB_NAME, '-e',
-      `INSERT INTO time_entries (user_id, clock_in) VALUES (${uid}, '${d1} ${t1}')`]);
+    await sqlCli(`INSERT INTO time_entries (user_id, clock_in) VALUES (${uid}, '${d1} ${t1}')`);
     await runCron();
     assert.ok(await waitMail(mailbox, x => x.to === 'sari@example.test' && /Unohtuiko leimata ulos/.test(x.subject)), 'ulosleimaushälytys puuttuu');
   });
@@ -1040,7 +1044,7 @@ const future = (days) => { const d = new Date(Date.now() + days * 864e5); return
   });
 
   await t('odotuslista täyteen menneeseen tapahtumaan: liittyminen, vapautuminen ja ilmoitus', async () => {
-    await execFileP('mysql', ['-h', process.env.DB_HOST, '-u', process.env.DB_USER, ...(process.env.DB_PASS ? ['-p' + process.env.DB_PASS] : []), process.env.DB_NAME, '-e', 'DELETE FROM login_attempts']);
+    await sqlCli('DELETE FROM login_attempts');
     const d = future(35);
     assert.ok((await admin.form('event', fdOf({ title: 'Odotuslistatesti', date: d, time_start: '19:00', type: 'music', is_public: '1', registration: 'rsvp', capacity: 2 }))).json.success);
     const ev = (await admin.get('')).json.events.find(e => e.title === 'Odotuslistatesti');
@@ -1106,7 +1110,7 @@ const future = (days) => { const d = new Date(Date.now() + days * 864e5); return
   });
   console.log('Keskuspalvelin (BarShift Hub)');
   await t('hub: julkiset tapahtumat ja keikkavuorot lähtevät allekirjoitettuina, hakemukset tulevat takaisin', async () => {
-    const sql = (q) => execFileP('mysql', ['-h', process.env.DB_HOST, '-u', process.env.DB_USER, ...(process.env.DB_PASS ? ['-p' + process.env.DB_PASS] : []), process.env.DB_NAME, '-e', q]);
+    const sql = (q) => sqlCli(q);
     const hub = { events: {}, shifts: {}, apps: [], badSig: 0, calls: [], decisions: [] };
     const spki = (raw) => crypto.createPublicKey({ key: Buffer.concat([Buffer.from('302a300506032b6570032100', 'hex'), Buffer.from(raw, 'base64')]), format: 'der', type: 'spki' });
     let hubKey = null; const seen = new Set();
@@ -1196,7 +1200,7 @@ const future = (days) => { const d = new Date(Date.now() + days * 864e5); return
   await t('verkkomaksu lippuihin (valinnainen, Stripe): kytkin, odotus, webhook, vanheneminen', async () => {
     const base = { ...settings, feature_tickets: true, feature_bookings: true, booking: { capacity: 10, max_party: 6, slot_minutes: 60, duration_minutes: 120, lead_hours: 0, days_ahead: 60, auto_confirm: false, hours: ALLDAYS } };
     const setPay = (on) => admin.post('save_pub_settings', { ...base, features_ext: { payments: on } });
-    await execFileP('mysql', ['-h', process.env.DB_HOST, '-u', process.env.DB_USER, ...(process.env.DB_PASS ? ['-p' + process.env.DB_PASS] : []), process.env.DB_NAME, '-e', 'DELETE FROM login_attempts']);   // julkisen ilmoittautumisen nopeusrajoitus nollataan
+    await sqlCli('DELETE FROM login_attempts');   // julkisen ilmoittautumisen nopeusrajoitus nollataan
     const d = future(25);
     const mk = async (title) => { assert.ok((await admin.form('event', fdOf({ title, date: d, time_start: '19:00', type: 'music', is_public: '1', registration: 'tickets', capacity: 5, ticket_price: '12.50' }))).json.success); return (await admin.get('')).json.events.find(e => e.title === title); };
     const sign = (payload, secret = 'whsec_test', ts = Math.floor(Date.now() / 1000)) => `t=${ts},v1=${crypto.createHmac('sha256', secret).update(ts + '.' + payload).digest('hex')}`;
@@ -1273,7 +1277,7 @@ const future = (days) => { const d = new Date(Date.now() + days * 864e5); return
     assert.strictEqual((await emp.get('')).status, 200);
     await boss.post('save_pub_settings', { ...settings, require_2fa: false });
     assert.ok((await ta.post('totp_disable', { password: PW, code: '000000' })).status >= 400);
-    await execFileP('mysql', ['-h', process.env.DB_HOST, '-u', process.env.DB_USER, ...(process.env.DB_PASS ? ['-p' + process.env.DB_PASS] : []), process.env.DB_NAME, '-e', "UPDATE users SET totp_enabled = 0, totp_secret = NULL, recovery_codes = NULL WHERE username = 'admin'; DELETE FROM users WHERE username = 'pakoteadmin'"]);
+    await sqlCli("UPDATE users SET totp_enabled = 0, totp_secret = NULL, recovery_codes = NULL WHERE username = 'admin'; DELETE FROM users WHERE username = 'pakoteadmin'");
   });
   await t('julkiset tiedostot: ei ulkoisia resursseja sovelluksen sivuilla', async () => {
     const fs = require('fs'), root = require('path').join(__dirname, '..');
@@ -1308,7 +1312,7 @@ const future = (days) => { const d = new Date(Date.now() + days * 864e5); return
     const tmp = require('path').join(require('os').tmpdir(), 'bs-backup-test.sql.gz'); require('fs').writeFileSync(tmp, 'x'.repeat(2048));
     await execFileP('php', ['tools/mark_backup.php', tmp], { env: { ...process.env, BARSHIFT_CONFIG: process.env.BARSHIFT_CONFIG }, cwd: require('path').join(__dirname, '..') }); require('fs').unlinkSync(tmp);
     st = (await admin.get('system_status')).json; assert.strictEqual(st.backup.expected, true); assert.ok(st.backup.age_hours < 0.1 && /bs-backup-test/.test(st.backup.info));
-    await execFileP('mysql', ['-h', process.env.DB_HOST, '-u', process.env.DB_USER, ...(process.env.DB_PASS ? ['-p' + process.env.DB_PASS] : []), process.env.DB_NAME, '-e', 'UPDATE mail_queue SET attempts = 0 WHERE sent_at IS NULL']); await runCron(); await sleep(300);   // ennen SMTP-palvelimen käynnistystä kertyneet epäonnistumiset nollataan
+    await sqlCli('UPDATE mail_queue SET attempts = 0 WHERE sent_at IS NULL'); await runCron(); await sleep(300);   // ennen SMTP-palvelimen käynnistystä kertyneet epäonnistumiset nollataan
     const al = (await admin.get('')).json.system_alerts; assert.ok(al.length === 0 && (await emp.get('')).json.system_alerts.length === 0, JSON.stringify(al));
   });
 
