@@ -60,7 +60,8 @@ function dbError($conn_or_stmt) {
     if (in_array((int)$conn_or_stmt->errno, [1054, 1146], true)) {
         fail('Tietokanta on päivittämättä. Aja komento "php migrate.php".', 500);
     }
-    fail('Tietokantavirhe', 500);
+    $isAdmin = isset($GLOBALS['me']) && is_array($GLOBALS['me']) && ($GLOBALS['me']['role'] ?? '') === 'admin';
+    fail('Tietokantavirhe' . ($isAdmin ? ' (' . substr((string)$conn_or_stmt->error, 0, 200) . ')' : ''), 500);   // ylläpitäjälle tarkempi syy
 }
 
 $method = $_SERVER['REQUEST_METHOD'];
@@ -3119,7 +3120,7 @@ if ($method === 'POST') {
             }
         }
         $dn = $dn === '' ? null : $dn; $desc = $desc === '' ? null : $desc; $addr = $addr === '' ? null : $addr; $city = $city === '' ? null : $city; $web = $web === '' ? null : $web;
-        $stmt = prepareQuery($conn, "INSERT INTO pub_profiles (display_name, description, address, city, lat, lng, website, color, is_public) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        $stmt = prepareQuery($conn, "INSERT INTO pub_profiles (id, display_name, description, address, city, lat, lng, website, color, is_public) VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON DUPLICATE KEY UPDATE display_name = VALUES(display_name), description = VALUES(description), address = VALUES(address), city = VALUES(city), lat = VALUES(lat), lng = VALUES(lng), website = VALUES(website), color = VALUES(color), is_public = VALUES(is_public)");
         $stmt->bind_param("ssssddssi", $dn, $desc, $addr, $city, $lat, $lng, $web, $color, $isPublic);
         run($stmt);
