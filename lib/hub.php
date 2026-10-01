@@ -80,7 +80,7 @@ function hubTimeStr(?string $t): ?string { return $t ? substr($t, 0, 5) : null; 
 // Synkronoi baarin julkiset tapahtumat ja keikkatyönä tarjotut vuorot. Palauttaa [lähetetyt, virheet].
 function hubSync($conn, array $cfg, array $pub): array {
     if (!hubConfigured($cfg)) return [0, 0];
-    $slug = $pub['slug']; $sent = 0; $errs = 0;
+    $sent = 0; $errs = 0;
     $known = [];
     foreach (hubRows($conn, "SELECT kind, local_id, hash FROM hub_sync") as $r) $known[$r['kind']][(int)$r['local_id']] = $r['hash'];
     $push = function (string $kind, int $id, array $payload) use ($conn, $cfg, &$known, &$sent, &$errs) {
@@ -103,7 +103,7 @@ function hubSync($conn, array $cfg, array $pub): array {
 
     // Baarin julkinen osoite ja sijainti kartalle (vain jos baarin julkinen profiili on julkaistu)
     if (!empty($pub['feature_hub_events'])) {
-        $pq = $conn->prepare("SELECT address, city, lat, lng, website FROM pub_profiles WHERE pub_name = ? AND is_public = 1"); $pq->bind_param("s", $slug); $pq->execute();
+        $pq = $conn->prepare("SELECT address, city, lat, lng, website FROM pub_profiles WHERE is_public = 1"); $pq->execute();
         if ($pr = $pq->get_result()->fetch_assoc()) {
             $push('profile', 0, array_filter(['address' => $pr['address'] ?: null, 'city' => $pr['city'] ?: null, 'lat' => $pr['lat'] !== null && $pr['lng'] !== null ? (float)$pr['lat'] : null,
                 'lng' => $pr['lat'] !== null && $pr['lng'] !== null ? (float)$pr['lng'] : null, 'website' => ($pr['website'] && preg_match('#^https?://#i', $pr['website'])) ? $pr['website'] : null], fn($v) => $v !== null));
@@ -113,8 +113,8 @@ function hubSync($conn, array $cfg, array $pub): array {
     // Julkiset tapahtumat (valinnainen)
     $want = [];
     if (!empty($pub['feature_hub_events'])) {
-        $st = $conn->prepare("SELECT id, title, date, time_start, time_end, type, description, registration, ticket_price, ticket_url FROM events WHERE pub_name = ? AND is_public = 1 AND date >= CURDATE() ORDER BY date LIMIT 500");
-        $st->bind_param("s", $slug); $st->execute();
+        $st = $conn->prepare("SELECT id, title, date, time_start, time_end, type, description, registration, ticket_price, ticket_url FROM events WHERE is_public = 1 AND date >= CURDATE() ORDER BY date LIMIT 500");
+        $st->execute();
         foreach ($st->get_result()->fetch_all(MYSQLI_ASSOC) as $e) {
             $want[(int)$e['id']] = true;
             $price = ($e['registration'] ?? 'none') !== 'none' && $e['ticket_price'] !== null ? rtrim(rtrim(number_format((float)$e['ticket_price'], 2, ',', ''), '0'), ',') . ' €' : null;
@@ -130,8 +130,8 @@ function hubSync($conn, array $cfg, array $pub): array {
     // Keikkatyönä tarjotut vuorot (valinnainen): vain aika, rooli ja palkkateksti
     $wantS = [];
     if (!empty($pub['feature_hub_gigs'])) {
-        $st = $conn->prepare("SELECT id, date, start, end, role, hub_pay, hub_gig, userId, status FROM shifts WHERE pub_name = ? AND hub_gig IN (1, 2) AND date >= CURDATE() - INTERVAL 7 DAY ORDER BY date LIMIT 500");
-        $st->bind_param("s", $slug); $st->execute();
+        $st = $conn->prepare("SELECT id, date, start, end, role, hub_pay, hub_gig, userId, status FROM shifts WHERE hub_gig IN (1, 2) AND date >= CURDATE() - INTERVAL 7 DAY ORDER BY date LIMIT 500");
+        $st->execute();
         foreach ($st->get_result()->fetch_all(MYSQLI_ASSOC) as $s) {
             $wantS[(int)$s['id']] = true;
             $open = (int)$s['hub_gig'] === 1 && empty($s['userId']) && $s['status'] === 'published';
@@ -155,14 +155,14 @@ function hubPullApplications($conn, array $cfg, array $pub, array $vapid): int {
     $new = 0;
     foreach ($j['applications'] as $a) {
         if (!preg_match('/^s(\d+)$/', (string)($a['shift'] ?? ''), $m)) continue;
-        $chk = $conn->prepare("SELECT id FROM shifts WHERE id = ? AND pub_name = ?"); $sid = (int)$m[1]; $chk->bind_param("is", $sid, $pub['slug']); $chk->execute();
+        $chk = $conn->prepare("SELECT id FROM shifts WHERE id = ?"); $sid = (int)$m[1]; $chk->bind_param("i", $sid); $chk->execute();
         if (!$chk->get_result()->fetch_assoc()) continue;
         $st = $conn->prepare("INSERT IGNORE INTO hub_applications (hub_id, shift_id, name, skills, city, message, status, email, phone) VALUES (?,?,?,?,?,?,?,?,?)");
         $hid = (int)$a['id']; $nm = mb_substr((string)($a['name'] ?? ''), 0, 120); $sk = mb_substr((string)($a['skills'] ?? ''), 0, 300); $ct = mb_substr((string)($a['city'] ?? ''), 0, 80);
         $msg = isset($a['message']) ? mb_substr((string)$a['message'], 0, 500) : null; $stt = in_array($a['status'] ?? '', ['pending', 'accepted', 'declined'], true) ? $a['status'] : 'pending';
         $em = isset($a['email']) ? mb_substr((string)$a['email'], 0, 190) : null; $ph = isset($a['phone']) ? mb_substr((string)$a['phone'], 0, 40) : null;
         $st->bind_param("iisssssss", $hid, $sid, $nm, $sk, $ct, $msg, $stt, $em, $ph); $st->execute();
-        if ($st->affected_rows > 0) { $new++; if (function_exists('pushToPub')) pushToPub($conn, $pub['slug'], 0, 'Uusi keikkahakemus', "$nm hakee keikkavuoroa. Katso Ylläpito → Keikkahakemukset.", $vapid, true); }
+        if ($st->affected_rows > 0) { $new++; if (function_exists('pushToPub')) pushToPub($conn, 0, 'Uusi keikkahakemus', "$nm hakee keikkavuoroa. Katso Ylläpito → Keikkahakemukset.", $vapid, true); }
     }
     return $new;
 }

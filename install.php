@@ -190,26 +190,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if ($e = runSql($conn, $schema)) { $errors[] = 'Taulujen luonti epäonnistui: ' . h($e) . ' (tarvitseeko käyttäjä CREATE-oikeuden?)'; }
             }
             if (!$errors && $conn) {
-                // 2) Vanhan kannan päivitys (virheet ohitetaan)
-                foreach ((is_file($root . '/db/legacy_upgrade.php') ? require $root . '/db/legacy_upgrade.php' : []) as $sql) { @$conn->query($sql); }
                 [, $migErr] = bsRunMigrations($conn, $root . '/db/migrations', $freshDb);
                 if ($migErr) $errors[] = h($migErr);
-                // 3) Baari (täsmälleen yksi) ja sen ylläpitäjä
-                $slug = trim(preg_replace('/[^a-z0-9]+/', '-', strtolower(strtr($in['pub_name'], ['ä' => 'a', 'ö' => 'o', 'å' => 'a', 'Ä' => 'a', 'Ö' => 'o', 'Å' => 'a']))), '-') ?: 'baari';
-                $exist = $conn->query("SELECT slug FROM pubs ORDER BY id LIMIT 1");
-                $row = $exist ? $exist->fetch_assoc() : null;
-                if ($row) { $slug = $row['slug']; }
-                else {
-                    $ps = $conn->prepare("INSERT INTO pubs (slug, name) VALUES (?, ?)");
-                    $ps->bind_param('ss', $slug, $in['pub_name']);
+                // 3) Baari ja sen ylläpitäjä
+                $exist = $conn->query("SELECT id FROM pubs ORDER BY id LIMIT 1");
+                if (!$exist || !$exist->fetch_assoc()) {
+                    $ps = $conn->prepare("INSERT INTO pubs (name) VALUES (?)");
+                    $ps->bind_param('s', $in['pub_name']);
                     if (!$ps->execute()) $errors[] = 'Baarin luonti epäonnistui.';
                 }
                 $hash = password_hash($in['su_pass'], PASSWORD_DEFAULT);
-                $st = $conn->prepare("INSERT INTO users (name, username, password, role, pub_name) VALUES (?, ?, ?, 'admin', ?)
+                $st = $conn->prepare("INSERT INTO users (name, username, password, role) VALUES (?, ?, ?, 'admin')
                                       ON DUPLICATE KEY UPDATE password = VALUES(password), role = 'admin'");
                 if (!$st) { $errors[] = 'Ylläpitäjän luonti epäonnistui.'; }
                 else {
-                    $st->bind_param('ssss', $in['admin_name'], $in['su_user'], $hash, $slug);
+                    $st->bind_param('sss', $in['admin_name'], $in['su_user'], $hash);
                     if (!$st->execute()) $errors[] = 'Ylläpitäjän luonti epäonnistui.';
                 }
             }

@@ -550,7 +550,7 @@ function renderClockWidget() {
 }
 
 async function clockIn() {
-    await fetch('api.php?action=clock_in', { method:'POST', body: JSON.stringify({ userId: state.user.id, pub_name: state.user.pub_name }) });
+    await fetch('api.php?action=clock_in', { method:'POST', body: JSON.stringify({ userId: state.user.id}) });
     showToast('Leimattu sisään!'); load();
 }
 async function clockOut() {
@@ -561,14 +561,6 @@ async function clockOut() {
 
 
 
-async function addPubAdmin() {
-    const pub = document.getElementById('sa-pub').value.trim().toLowerCase().replace(/\s+/g, '');
-    const data = { name: document.getElementById('sa-name').value, username: document.getElementById('sa-user').value, password: document.getElementById('sa-pass').value, role: 'admin', color: '#E14D2A', pub_name: pub };
-    if(!pub || !data.username || !data.password) return showToast('Täytä kaikki kentät', 'error');
-    const sr = await (await fetch('api.php?action=user', { method:'POST', body: JSON.stringify(data) })).json();
-    if (sr.error) return showToast(sr.error, 'error');
-    showToast(`Baari ${pub} lisätty`); load();
-}
 
 // ===================== TRADE ALERTS =====================
 function renderTradeAlerts() {

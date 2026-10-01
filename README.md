@@ -4,7 +4,7 @@ Yhden baarin työvuorojen hallinta (PHP + MySQL, PWA). **Tässä asennuksessa on
 kanta, jossa on useampi baari, hylätään (`thePub()`-vartija). Baarien väliset asiat (yhteinen tapahtumakalenteri, keikkatyön välitys) hoitaa erillinen
 [barshift-server](https://github.com/raptaqua/barshift-server) (BarShift Hub); yhteys on valinnainen ja vain työntö: ks. *Keskuspalvelin* alla.
 
-Demodatan poisto kannasta (säilyttää oman baarisi): `php bin/clear_demo.php` (kysyy varmistuksen; `--yes` ohittaa). Demobaari + oma baari samassa kannassa estää muuten toiminnan.
+Demodatan poisto: tyhjennä kanta ja aja `php install.php` uudelleen (tai poista demorivit käsin).
 
 Salasanan tai 2FA:n palautus palvelimelta: `php bin/admin.php reset-password <tunnus>` / `reset-2fa <tunnus>`.
 
@@ -42,17 +42,15 @@ ja ne on otettu demodatasta. Kun käyttöliittymä muuttuu, päivitä kuvat: `no
 
 Kun korvaat tiedostot uudemmilla, päivitä myös tietokanta (uudet ominaisuudet käyttävät uusia sarakkeita ja tauluja):
 
-- komentorivillä: `php migrate.php` (turvallinen ajaa uudelleen; ei poista dataa), tai
-- phpMyAdminissa: *Tuo* → `db/upgrade.sql` (MariaDB 10.0.2+; turvallinen ajaa uudelleen).
+- komentorivillä: `php migrate.php` (turvallinen ajaa uudelleen; ei poista dataa).
 
 Jos tietokanta on päivittämättä, API kertoo sen virheilmoituksessa ("Tietokanta on päivittämättä…").
 
 ## Baari ja sen asetukset
 
-Baari on oma entiteettinsä (`pubs`-taulu): sisäinen tunniste (`slug`) pysyy samana, mutta
-näyttönimeä voi vaihtaa. Admin muokkaa kohdassa *Hallinta → Baari*: nimi, aikavyöhyke, vuororoolit, työaikasäännöt
+Baari on `pubs`-taulun ainoa rivi; näyttönimeä voi vaihtaa. Admin muokkaa kohdassa *Hallinta → Baari*: nimi, aikavyöhyke, vuororoolit, työaikasäännöt
 (vähimmäislepo, viikkotuntiraja), palkkalisät (ilta, yö, la, su + ilta-/yörajat) ja laskutustiedot.
-Puuttuvat `pubs`-rivit luodaan automaattisesti olemassa oleville baareille (`php migrate.php` / `db/upgrade.sql`).
+Rivi luodaan automaattisesti, jos sitä ei ole.
 
 **Viikkopohjat ja tyhjennys:** `week_templates` tallentaa viikon vuorot (viikonpäivä, työntekijä, aika, rooli); `apply_week_template` syöttää pohjan valittuun viikkoon (luonnoksina/avoimina, duplikaatit ohitetaan); `clear_shifts` poistaa vuorot aikavälin (enintään 93 pv) ja tarvittaessa työntekijän tai luonnosten mukaan.
 

@@ -102,12 +102,12 @@ function bsEmailFallback($conn, int $userId, string $title, string $body): void 
         . "Saat tämän viestin sähköpostina, koska et ole ottanut push-ilmoituksia käyttöön. Voit muuttaa asetusta Oma profiili -sivulla.");
 }
 
-function pushToPub($conn, string $pub, $exceptId, $title, $body, $auth, $onlyAdmins = false) {
-    $sql = "SELECT id FROM users WHERE pub_name = ? AND id != ? AND anonymized_at IS NULL" . ($onlyAdmins ? " AND role = 'admin'" : "");
+function pushToPub($conn, $exceptId, $title, $body, $auth, $onlyAdmins = false) {
+    $sql = "SELECT id FROM users WHERE id != ? AND anonymized_at IS NULL" . ($onlyAdmins ? " AND role = 'admin'" : "");
     $stmt = $conn->prepare($sql);
     if (!$stmt) return;
     $ex = (int)$exceptId;
-    $stmt->bind_param("si", $pub, $ex);
+    $stmt->bind_param("i", $ex);
     $stmt->execute();
     foreach ($stmt->get_result()->fetch_all(MYSQLI_ASSOC) as $u) sendPushToUser($conn, $u['id'], $title, $body, $auth);
 }

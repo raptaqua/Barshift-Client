@@ -115,8 +115,7 @@ async function sendChatMessage(receiverId) {
     await fetch('api.php?action=send_message', { 
         method: 'POST', 
         body: JSON.stringify({ 
-            pub_name: state.user.pub_name, 
-            sender_id: state.user.id, 
+                        sender_id: state.user.id, 
             receiver_id: receiverId, 
             message: msg 
         }) 
@@ -133,7 +132,7 @@ async function addShiftLog() {
     await fetch('api.php?action=add_log', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: msg, pub_name: state.user.pub_name, userId: state.user.id })
+        body: JSON.stringify({ message: msg, userId: state.user.id })
     });
     document.getElementById('new-log-msg').value = '';
     load();
@@ -145,7 +144,7 @@ async function addShopItem() {
     await fetch('api.php?action=add_shop_item', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ item_name: item, pub_name: state.user.pub_name, userId: state.user.id })
+        body: JSON.stringify({ item_name: item, userId: state.user.id })
     });
     document.getElementById('new-shop-item').value = '';
     load();
@@ -164,19 +163,19 @@ async function completeShopItem(id) {
 
 async function toggleTask(taskId, date, isCompleted) {
     if (isCompleted) {
-        state.data.task_completions.push({task_id: taskId, date: date, pub_name: state.user.pub_name});
+        state.data.task_completions.push({task_id: taskId, date: date});
     } else {
         state.data.task_completions = state.data.task_completions.filter(tc => !(tc.task_id == taskId && tc.date === date));
     }
     render();
-    await fetch('api.php?action=toggle_task', { method: 'POST', body: JSON.stringify({ pub_name: state.user.pub_name, date: date, task_id: taskId, completed: isCompleted }) });
+    await fetch('api.php?action=toggle_task', { method: 'POST', body: JSON.stringify({ date: date, task_id: taskId, completed: isCompleted }) });
 }
 
 async function saveTask() { 
     const label = document.getElementById('m-task-label')?.value.trim() || document.getElementById('new-task-label')?.value.trim(); 
     if(!label) return; 
     const id = state.editingTask ? state.editingTask.id : null;
-    await fetch('api.php?action=task', { method:'POST', body: JSON.stringify({ id: id, label: label, kind: document.getElementById('m-task-cash')?.checked ? 'cash' : 'normal', pub_name: state.user.pub_name }) }).then(async r => { if (!r.ok) { const j = await r.json().catch(() => ({})); showToast(j.error || 'Tallennus epäonnistui'); } }); 
+    await fetch('api.php?action=task', { method:'POST', body: JSON.stringify({ id: id, label: label, kind: document.getElementById('m-task-cash')?.checked ? 'cash' : 'normal'}) }).then(async r => { if (!r.ok) { const j = await r.json().catch(() => ({})); showToast(j.error || 'Tallennus epäonnistui'); } }); 
     if (document.getElementById('new-task-label')) document.getElementById('new-task-label').value = '';
     closeModal();
     showToast('Tehtävä tallennettu!'); load(); 
@@ -207,8 +206,7 @@ async function takeOpenShift(id) {
     const shift = state.data.shifts.find(s => s.id == id);
     if(!shift) return;
     shift.userId = state.user.id;
-    shift.pub_name = state.user.pub_name; 
-    await fetch('api.php?action=shift', {method:'POST', body: JSON.stringify(shift)});
+        await fetch('api.php?action=shift', {method:'POST', body: JSON.stringify(shift)});
     showToast('Vuoro otettu!');
     load();
 }

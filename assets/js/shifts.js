@@ -80,10 +80,10 @@ async function toggleAvailability(date) {
     if (nextStatus === 'none') { state.data.availability = state.data.availability.filter(a => !(a.user_id == state.user.id && a.date === date)); } 
     else {
         if (existing) existing.status = nextStatus;
-        else state.data.availability.push({ user_id: state.user.id, date: date, status: nextStatus, pub_name: state.user.pub_name });
+        else state.data.availability.push({ user_id: state.user.id, date: date, status: nextStatus});
     }
     render();
-    await fetch('api.php?action=availability', { method: 'POST', body: JSON.stringify({ userId: state.user.id, pub_name: state.user.pub_name, date: date, status: nextStatus }) });
+    await fetch('api.php?action=availability', { method: 'POST', body: JSON.stringify({ userId: state.user.id, date: date, status: nextStatus }) });
 }
 
 function itemsStartingAt(date, h) { return [...state.data.shifts.filter(s => s.date === date && (!state.onlyMine || s.userId == state.user.id || !s.userId || s.userId == 0)), ...state.data.events.filter(e => e.date === date)].filter(i => parseInt((i.start || i.time_start || i.time).split(':')[0]) === h); }
@@ -408,7 +408,7 @@ async function copyFullWeek(startStr, endStr) {
     const newShifts = shiftsToCopy.map(s => {
         let d = new Date(s.date + 'T00:00:00'); 
         d.setDate(d.getDate() + (7 * targetWeeks));
-        return { userId: s.userId, date: getLocalDateString(d), start: s.start.substring(0,5), end: s.end.substring(0,5), role: s.role, pub_name: state.user.pub_name };
+        return { userId: s.userId, date: getLocalDateString(d), start: s.start.substring(0,5), end: s.end.substring(0,5), role: s.role};
     });
     
     await fetch('api.php?action=bulk_shifts', { method: 'POST', body: JSON.stringify(newShifts) });

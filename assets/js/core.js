@@ -245,7 +245,7 @@ function render() {
                 <div class="nav-logo">
                     ${logoHtml}
                     <div class="user-info-badge" style="margin-top: 12px; display: inline-block;">
-                        ${esc(state.user.username)}@${esc(state.user.pub_name)}
+                        ${esc(state.user.username)}
                     </div>
                     
                 </div>
@@ -256,7 +256,7 @@ function render() {
                     <div class="top-logo">${logoHtml}</div>
                     <div class="top-actions">
                         
-                        <div class="user-info-badge top-badge">${esc(state.user.username)}@${esc(state.user.pub_name)}</div>
+                        <div class="user-info-badge top-badge">${esc(state.user.username)}</div>
                         ${topBtns}
                     </div>
                 </header>

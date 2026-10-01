@@ -1,5 +1,5 @@
 // API-integraatiotestit (node tests/api.test.js; käynnistä tests/run_api_tests.sh:lla).
-// Ympäristö: BASE = palvelimen osoite. Kanta on ladattu demodatalla (yksi baari: demobaari).
+// Ympäristö: BASE = palvelimen osoite. Kanta on ladattu demodatalla (yksi baari).
 const assert = require('assert');
 const crypto = require('crypto');
 const { execFile } = require('child_process');
@@ -30,7 +30,7 @@ class Client {
   get(action, query = '') { return this.req('GET', action, { query }); }
   post(action, body = {}, query = '') { return this.req('POST', action, { body, query }); }
   del(type, id) { return this.req('DELETE', '', { query: `&type=${type}&id=${id}` }); }
-  async login(user, pub, pass = PW) { return this.post('login', { username: user, pub_name: pub, password: pass }); }
+  async login(user, _ignored, pass = PW) { return this.post('login', { username: user, password: pass }); }
 }
 
 // ---- TOTP (RFC 6238) testien puolella ----
@@ -64,7 +64,7 @@ const future = (days) => { const d = new Date(Date.now() + days * 864e5); return
   console.log('Kirjautuminen ja suojaukset');
   await t('kirjautumaton pyyntö -> 401', async () => { assert.strictEqual((await anon.get('')).status, 401); });
   await t('väärä salasana hylätään', async () => { const r = await new Client().login('admin', 'demobaari', 'vaara-salasana-1'); assert.ok(r.json.error); assert.notStrictEqual(r.status, 200); });
-  await t('CSRF: vieras Origin estetään', async () => { const r = await new Client().req('POST', 'login', { body: { username: 'admin', pub_name: 'demobaari', password: PW }, origin: 'https://evil.example' }); assert.strictEqual(r.status, 403); });
+  await t('CSRF: vieras Origin estetään', async () => { const r = await new Client().req('POST', 'login', { body: { username: 'admin', password: PW }, origin: 'https://evil.example' }); assert.strictEqual(r.status, 403); });
   await t('admin kirjautuu', async () => { const r = await admin.login('admin', 'demobaari'); assert.ok(r.json.success, JSON.stringify(r.json)); });
   await t('työntekijä kirjautuu', async () => { const r = await emp.login('sari', 'demobaari'); assert.ok(r.json.success); });
 
@@ -74,13 +74,9 @@ const future = (days) => { const d = new Date(Date.now() + days * 864e5); return
     assert.strictEqual(r.json.user.memberships, undefined);
     for (const a of ['gig_pool', 'switch_pub', 'toggle_pub', 'gig_invite', 'create_job_listing', 'accept_link']) assert.ok((await admin.post(a, {})).status >= 400, a + ' on yhä käytössä');
     const d = (await admin.get('')).json; for (const k of ['memberships', 'job_listings', 'gig_incoming', 'gig_outgoing']) assert.strictEqual(d[k], undefined, k);
-  });
-  await t('toinen baari kannassa estää toiminnan (tietoturvavartija)', async () => {
-    const sql = (q) => execFileP('mysql', ['-h', process.env.DB_HOST, '-u', process.env.DB_USER, ...(process.env.DB_PASS ? ['-p' + process.env.DB_PASS] : []), process.env.DB_NAME, '-e', q]);
-    await sql("INSERT INTO pubs (slug, name) VALUES ('vieras', 'Vieras')");
-    try { const r = await admin.get(''); assert.strictEqual(r.status, 500); assert.match(JSON.stringify(r.json), /yksi baari/); assert.ok((await new Client().login('sari', undefined)).status >= 400); }
-    finally { await sql("DELETE FROM pubs WHERE slug = 'vieras'"); }
-    assert.strictEqual((await admin.get('')).status, 200);
+    const q = (sqlText) => execFileP('mysql', ['-h', process.env.DB_HOST, '-u', process.env.DB_USER, ...(process.env.DB_PASS ? ['-p' + process.env.DB_PASS] : []), process.env.DB_NAME, '-N', '-e', sqlText]);
+    assert.strictEqual((await q("SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND (column_name IN ('pub_name', 'from_pub', 'slug') OR column_name LIKE '%gig_avail%')")).trim(), '0', 'monibaarisarakkeita jäi kantaan');
+    assert.strictEqual((await q("SELECT COUNT(*) FROM pubs")).trim(), '1');
   });
   await t('työntekijä ei näe kollegoiden palkkaa', async () => {
     const d = (await emp.get('')).json; const others = d.users.filter(u => u.username !== 'sari');
@@ -95,7 +91,7 @@ const future = (days) => { const d = new Date(Date.now() + days * 864e5); return
   });
   await t('julkinen rajapinta ei paljasta baaritunnusta tai käyttäjiä', async () => {
     const r = await anon.req('GET', 'public_events', { raw: true }); assert.strictEqual(r.status, 200);
-    const j = JSON.parse(r.text); assert.ok(j.pub && j.pub.name); assert.ok(!('pubs' in j) && !('id' in j.pub) && !('pub_name' in j.pub), 'monibaarimuoto jäi julkiseen rajapintaan');
+    const j = JSON.parse(r.text); assert.ok(j.pub && j.pub.name); assert.ok(!('pubs' in j) && !('id' in j.pub), 'monibaarimuoto jäi julkiseen rajapintaan');
     assert.ok(j.events.every(e => !('pub' in e)));
     assert.ok(!/hourly_wage|password|username/.test(r.text));
   });
@@ -570,7 +566,6 @@ const future = (days) => { const d = new Date(Date.now() + days * 864e5); return
     // CSV vain hallitsijalle
     assert.strictEqual((await emp.req('GET', 'event_guests_csv', { raw: true, query: `&event_id=${ev.id}` })).status, 403);
     const csv = (await admin.req('GET', 'event_guests_csv', { raw: true, query: `&event_id=${ev.id}` })).text; assert.ok(csv.includes('Matti Meikäläinen') && csv.includes('Neljäs'));
-    // toinen baari ei näe eikä pääse käsiksi
     // julkiset rajapinnat eivät sisällä nimiä
     await admin.post('save_pub_profile', { display_name: 'Demo', is_public: 1, city: 'Helsinki', address: 'Testikatu 1' });
     for (const a of ['public_events', 'public_ics', 'public_rss']) { const r = await anon.req('GET', a, { raw: true, query: '' }); assert.ok(!/Matti|Liisa|Neljäs|vieras/i.test(r.text), a + ' vuotaa vieraslistan'); }
@@ -678,7 +673,7 @@ const future = (days) => { const d = new Date(Date.now() + days * 864e5); return
   await t('salasanan palautus sähköpostilla (linkki kertakäyttöinen)', async () => {
     const c = new Client();
     const before = mailbox.messages.length;
-    const r = await c.post('request_reset', { username: 'sari', pub_name: 'demobaari' }); assert.ok(r.json.success);
+    const r = await c.post('request_reset', { username: 'sari' }); assert.ok(r.json.success);
     const mail = await waitMail(mailbox, m => m.to === 'sari@example.test' && /salasanan vaihto/i.test(m.subject)); assert.ok(mail, 'viesti ei saapunut');
     const tok = tokenFrom(mail); assert.ok(tok, mail.body);
     assert.strictEqual((await c.get('token_info', `&token=${tok}`)).json.login, 'sari');
@@ -693,13 +688,13 @@ const future = (days) => { const d = new Date(Date.now() + days * 864e5); return
   });
   await t('palautuspyyntö ei paljasta tunnuksen olemassaoloa eikä lähetä postia tuntemattomalle', async () => {
     const c = new Client(); const n = mailbox.messages.length;
-    const a = (await c.post('request_reset', { username: 'eiole', pub_name: 'demobaari' })).json;
-    const b = (await c.post('request_reset', { username: 'mikko', pub_name: 'demobaari' })).json;   // ei sähköpostia
+    const a = (await c.post('request_reset', { username: 'eiole' })).json;
+    const b = (await c.post('request_reset', { username: 'mikko' })).json;   // ei sähköpostia
     assert.deepStrictEqual(a, b); await sleep(400); assert.strictEqual(mailbox.messages.length, n);
   });
   await t('palautuspyynnöt rajoitettu (429)', async () => {
     const c = new Client(); let last = 0;
-    for (let i = 0; i < 8; i++) last = (await c.post('request_reset', { username: 'x' + i, pub_name: 'demobaari' })).status;
+    for (let i = 0; i < 8; i++) last = (await c.post('request_reset', { username: 'x' + i })).status;
     assert.strictEqual(last, 429);
   });
   await t('väärä linkkitunniste hylätään', async () => {
@@ -814,7 +809,7 @@ const future = (days) => { const d = new Date(Date.now() + days * 864e5); return
     const [d1, t1] = helsinki(-300), [d2, t2] = helsinki(-120);   // vuoro 5 h sitten -> 2 h sitten
     await admin.post('shift', { userId: uid, date: d1, start: t1.slice(0, 5), end: t2.slice(0, 5), role: 'Ovi' });
     await execFileP('mysql', ['-h', process.env.DB_HOST, '-u', process.env.DB_USER, ...(process.env.DB_PASS ? ['-p' + process.env.DB_PASS] : []), process.env.DB_NAME, '-e',
-      `INSERT INTO time_entries (user_id, pub_name, clock_in) VALUES (${uid}, 'demobaari', '${d1} ${t1}')`]);
+      `INSERT INTO time_entries (user_id, clock_in) VALUES (${uid}, '${d1} ${t1}')`]);
     await runCron();
     assert.ok(await waitMail(mailbox, x => x.to === 'sari@example.test' && /Unohtuiko leimata ulos/.test(x.subject)), 'ulosleimaushälytys puuttuu');
   });

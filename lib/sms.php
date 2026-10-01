@@ -16,13 +16,13 @@ function bsNormalizePhone(string $raw, string $cc = '358'): ?string {
 }
 
 // Palauttaa [ok, virhe]. Kuukausikatto estää odottamattomat kulut.
-function bsSendSms($conn, array $cfg, string $pub, string $phone, string $body): array {
+function bsSendSms($conn, array $cfg, string $phone, string $body): array {
     if (!bsSmsConfigured($cfg)) return [false, 'SMS ei ole määritetty'];
     $s = $cfg['sms']; $to = bsNormalizePhone($phone, (string)($s['default_country_code'] ?? '358'));
     if ($to === null) return [false, 'Virheellinen puhelinnumero'];
     $cap = (int)($s['monthly_cap'] ?? 300);
-    $q = $conn->prepare("SELECT COUNT(*) c FROM sms_log WHERE pub_name = ? AND ok = 1 AND created_at >= DATE_FORMAT(NOW(), '%Y-%m-01')");
-    $q->bind_param('s', $pub); $q->execute(); $n = (int)$q->get_result()->fetch_assoc()['c'];
+    $q = $conn->prepare("SELECT COUNT(*) c FROM sms_log WHERE ok = 1 AND created_at >= DATE_FORMAT(NOW(), '%Y-%m-01')");
+    $q->execute(); $n = (int)$q->get_result()->fetch_assoc()['c'];
     if ($n >= $cap) return [false, 'Kuukausikatto täynnä (' . $cap . ')'];
     $url = rtrim((string)($s['api_base'] ?? 'https://api.twilio.com'), '/') . '/2010-04-01/Accounts/' . rawurlencode($s['account_sid']) . '/Messages.json';
     $ch = curl_init($url);
@@ -31,6 +31,6 @@ function bsSendSms($conn, array $cfg, string $pub, string $phone, string $body):
     $resp = curl_exec($ch); $code = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE); $err = curl_error($ch); curl_close($ch);
     $ok = $resp !== false && $code >= 200 && $code < 300;
     $msg = $ok ? null : mb_substr($err ?: ('HTTP ' . $code . ' ' . (string)$resp), 0, 190);
-    $ins = $conn->prepare("INSERT INTO sms_log (pub_name, to_phone, ok, error) VALUES (?, ?, ?, ?)"); $okI = $ok ? 1 : 0; $ins->bind_param('ssis', $pub, $to, $okI, $msg); $ins->execute();
+    $ins = $conn->prepare("INSERT INTO sms_log (to_phone, ok, error) VALUES (?, ?, ?)"); $okI = $ok ? 1 : 0; $ins->bind_param('sis', $to, $okI, $msg); $ins->execute();
     return [$ok, $msg];
 }

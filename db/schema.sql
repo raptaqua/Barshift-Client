@@ -12,7 +12,6 @@ CREATE TABLE IF NOT EXISTS `users` (
   `role` enum('admin','employee') NOT NULL DEFAULT 'employee',
   `color` varchar(7) DEFAULT NULL,
   `initials` varchar(5) DEFAULT NULL,
-  `pub_name` varchar(100) NOT NULL,
   `phone` varchar(20) DEFAULT '',
   `hourly_wage` decimal(10,2) NOT NULL DEFAULT 0.00,
   `status` varchar(20) NOT NULL DEFAULT 'active',
@@ -35,9 +34,8 @@ CREATE TABLE IF NOT EXISTS `users` (
   `cert_alert_for` date DEFAULT NULL,
   `access_role` varchar(40) DEFAULT NULL,
   PRIMARY KEY (`id`),
-  UNIQUE KEY `unique_user_per_pub` (`username`,`pub_name`),
-  UNIQUE KEY `ical_token` (`ical_token`),
-  KEY `pub_name` (`pub_name`)
+  UNIQUE KEY `uq_username` (`username`),
+  UNIQUE KEY `ical_token` (`ical_token`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 CREATE TABLE IF NOT EXISTS `shifts` (
@@ -47,7 +45,6 @@ CREATE TABLE IF NOT EXISTS `shifts` (
   `start` time DEFAULT NULL,
   `end` time DEFAULT NULL,
   `role` varchar(50) DEFAULT NULL,
-  `pub_name` varchar(100) DEFAULT NULL,
   `original_userId` int(11) DEFAULT NULL,
   `status` enum('draft','published') NOT NULL DEFAULT 'published',   -- luonnos näkyy vain adminille
   `reminded_at` datetime DEFAULT NULL,               -- muistutus lähetetty
@@ -56,31 +53,27 @@ CREATE TABLE IF NOT EXISTS `shifts` (
   `hub_pay` varchar(80) DEFAULT NULL,
   PRIMARY KEY (`id`),
   KEY `userId` (`userId`),
-  KEY `pub_date` (`pub_name`,`date`),
+  KEY `idx_date` (`date`),
   CONSTRAINT `shifts_ibfk_1` FOREIGN KEY (`userId`) REFERENCES `users` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- Vuoropohjat (nimetty aika + rooli) nopeaan vuorojen luontiin
 CREATE TABLE IF NOT EXISTS `shift_templates` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
-  `pub_name` varchar(100) NOT NULL,
   `name` varchar(60) NOT NULL,
   `start` time NOT NULL,
   `end` time NOT NULL,
   `role` varchar(50) DEFAULT NULL,
-  PRIMARY KEY (`id`),
-  KEY `pub_name` (`pub_name`)
+  PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- Viikkopohjat (koko viikon vuorot mallina)
 CREATE TABLE IF NOT EXISTS `week_templates` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
-  `pub_name` varchar(100) NOT NULL,
   `name` varchar(60) NOT NULL,
   `data` mediumtext NOT NULL,                       -- JSON: [{dow 0=ma..6=su, userId|null, start, end, role}]
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
-  PRIMARY KEY (`id`),
-  KEY `pub_name` (`pub_name`)
+  PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 CREATE TABLE IF NOT EXISTS `absences` (
@@ -100,12 +93,10 @@ CREATE TABLE IF NOT EXISTS `absences` (
 CREATE TABLE IF NOT EXISTS `availability` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `user_id` int(11) NOT NULL,
-  `pub_name` varchar(100) NOT NULL,
   `date` date NOT NULL,
   `status` varchar(20) NOT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `user_date` (`user_id`,`date`),
-  KEY `pub_name` (`pub_name`),
   CONSTRAINT `availability_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
@@ -117,7 +108,6 @@ CREATE TABLE IF NOT EXISTS `events` (
   `time` time DEFAULT '18:00:00',
   `time_start` time DEFAULT NULL,
   `time_end` time DEFAULT NULL,
-  `pub_name` varchar(100) NOT NULL,
   `image_path` varchar(255) DEFAULT NULL,
   `description` varchar(600) DEFAULT NULL,
   `is_public` tinyint(1) NOT NULL DEFAULT 1,       -- näkyykö julkisessa tapahtumakalenterissa (kun baarin profiili on julkinen)
@@ -127,12 +117,12 @@ CREATE TABLE IF NOT EXISTS `events` (
   `ticket_url` varchar(255) DEFAULT NULL,
   `guest_capacity` int(11) DEFAULT NULL,
   PRIMARY KEY (`id`),
-  KEY `pub_date` (`pub_name`,`date`)
+  KEY `idx_date` (`date`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- Baarin julkinen profiili (tapahtumakalenteri ja kartta). Ei näy ennen kuin is_public = 1.
 CREATE TABLE IF NOT EXISTS `pub_profiles` (
-  `pub_name` varchar(100) NOT NULL,
+  `id` tinyint(4) NOT NULL DEFAULT 1,
   `display_name` varchar(120) DEFAULT NULL,
   `description` varchar(500) DEFAULT NULL,
   `address` varchar(200) DEFAULT NULL,
@@ -143,14 +133,13 @@ CREATE TABLE IF NOT EXISTS `pub_profiles` (
   `color` varchar(7) DEFAULT NULL,
   `is_public` tinyint(1) NOT NULL DEFAULT 0,
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
-  PRIMARY KEY (`pub_name`),
+  PRIMARY KEY (`id`),
   KEY `public_city` (`is_public`,`city`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
--- Baari omana entiteettinään: kirjautumistunnus (slug = users.pub_name, ei muutu), näyttönimi ja baarikohtaiset asetukset
+-- Baari (yksi rivi): näyttönimi ja baarikohtaiset asetukset
 CREATE TABLE IF NOT EXISTS `pubs` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
-  `slug` varchar(100) NOT NULL,
   `name` varchar(120) NOT NULL,
   `timezone` varchar(64) NOT NULL DEFAULT 'Europe/Helsinki',
   `roles` text DEFAULT NULL,                                   -- JSON-lista vuoroissa käytettävistä rooleista
@@ -203,14 +192,12 @@ CREATE TABLE IF NOT EXISTS `pubs` (
   `reminder_sms` tinyint(1) NOT NULL DEFAULT 0,
   `feature_hub_events` tinyint(1) NOT NULL DEFAULT 0,
   `feature_hub_gigs` tinyint(1) NOT NULL DEFAULT 0,
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `slug` (`slug`)
+  PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- Auditloki admin-toimista (ei sisällä salasanoja eikä viestien sisältöä)
 CREATE TABLE IF NOT EXISTS `audit_log` (
   `id` bigint(20) NOT NULL AUTO_INCREMENT,
-  `pub_name` varchar(100) NOT NULL,
   `user_id` int(11) DEFAULT NULL,
   `user_name` varchar(100) DEFAULT NULL,
   `action` varchar(40) NOT NULL,
@@ -218,7 +205,7 @@ CREATE TABLE IF NOT EXISTS `audit_log` (
   `detail` varchar(300) DEFAULT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   PRIMARY KEY (`id`),
-  KEY `pub_time` (`pub_name`,`created_at`)
+  KEY `idx_created` (`created_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- Kutsu- ja salasananvaihtolinkit (kertakäyttöiset; kantaan vain tunnisteen sha256)
@@ -252,11 +239,9 @@ CREATE TABLE IF NOT EXISTS `mail_queue` (
 
 CREATE TABLE IF NOT EXISTS `notices` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
-  `pub_name` varchar(100) NOT NULL,
   `message` mediumtext NOT NULL,
   `created_at` timestamp NULL DEFAULT current_timestamp(),
-  PRIMARY KEY (`id`),
-  KEY `pub_name` (`pub_name`)
+  PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 CREATE TABLE IF NOT EXISTS `shift_trades` (
@@ -278,51 +263,45 @@ CREATE TABLE IF NOT EXISTS `shift_trades` (
 CREATE TABLE IF NOT EXISTS `time_entries` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `user_id` int(11) NOT NULL,
-  `pub_name` varchar(100) NOT NULL,
   `clock_in` datetime NOT NULL,
   `clock_out` datetime DEFAULT NULL,
   `alerted_at` datetime DEFAULT NULL,               -- "ulosleimaus unohtui" -hälytys lähetetty
   PRIMARY KEY (`id`),
-  KEY `pub_clock` (`pub_name`,`clock_in`),
+  KEY `idx_clock` (`clock_in`),
   KEY `user_id` (`user_id`),
   CONSTRAINT `time_entries_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 CREATE TABLE IF NOT EXISTS `tasks` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
-  `pub_name` varchar(100) NOT NULL,
   `label` varchar(255) NOT NULL,
   `sort_order` int(11) NOT NULL DEFAULT 0,
   `kind` varchar(10) NOT NULL DEFAULT 'normal',
-  PRIMARY KEY (`id`),
-  KEY `pub_name` (`pub_name`)
+  PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 CREATE TABLE IF NOT EXISTS `task_completions` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
-  `pub_name` varchar(100) NOT NULL,
   `date` date NOT NULL,
   `task_id` int(11) NOT NULL,
   PRIMARY KEY (`id`),
-  UNIQUE KEY `pub_date_task` (`pub_name`,`date`,`task_id`),
+  UNIQUE KEY `uq_date_task` (`date`,`task_id`),
   KEY `task_id` (`task_id`),
   CONSTRAINT `completions_task` FOREIGN KEY (`task_id`) REFERENCES `tasks` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 CREATE TABLE IF NOT EXISTS `shift_logs` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
-  `pub_name` varchar(100) NOT NULL,
   `user_id` int(11) NOT NULL,
   `message` text NOT NULL,
   `created_at` timestamp NULL DEFAULT current_timestamp(),
   `image_path` varchar(255) DEFAULT NULL,
   PRIMARY KEY (`id`),
-  KEY `pub_created` (`pub_name`,`created_at`)
+  KEY `idx_created` (`created_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 CREATE TABLE IF NOT EXISTS `shopping_list` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
-  `pub_name` varchar(100) NOT NULL,
   `added_by` int(11) NOT NULL,
   `item_name` varchar(255) NOT NULL,
   `status` varchar(50) NOT NULL DEFAULT 'pending',
@@ -330,7 +309,7 @@ CREATE TABLE IF NOT EXISTS `shopping_list` (
   `assigned_to` int(11) DEFAULT NULL,
   `image_path` varchar(255) DEFAULT NULL,
   PRIMARY KEY (`id`),
-  KEY `pub_status` (`pub_name`,`status`)
+  KEY `idx_status` (`status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 
@@ -338,7 +317,6 @@ CREATE TABLE IF NOT EXISTS `shopping_list` (
 -- Viestit tallennetaan salattuna (sovelluskerroksessa), ei selkotekstinä.
 CREATE TABLE IF NOT EXISTS `private_messages` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
-  `pub_name` varchar(100) NOT NULL,
   `sender_id` int(11) NOT NULL,
   `receiver_id` int(11) NOT NULL,
   `message` text NOT NULL,
@@ -376,44 +354,37 @@ CREATE TABLE IF NOT EXISTS `login_attempts` (
 
 CREATE TABLE IF NOT EXISTS `staffing_rules` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
-  `pub_name` varchar(100) NOT NULL,
   `dow` tinyint(4) DEFAULT NULL,                    -- 0 = ma ... 6 = su; NULL = joka päivä
   `start` time NOT NULL,
   `end` time NOT NULL,
   `role` varchar(50) DEFAULT NULL,                  -- NULL = mikä tahansa rooli
   `min_staff` tinyint(4) NOT NULL DEFAULT 1,
-  PRIMARY KEY (`id`),
-  KEY `pub_name` (`pub_name`)
+  PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 CREATE TABLE IF NOT EXISTS `availability_rules` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `user_id` int(11) NOT NULL,
-  `pub_name` varchar(100) NOT NULL,
   `dow` tinyint(4) NOT NULL,                        -- 0 = ma ... 6 = su
   `valid_from` date DEFAULT NULL,
   `valid_to` date DEFAULT NULL,
   `note` varchar(100) DEFAULT NULL,
   PRIMARY KEY (`id`),
   KEY `user_id` (`user_id`),
-  KEY `pub_name` (`pub_name`),
   CONSTRAINT `avail_rules_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 CREATE TABLE IF NOT EXISTS `daily_sales` (
-  `pub_name` varchar(100) NOT NULL,
   `date` date NOT NULL,
   `amount` decimal(10,2) NOT NULL,
-  PRIMARY KEY (`pub_name`,`date`)
+  PRIMARY KEY (`date`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 CREATE TABLE IF NOT EXISTS `checklists` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
-  `pub_name` varchar(100) NOT NULL,
   `name` varchar(100) NOT NULL,
   `items` text NOT NULL,                            -- JSON: [tehtävätekstit]
-  PRIMARY KEY (`id`),
-  KEY `pub_name` (`pub_name`)
+  PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 CREATE TABLE IF NOT EXISTS `checklist_progress` (
@@ -432,7 +403,6 @@ CREATE TABLE IF NOT EXISTS `checklist_progress` (
 
 CREATE TABLE IF NOT EXISTS `documents` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
-  `pub_name` varchar(100) NOT NULL,
   `title` varchar(150) NOT NULL,
   `description` varchar(500) DEFAULT NULL,
   `file_path` varchar(255) NOT NULL,                -- suhteellinen polku uploads/docs/ alla; ladataan vain API:n kautta
@@ -440,8 +410,7 @@ CREATE TABLE IF NOT EXISTS `documents` (
   `size` int(11) NOT NULL DEFAULT 0,
   `requires_ack` tinyint(1) NOT NULL DEFAULT 0,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
-  PRIMARY KEY (`id`),
-  KEY `pub_name` (`pub_name`)
+  PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 CREATE TABLE IF NOT EXISTS `document_acks` (
@@ -455,23 +424,20 @@ CREATE TABLE IF NOT EXISTS `document_acks` (
 
 CREATE TABLE IF NOT EXISTS `kudos` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
-  `pub_name` varchar(100) NOT NULL,
   `from_user` int(11) NOT NULL,
   `to_user` int(11) NOT NULL,
   `message` varchar(300) NOT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   PRIMARY KEY (`id`),
-  KEY `pub_created` (`pub_name`,`created_at`)
+  KEY `idx_created` (`created_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 CREATE TABLE IF NOT EXISTS `surveys` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
-  `pub_name` varchar(100) NOT NULL,
   `question` varchar(300) NOT NULL,
   `status` enum('open','closed') NOT NULL DEFAULT 'open',
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
-  PRIMARY KEY (`id`),
-  KEY `pub_name` (`pub_name`)
+  PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 CREATE TABLE IF NOT EXISTS `survey_answers` (             -- ei käyttäjätunnusta: vastaukset ovat nimettömiä
@@ -521,7 +487,6 @@ CREATE TABLE IF NOT EXISTS `event_registrations` (
 
 CREATE TABLE IF NOT EXISTS `bookings` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
-  `pub_name` varchar(100) NOT NULL,
   `name` varchar(100) NOT NULL,
   `email` varchar(150) DEFAULT NULL,
   `phone` varchar(30) DEFAULT NULL,
@@ -536,12 +501,11 @@ CREATE TABLE IF NOT EXISTS `bookings` (
   `reminded_at` datetime DEFAULT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `cancel_hash` (`cancel_hash`),
-  KEY `pub_time` (`pub_name`,`starts_at`)
+  KEY `idx_starts` (`starts_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 CREATE TABLE IF NOT EXISTS `cash_reports` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
-  `pub_name` varchar(100) NOT NULL,
   `date` date NOT NULL,
   `sales_total` decimal(10,2) NOT NULL,
   `card_total` decimal(10,2) DEFAULT NULL,
@@ -554,7 +518,7 @@ CREATE TABLE IF NOT EXISTS `cash_reports` (
   `expenses` decimal(10,2) DEFAULT NULL,
   `tips` decimal(10,2) DEFAULT NULL,
   PRIMARY KEY (`id`),
-  UNIQUE KEY `pub_date` (`pub_name`,`date`)
+  UNIQUE KEY `uq_date` (`date`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 CREATE TABLE IF NOT EXISTS `event_guests` (
@@ -578,11 +542,9 @@ CREATE TABLE IF NOT EXISTS `system_status` (
 
 CREATE TABLE IF NOT EXISTS `skills` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
-  `pub_name` varchar(100) NOT NULL,
   `name` varchar(60) NOT NULL,
   `for_role` varchar(100) DEFAULT NULL,
-  PRIMARY KEY (`id`),
-  KEY `pub_name` (`pub_name`)
+  PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 CREATE TABLE IF NOT EXISTS `user_skills` (
@@ -597,7 +559,6 @@ CREATE TABLE IF NOT EXISTS `user_skills` (
 
 CREATE TABLE IF NOT EXISTS `hour_confirmations` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
-  `pub_name` varchar(100) NOT NULL,
   `user_id` int(11) NOT NULL,
   `month` char(7) NOT NULL,
   `hours` decimal(7,2) NOT NULL DEFAULT 0.00,
@@ -609,7 +570,7 @@ CREATE TABLE IF NOT EXISTS `hour_confirmations` (
   `admin_note` varchar(300) NOT NULL DEFAULT '',
   PRIMARY KEY (`id`),
   UNIQUE KEY `user_month` (`user_id`,`month`),
-  KEY `pub_month` (`pub_name`,`month`),
+  KEY `idx_month` (`month`),
   CONSTRAINT `hc_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
@@ -628,7 +589,6 @@ CREATE TABLE IF NOT EXISTS `shift_bids` (
 
 CREATE TABLE IF NOT EXISTS `guests` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
-  `pub_name` varchar(100) NOT NULL,
   `name` varchar(100) NOT NULL,
   `email` varchar(150) DEFAULT NULL,
   `phone` varchar(30) DEFAULT NULL,
@@ -639,19 +599,17 @@ CREATE TABLE IF NOT EXISTS `guests` (
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
   PRIMARY KEY (`id`),
-  UNIQUE KEY `pub_email` (`pub_name`,`email`),
-  KEY `pub_name` (`pub_name`)
+  UNIQUE KEY `uq_email` (`email`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 CREATE TABLE IF NOT EXISTS `sms_log` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
-  `pub_name` varchar(100) NOT NULL,
   `to_phone` varchar(20) NOT NULL,
   `ok` tinyint(1) NOT NULL DEFAULT 0,
   `error` varchar(200) DEFAULT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   PRIMARY KEY (`id`),
-  KEY `pub_month` (`pub_name`,`created_at`)
+  KEY `idx_created` (`created_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 CREATE TABLE IF NOT EXISTS `event_waitlist` (

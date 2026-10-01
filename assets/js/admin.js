@@ -10,7 +10,7 @@ function adminTabUsers() {
         <div class="card" style="padding:0; overflow-x:auto;"><table class="bs-table">
             <thead><tr><th>Nimi</th><th>Luvat</th><th>Tavoite</th><th>Loma</th><th>Rooli</th><th></th></tr></thead>
             <tbody>${(state.data.users || []).map(u => `<tr>
-                <td><strong>${esc(u.name)}</strong> ${u.anonymized_at ? '<span class="badge" style="background:var(--surface2)">Anonymisoitu</span>' : ''} ${u.employment_type === 'casual' ? '<span class="badge badge-orange" title="Keikkalainen">Keikka</span>' : ''}<br><span style="font-size:11px; color:var(--text3);">${esc(u.username)}@${esc(u.pub_name)}</span>${u.start_date ? `<br><span style="font-size:11px; color:var(--text3);">Aloittanut ${fullDate(u.start_date)} · ${tenureText(u.start_date)}</span>` : '<br><span style="font-size:11px; color:#b45309;">Aloituspäivä puuttuu</span>'}</td>
+                <td><strong>${esc(u.name)}</strong> ${u.anonymized_at ? '<span class="badge" style="background:var(--surface2)">Anonymisoitu</span>' : ''} ${u.employment_type === 'casual' ? '<span class="badge badge-orange" title="Keikkalainen">Keikka</span>' : ''}<br><span style="font-size:11px; color:var(--text3);">${esc(u.username)}</span>${u.start_date ? `<br><span style="font-size:11px; color:var(--text3);">Aloittanut ${fullDate(u.start_date)} · ${tenureText(u.start_date)}</span>` : '<br><span style="font-size:11px; color:#b45309;">Aloituspäivä puuttuu</span>'}</td>
                 <td>
                     <span style="color:${u.has_hygiene==1?'#0D9488':'var(--border2)'};" title="Hygieniapassi"><i class="bi bi-droplet-fill"></i></span>
                     <span style="color:${u.has_alcohol==1?'#0D9488':'var(--border2)'}; margin:0 6px;" title="Anniskelupassi"><i class="bi bi-cup-straw"></i></span>
@@ -428,7 +428,7 @@ async function saveNotice() {
     const msg = document.getElementById('m-notice-msg').value.trim(); 
     if(!msg) return; 
     const id = state.editingNotice ? state.editingNotice.id : null;
-    await fetch('api.php?action=notice', { method:'POST', body: JSON.stringify({ id: id, message: msg, pub_name: state.user.pub_name }) }); 
+    await fetch('api.php?action=notice', { method:'POST', body: JSON.stringify({ id: id, message: msg}) }); 
     closeModal(); showToast('Uutinen tallennettu!'); load(); 
 }
 
@@ -452,8 +452,7 @@ async function addUser() {
         expiry_jv: expiry_jv ? expiry_jv : null,
         start_date: document.getElementById('u-start').value || null,
         employment_type: document.getElementById('u-emp').value,
-        color: '#E14D2A', 
-        pub_name: state.user.pub_name 
+        color: '#E14D2A'
     }; 
     const ur = await (await fetch('api.php?action=user', { method:'POST', body: JSON.stringify(data) })).json();
     if (ur.error) return showToast(ur.error, 'error');
@@ -610,7 +609,7 @@ async function saveShift() {
     const warns = await checkShiftWarnings();
     if (warns.length && !confirm('Huomioitavaa:\n\n• ' + warns.map(w => w.msg).join('\n• ') + '\n\nTallennetaanko silti?')) return;
     const rep = document.getElementById('m-repeat');
-    const data = { id: state.editingShift?.id || null, userId: userId, date: date, start: start, end: document.getElementById('m-end').value, role: document.getElementById('m-role').value, pub_name: state.user.pub_name,
+    const data = { id: state.editingShift?.id || null, userId: userId, date: date, start: start, end: document.getElementById('m-end').value, role: document.getElementById('m-role').value,
         status: document.getElementById('m-draft').checked ? 'draft' : 'published', repeat_weeks: rep ? parseInt(rep.value) || 0 : 0 };
     if (document.getElementById('m-hub')) { data.hub_gig = document.getElementById('m-hub').checked; data.hub_pay = document.getElementById('m-hubpay').value; }
     const r = await (await fetch('api.php?action=shift', { method:'POST', body: JSON.stringify(data) })).json();

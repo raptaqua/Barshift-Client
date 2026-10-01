@@ -848,7 +848,7 @@
   "Ei löydy": "Not found",
   "Ei löydy tai ei oikeuksia": "Not found or no permission",
   "Tuntematon toiminto": "Unknown action",
-  "Tietokanta on päivittämättä. Aja komento \"php migrate.php\" tai tuo db/upgrade.sql (phpMyAdmin).": "The database is not up to date. Run \"php migrate.php\" or import db/upgrade.sql (phpMyAdmin).",
+  "Tietokanta on päivittämättä. Aja komento \"php migrate.php\".": "The database is not up to date. Run \"php migrate.php\" or import db/upgrade.sql (phpMyAdmin).",
   "Henkilö on jo tämän baarin jäsen": "The person is already a member of this bar",
   "Kutsu on jo lähetetty": "An invitation has already been sent",
   "Anna jokaiselle roolille nimi": "Give every role a name",

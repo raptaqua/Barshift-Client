@@ -13,7 +13,7 @@ function bsWaitlistFree($conn, int $eventId): ?int {   // vapaat paikat tai null
 // Ilmoittaa jonon seuraaville. Palauttaa ilmoitettujen määrän.
 function bsWaitlistPromote($conn, array $cfg, int $eventId): int {
     $free = bsWaitlistFree($conn, $eventId); if ($free === null || $free < 1) return 0;
-    $ev = $conn->prepare("SELECT e.title, e.date, e.time_start, e.pub_name, p.name AS pname FROM events e LEFT JOIN pubs p ON p.slug = e.pub_name WHERE e.id = ? AND e.date >= CURDATE() AND e.registration <> 'none'");
+    $ev = $conn->prepare("SELECT e.title, e.date, e.time_start, p.name AS pname FROM events e CROSS JOIN pubs p WHERE e.id = ? AND e.date >= CURDATE() AND e.registration <> 'none'");
     $ev->bind_param('i', $eventId); $ev->execute(); $e = $ev->get_result()->fetch_assoc(); if (!$e) return 0;
     $wl = $conn->prepare("SELECT id, name, email, qty FROM event_waitlist WHERE event_id = ? AND notified_at IS NULL ORDER BY id"); $wl->bind_param('i', $eventId); $wl->execute();
     $n = 0; $when = date('j.n.Y', strtotime($e['date'])) . ($e['time_start'] ? ' klo ' . substr($e['time_start'], 0, 5) : '');

@@ -18,11 +18,6 @@ $ok = $conn->multi_query(file_get_contents(__DIR__ . '/db/schema.sql'));
 while ($ok && $conn->more_results() && $conn->next_result()) { if ($r = $conn->store_result()) $r->free(); }
 echo ($conn->errno ? "VIRHE schema.sql: " . $conn->error : "OK    db/schema.sql") . "\n";
 
-foreach (require __DIR__ . '/db/legacy_upgrade.php' as $sql) {
-    $res = $conn->query($sql);
-    echo ($res ? "OK    " : "ohita ") . substr($sql, 0, 70) . ($res ? '' : '  (' . $conn->error . ')') . "\n";
-}
-
 [$n, $err] = bsRunMigrations($conn, __DIR__ . '/db/migrations', $fresh, function ($m) { echo $m . "\n"; });
 if ($err) { fwrite(STDERR, "VIRHE $err\n"); exit(1); }
 echo $n ? "Migraatioita käsitelty: $n\n" : "Ei uusia migraatioita\n";

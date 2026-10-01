@@ -363,7 +363,7 @@ async function saveEvent() {
     let titleInput = document.getElementById('e-title').value.trim(); const activeIcon = document.querySelector('.icon-selector.active');
     if (activeIcon) titleInput = activeIcon.dataset.icon + ' ' + titleInput;
     
-    const formData = new FormData(); formData.append('id', state.editingEvent?.id || ''); formData.append('title', titleInput); formData.append('date', document.getElementById('e-date').value); formData.append('time_start', document.getElementById('e-time').value); formData.append('time_end', document.getElementById('e-time-end').value); formData.append('pub_name', state.user.pub_name);
+    const formData = new FormData(); formData.append('id', state.editingEvent?.id || ''); formData.append('title', titleInput); formData.append('date', document.getElementById('e-date').value); formData.append('time_start', document.getElementById('e-time').value); formData.append('time_end', document.getElementById('e-time-end').value);
     formData.append('type', document.getElementById('e-type').value); formData.append('description', document.getElementById('e-desc').value); formData.append('is_public', document.getElementById('e-public').checked ? '1' : '0');
     formData.append('guest_capacity', document.getElementById('e-guestcap').value);
     eventRegFormData(formData);
