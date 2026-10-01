@@ -39,6 +39,8 @@ function safeImg(p) { return /^uploads\/[A-Za-z0-9_\/.-]+$/.test(p || '') && !p.
 
 const PUB_DEFAULTS = { name: '', timezone: 'Europe/Helsinki', roles: ['Baarimestari', 'Järjestyksenvalvoja', 'Tarjoilija', 'Vuoropäällikkö'], min_rest_hours: 11, max_week_hours: null,
     features: { tickets: false, bookings: false }, booking: { capacity: 30, max_party: 8, slot_minutes: 30, duration_minutes: 120, lead_hours: 2, days_ahead: 60, auto_confirm: true, hours: [] }, require_2fa: false, evening_start: 18, night_end: 6, overtime_week_hours: 40, weekly_budget: null, retention_months: 60, side_cost_pct: 0, reminder_hours: 3, clock_alert_minutes: 0, bonuses: { evening: 1.33, night: 2.25, sat: 5.39, sun: 2 } };
+// Käyttäjätunnus ja baarin nimi badgeissa: "tunnus · Baarin nimi"
+function userBadgeText() { const n = ((state.data && state.data.pub) || {}).name; return esc(state.user.username) + (n ? ' · ' + esc(n) : ''); }
 function pubCfg() { return Object.assign({}, PUB_DEFAULTS, (state.data && state.data.pub) || {}); }
 
 function getRoleIcon(role) {
@@ -245,8 +247,8 @@ function render() {
             <nav class="nav-bar">
                 <div class="nav-logo">
                     ${logoHtml}
-                    <div class="user-info-badge" style="margin-top: 12px; display: inline-block;">
-                        ${esc(state.user.username)}
+                    <div class="user-info-badge" style="margin-top: 12px; display: inline-block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${userBadgeText()}">
+                        ${userBadgeText()}
                     </div>
                     
                 </div>
@@ -257,7 +259,7 @@ function render() {
                     <div class="top-logo">${logoHtml}</div>
                     <div class="top-actions">
                         
-                        <div class="user-info-badge top-badge">${esc(state.user.username)}</div>
+                        <div class="user-info-badge top-badge" style="max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${userBadgeText()}">${userBadgeText()}</div>
                         ${topBtns}
                     </div>
                 </header>
