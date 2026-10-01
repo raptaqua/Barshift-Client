@@ -1,5 +1,5 @@
 // API-integraatiotestit (node tests/api.test.js; käynnistä tests/run_api_tests.sh:lla).
-// Ympäristö: BASE = palvelimen osoite. Kanta on ladattu demodatalla (demobaari + toinen baari "toinenbaari").
+// Ympäristö: BASE = palvelimen osoite. Kanta on ladattu demodatalla (yksi baari: demobaari).
 const assert = require('assert');
 const crypto = require('crypto');
 const { execFile } = require('child_process');
@@ -59,7 +59,7 @@ async function t(name, fn) {
 const future = (days) => { const d = new Date(Date.now() + days * 864e5); return d.toISOString().slice(0, 10); };
 
 (async () => {
-  const admin = new Client(), emp = new Client(), other = new Client(), anon = new Client();
+  const admin = new Client(), emp = new Client(), anon = new Client();
 
   console.log('Kirjautuminen ja suojaukset');
   await t('kirjautumaton pyyntö -> 401', async () => { assert.strictEqual((await anon.get('')).status, 401); });
@@ -67,9 +67,21 @@ const future = (days) => { const d = new Date(Date.now() + days * 864e5); return
   await t('CSRF: vieras Origin estetään', async () => { const r = await new Client().req('POST', 'login', { body: { username: 'admin', pub_name: 'demobaari', password: PW }, origin: 'https://evil.example' }); assert.strictEqual(r.status, 403); });
   await t('admin kirjautuu', async () => { const r = await admin.login('admin', 'demobaari'); assert.ok(r.json.success, JSON.stringify(r.json)); });
   await t('työntekijä kirjautuu', async () => { const r = await emp.login('sari', 'demobaari'); assert.ok(r.json.success); });
-  await t('toisen baarin admin kirjautuu', async () => { const r = await other.login('muuadmin', 'toinenbaari'); assert.ok(r.json.success, JSON.stringify(r.json)); });
 
   console.log('Roolit ja baarieristys');
+  await t('yhden baarin asennus: kirjautuminen ilman baaria, ei baarien välisiä toimintoja', async () => {
+    const c = new Client(); const r = await c.post('login', { username: 'sari', password: PW }); assert.ok(r.json.success, JSON.stringify(r.json));
+    assert.strictEqual(r.json.user.memberships, undefined);
+    for (const a of ['gig_pool', 'switch_pub', 'toggle_pub', 'gig_invite', 'create_job_listing', 'accept_link']) assert.ok((await admin.post(a, {})).status >= 400, a + ' on yhä käytössä');
+    const d = (await admin.get('')).json; for (const k of ['memberships', 'job_listings', 'gig_incoming', 'gig_outgoing']) assert.strictEqual(d[k], undefined, k);
+  });
+  await t('toinen baari kannassa estää toiminnan (tietoturvavartija)', async () => {
+    const sql = (q) => execFileP('mysql', ['-h', process.env.DB_HOST, '-u', process.env.DB_USER, ...(process.env.DB_PASS ? ['-p' + process.env.DB_PASS] : []), process.env.DB_NAME, '-e', q]);
+    await sql("INSERT INTO pubs (slug, name) VALUES ('vieras', 'Vieras')");
+    try { const r = await admin.get(''); assert.strictEqual(r.status, 500); assert.match(JSON.stringify(r.json), /yksi baari/); assert.ok((await new Client().login('sari', undefined)).status >= 400); }
+    finally { await sql("DELETE FROM pubs WHERE slug = 'vieras'"); }
+    assert.strictEqual((await admin.get('')).status, 200);
+  });
   await t('työntekijä ei näe kollegoiden palkkaa', async () => {
     const d = (await emp.get('')).json; const others = d.users.filter(u => u.username !== 'sari');
     assert.ok(others.length > 0); assert.ok(others.every(u => u.hourly_wage === null));
@@ -80,21 +92,6 @@ const future = (days) => { const d = new Date(Date.now() + days * 864e5); return
     assert.strictEqual((await emp.post('check_shift', {})).status, 403);
     assert.strictEqual((await emp.get('export_user_data', '&id=9002')).status, 403);
     assert.strictEqual((await emp.get('audit_log')).status, 403);
-  });
-  await t('baarit eivät näe toistensa dataa', async () => {
-    const d = (await other.get('')).json;
-    assert.ok(d.users.every(u => u.pub_name === 'toinenbaari'), 'käyttäjiä toisesta baarista');
-    assert.ok(!d.shifts.some(s => s.pub_name === 'demobaari'));
-  });
-  await t('admin ei voi muokata/poistaa toisen baarin käyttäjää tai vuoroa', async () => {
-    const o = (await other.get('')).json; const foreignUser = o.users.find(u => u.username === 'muutyontekija');
-    assert.ok(foreignUser);
-    assert.ok([403, 404].includes((await admin.del('user', foreignUser.id)).status));
-    const r = await admin.post('user', { id: foreignUser.id, name: 'Hakkeroitu', username: 'muutyontekija', role: 'employee' });
-    assert.ok(r.status >= 400, 'muokkaus onnistui: ' + r.status);
-    assert.ok([403, 404].includes((await admin.get('export_user_data', `&id=${foreignUser.id}`)).status));
-    const still = (await other.get('')).json.users.find(u => u.id === foreignUser.id);
-    assert.strictEqual(still.name, 'Muu Työntekijä');
   });
   await t('julkinen rajapinta ei paljasta baaritunnusta tai käyttäjiä', async () => {
     const r = await anon.req('GET', 'public_events', { raw: true }); assert.strictEqual(r.status, 200);
@@ -132,7 +129,7 @@ const future = (days) => { const d = new Date(Date.now() + days * 864e5); return
     const p = (await emp.get('')).json.pub; assert.deepStrictEqual(p.roles, ['Baarimestari', 'Ovi']); assert.strictEqual(p.billing_email, undefined);
   });
   await t('palkka-ajo JSON ja CSV', async () => {
-    const m = new Date().toISOString().slice(0, 7);
+    const m = new Date(Date.now() - 5 * 864e5).toISOString().slice(0, 7);   // kuun alussa edellinen kuu (ei vielä valmiita vuoroja)
     const j = (await admin.get('payroll', `&month=${m}`)).json; assert.ok(j.rows.length > 0 && j.total > 0, 'ei rivejä: ' + JSON.stringify(j).slice(0, 200));
     j.rows.forEach(r => assert.ok(r.total_pay >= r.base_pay, 'palkka lisineen pienempi kuin perusosa'));
     const c = await admin.req('GET', 'payroll', { query: `&month=${m}&format=csv`, raw: true });
@@ -141,7 +138,7 @@ const future = (days) => { const d = new Date(Date.now() + days * 864e5); return
   });
   await t('raportti: usean kuukauden CSV ja sivukulut', async () => {
     assert.ok((await admin.post('save_pub_settings', { ...settings, side_cost_pct: 20 })).json.success);
-    const m = new Date().toISOString().slice(0, 7);
+    const m = new Date(Date.now() - 5 * 864e5).toISOString().slice(0, 7);   // kuun alussa edellinen kuu (ei vielä valmiita vuoroja)
     const j = (await admin.get('report', `&from=${m}&to=${m}`)).json;
     assert.ok(j.rows.length > 0 && Math.abs(j.rows[0].employer_cost - j.rows[0].total_pay * 1.2) < 0.02, 'sivukulut');
     assert.strictEqual((await admin.get('report', '&from=2026-05&to=2026-01')).status, 400);
@@ -224,8 +221,6 @@ const future = (days) => { const d = new Date(Date.now() + days * 864e5); return
     assert.strictEqual((await admin.post('clear_shifts', { from: wk2, to: add(wk2, 6) })).json.deleted, 1);
     assert.ok((await admin.post('clear_shifts', { from: wk, to: add(wk, 200) })).status >= 400, 'liian pitkä väli');
     assert.strictEqual((await emp.post('clear_shifts', { from: wk, to: wk })).status, 403);
-    assert.strictEqual((await other.post('clear_shifts', { from: '2000-01-01', to: '2000-02-01' })).json.deleted, 0);
-    assert.ok((await other.post('apply_week_template', { id: tpl.id, weekStart: wk })).status >= 400, 'toisen baarin pohja');
     await admin.del('week_template', tpl.id);
   });
 
@@ -293,7 +288,7 @@ const future = (days) => { const d = new Date(Date.now() + days * 864e5); return
     assert.ok((await admin.post('user', { id: sari.id, name: sari.name, username: 'sari', role: 'employee', hourly_wage: 11.5, email: 'sari@example.test', employee_number: 'E-042' })).json.success);
     assert.strictEqual((await usersNow()).find(u => u.username === 'sari').employee_number, 'E-042');
     assert.strictEqual((await emp.get('')).json.users.find(u => u.username === 'mikko').employee_number, null);
-    const m = new Date().toISOString().slice(0, 7);
+    const m = new Date(Date.now() - 5 * 864e5).toISOString().slice(0, 7);   // kuun alussa edellinen kuu (ei vielä valmiita vuoroja)
     const c = await admin.req('GET', 'report', { query: `&from=${m}&to=${m}&format=csv&layout=lines`, raw: true });
     const lines = c.text.replace(/^﻿/, '').split('\n').filter(Boolean);
     assert.ok(lines[0].startsWith('Kuukausi;Työntekijänumero;Nimi;Palkkalaji'), lines[0]);
@@ -356,9 +351,7 @@ const future = (days) => { const d = new Date(Date.now() + days * 864e5); return
     assert.ok((await admin.get('sales_report', `&range=month&date=${day(-40)}`)).json.days_with_sales > 10, 'demon myyntihistoria');
     const yr = (await admin.get('sales_report', `&range=year&date=${day(0)}`)).json; assert.strictEqual(yr.points.length, 12); assert.ok(yr.total >= 2300.5);
     assert.strictEqual((await admin.get('sales_report', '&range=day')).status, 400);
-    assert.strictEqual((await other.get('cash_reports')).json.reports.length, 0, 'toisen baarin kassa vuotaa');
     const del = list.find(c => c.date === day(-20)); assert.strictEqual((await emp.del('cash_report', del.id)).status, 403);
-    assert.strictEqual((await other.del('cash_report', del.id)).status >= 400, true);
     assert.ok((await admin.del('cash_report', del.id)).json.success);
     assert.strictEqual((await admin.get('cash_reports', `&from=${day(-30)}&to=${day(0)}`)).json.reports.length, list.length - 1);
   });
@@ -373,7 +366,6 @@ const future = (days) => { const d = new Date(Date.now() + days * 864e5); return
     const rep = (await emp.get('')).json.cash_recent.find(c => c.date === day0); assert.ok(rep.has_photo); assert.ok(!('photo_path' in rep));
     const img = await emp.req('GET', 'cash_photo', { raw: true, query: `&id=${rep.id}` }); assert.strictEqual(img.status, 200); assert.strictEqual(img.headers.get('content-type'), 'image/png');
     assert.strictEqual((await admin.req('GET', 'cash_photo', { raw: true, query: `&id=${rep.id}` })).status, 200);
-    assert.strictEqual((await other.req('GET', 'cash_photo', { raw: true, query: `&id=${rep.id}` })).status >= 400, true, 'toisen baarin kuva vuotaa');
     assert.strictEqual((await emp.form('cash_report', mk({}, null))).json.has_photo, true, 'kuva säilyy ilman uutta tiedostoa');
     assert.strictEqual((await emp.form('cash_report', mk({ remove_photo: '1' }, null))).json.has_photo, false);
     assert.strictEqual((await emp.req('GET', 'cash_photo', { raw: true, query: `&id=${rep.id}` })).status, 404);
@@ -468,7 +460,6 @@ const future = (days) => { const d = new Date(Date.now() + days * 864e5); return
     assert.ok((await emp.get('')).json.user_skills.every(x => x.user_id === sari.id), 'työntekijä näkee vain omansa');
     assert.ok((await admin.get('')).json.user_skills.some(x => x.skill_id === sk.id));
     assert.ok((await emp.post('user_skill', { user_id: sari.id, skill_id: sk.id, has: 0 })).status === 403);
-    assert.ok((await other.post('user_skill', { user_id: sari.id, skill_id: sk.id, has: 1 })).status >= 400, 'toisen baarin');
     assert.ok((await admin.post('user_skill', { user_id: sari.id, skill_id: sk.id, has: 0 })).json.success);
     assert.ok((await admin.del('skill', sk.id)).json.success);
   });
@@ -500,9 +491,7 @@ const future = (days) => { const d = new Date(Date.now() + days * 864e5); return
     assert.strictEqual((await emp.req('GET', 'payslip', { raw: true, query: `&month=${prev}&user_id=${(await usersNow()).find(u => u.username === 'mikko').id}` })).status, 403, 'toisen erittely vain palkka-oikeudella');
     assert.strictEqual((await emp.req('GET', 'payslip', { raw: true, query: `&month=${cur}` })).status, 409, 'hyväksymättömästä kuusta ei erittelyä');
     assert.strictEqual((await admin.req('GET', 'payslip', { raw: true, query: `&month=${prev}&user_id=${sari.id}` })).status, 200);
-    assert.strictEqual((await other.req('GET', 'payslip', { raw: true, query: `&month=${prev}&user_id=${sari.id}` })).status >= 400, true, 'toisen baarin');
     assert.ok((await admin.post('decide_hours', { user_id: sari.id, month: prev, decision: 'huono' })).status >= 400);
-    assert.ok((await other.post('decide_hours', { user_id: sari.id, month: prev, decision: 'approved' })).status >= 400, 'toisen baarin ylläpito');
   });
 
   await t('vuorohaku (valinnainen): ilman ominaisuutta suora otto, sen kanssa haku ja valinta', async () => {
@@ -518,7 +507,6 @@ const future = (days) => { const d = new Date(Date.now() + days * 864e5); return
     assert.strictEqual((await emp.get('shift_bids', `&shift_id=${open.id}`)).status, 403, 'hakijalista vain suunnittelijalle');
     const bids = (await admin.get('shift_bids', `&shift_id=${open.id}`)).json.bids; assert.strictEqual(bids.length, 1); assert.strictEqual(bids[0].note, 'Pääsen kyllä');
     assert.strictEqual((await emp.post('shift_assign', { shift_id: open.id, user_id: sari.id })).status, 403);
-    assert.ok((await other.post('shift_bid', { shift_id: open.id })).status >= 400, 'toisen baarin');
     assert.ok((await admin.post('shift_assign', { shift_id: open.id, user_id: sari.id })).json.success);
     assert.strictEqual((await admin.post('shift_assign', { shift_id: open.id, user_id: sari.id })).status, 409, 'jo annettu');
     const got = (await emp.get('')).json.shifts.find(x => x.id === open.id); assert.strictEqual(got.userId, sari.id);
@@ -586,10 +574,6 @@ const future = (days) => { const d = new Date(Date.now() + days * 864e5); return
     assert.strictEqual((await emp.req('GET', 'event_guests_csv', { raw: true, query: `&event_id=${ev.id}` })).status, 403);
     const csv = (await admin.req('GET', 'event_guests_csv', { raw: true, query: `&event_id=${ev.id}` })).text; assert.ok(csv.includes('Matti Meikäläinen') && csv.includes('Neljäs'));
     // toinen baari ei näe eikä pääse käsiksi
-    const o = (await other.get('')).json; assert.ok(!JSON.stringify(o).includes('Matti Meikäläinen'), 'nimet vuotavat toiseen baariin');
-    assert.ok((await other.post('event_guest', { event_id: ev.id, name: 'Hyökkääjä' })).status >= 400);
-    assert.ok((await other.del('event_guest', guests[0].id)).status >= 400);
-    assert.ok((await other.get('event_guests_csv', `&event_id=${ev.id}`)).status >= 400);
     // julkiset rajapinnat eivät sisällä nimiä
     await admin.post('save_pub_profile', { display_name: 'Demo', is_public: 1, city: 'Helsinki', address: 'Testikatu 1' });
     for (const a of ['public_events', 'public_ics', 'public_rss']) { const r = await anon.req('GET', a, { raw: true, query: a === 'public_events' ? '' : '&pub=' + ((await anon.req('GET', 'public_events')).json.pubs[0] || {}).id }); assert.ok(!/Matti|Liisa|Neljäs|vieras/i.test(r.text), a + ' vuotaa vieraslistan'); }
@@ -651,9 +635,7 @@ const future = (days) => { const d = new Date(Date.now() + days * 864e5); return
     assert.strictEqual((await admin.get('search', '&q=a')).json.results.length, 0, 'liian lyhyt');
     const own = (await emp.get('search', '&q=sanasalaisuus')).json.results; assert.ok(own.some(r => r.type === 'message' && r.id === mikko.id), 'oma viesti löytyy');
     assert.ok(!(await admin.get('search', '&q=sanasalaisuus')).json.results.some(r => r.type === 'message'), 'toisten viestit eivät löydy');
-    assert.ok(!(await other.get('search', '&q=sanasalaisuus')).json.results.some(r => r.type === 'message'), 'toisen baarin viestit eivät löydy');
     assert.ok((await admin.get('search', '&q=Maistelu')).json.results.some(r => r.type === 'event'));
-    assert.ok(!(await other.get('search', '&q=Maistelu')).json.results.some(r => r.type === 'event'), 'toisen baarin tapahtumat');
     assert.ok(!(await emp.get('search', '&q=2026')).json.results.some(r => r.type === 'cash' || r.type === 'booking'), 'työntekijä ei näe kassaa eikä varauksia');
     assert.ok((await emp.get('search', '&q=Liisa')).json.results.length >= 0);
     assert.ok((await admin.get('search', `&q=${encodeURIComponent("100%_'\"")}`)).json.success, 'erikoismerkit eivät riko hakua');
@@ -743,35 +725,6 @@ const future = (days) => { const d = new Date(Date.now() + days * 864e5); return
     assert.strictEqual((await new Client().get('token_info', `&token=${t1}`)).status, 404); assert.strictEqual((await new Client().get('token_info', `&token=${t2}`)).status, 200);
     assert.strictEqual((await emp.post('send_invite', { userId: uid })).status, 403);
     await admin.del('user', uid);
-  });
-  await t('yksi tunnus, monta baaria: yhdistäminen, jäsenyyslista ja baarin vaihto', async () => {
-    const r = await other.post('user', { name: 'Sari Salo', username: 'sari2', link: true, email: 'sari@example.test', role: 'employee', hourly_wage: 12 });
-    assert.ok(r.json.success && r.json.invite.kind === 'link' && r.json.invite.emailed, JSON.stringify(r.json));
-    const mail = await waitMail(mailbox, m => m.to === 'sari@example.test' && /uuteen baariin/.test(m.subject)); assert.ok(mail, 'kutsu puuttuu');
-    const tok = tokenFrom(mail); assert.strictEqual((await new Client().get('token_info', `&token=${tok}`)).json.kind, 'link');
-    assert.ok((await other.post('user', { name: 'X', username: 'x-ilman', link: true, role: 'employee' })).status >= 400, 'yhdistäminen ilman sähköpostia sallittiin');
-    const c = new Client();
-    assert.strictEqual((await c.post('accept_link', { token: tok, username: 'sari', pub_name: 'demobaari', password: 'vaara-salasana' })).status, 401);
-    assert.strictEqual((await c.post('accept_link', { token: tok, username: 'sari2', pub_name: 'toinenbaari', password: PW })).status, 401, 'yhdisti tunnuksen itseensä');
-    assert.ok((await c.post('accept_link', { token: tok, username: 'sari', pub_name: 'demobaari', password: 'UusiSalasana2026!' })).json.success);
-    assert.strictEqual((await c.post('accept_link', { token: tok, username: 'sari', pub_name: 'demobaari', password: 'UusiSalasana2026!' })).status, 404, 'linkki toimi kahdesti');
-    // jäsenyydet näkyvät molemmilta puolilta ja vaihto toimii
-    const me1 = (await emp.get('me')).json.user; assert.strictEqual(me1.memberships.length, 2);
-    const second = me1.memberships.find(m => m.pub_name === 'toinenbaari'), first = me1.memberships.find(m => m.pub_name === 'demobaari');
-    assert.ok(second && first);
-    try {
-      const sw = await emp.post('switch_pub', { userId: second.id }); assert.ok(sw.json.success && sw.json.user.pub_name === 'toinenbaari', JSON.stringify(sw.json));
-      const d = (await emp.get('')).json; assert.ok(d.users.every(u => u.pub_name === 'toinenbaari'), 'vaihdon jälkeen näkyy edellisen baarin dataa');
-      assert.ok(d.memberships.length === 2);
-      assert.strictEqual((await emp.post('save_pub_settings', { name: 'X' })).status, 403);   // vaihdon jälkeen vain työntekijän oikeudet
-    } finally { assert.ok((await emp.post('switch_pub', { userId: first.id })).json.success); }
-    assert.strictEqual((await emp.get('')).json.users.find(u => u.username === 'sari').pub_name, 'demobaari');
-    // muiden jäsenyyksiin ei pääse vaihtamaan
-    const mid = (await admin.get('')).json.users.find(u => u.username === 'mikko').id;
-    assert.strictEqual((await emp.post('switch_pub', { userId: mid })).status, 403);
-    assert.deepStrictEqual((await admin.get('me')).json.user.memberships, []);
-    // kirjautuminen kummallakin tunnuksella
-    const both = new Client(); const l = (await both.login('sari2', 'toinenbaari', 'ei-tiedossa-1')).status; assert.ok(l >= 400, 'sari2:lla ei pitäisi olla omaa salasanaa');
   });
   await t('ilmoitus tulee sähköpostina, kun push ei ole käytössä (ja vain sallineelle)', async () => {
     const n = mailbox.messages.length;
@@ -913,7 +866,6 @@ const future = (days) => { const d = new Date(Date.now() + days * 864e5); return
     const doc = (await emp.get('')).json.documents.find(x => x.title === 'Avausohje'); assert.ok(doc && doc.requires_ack === 1 && doc.acked === false); assert.strictEqual(doc.acked_by, undefined);
     const dl = await emp.req('GET', 'doc_file', { query: `&id=${doc.id}`, raw: true }); assert.strictEqual(dl.status, 200); assert.ok(/application\/pdf/.test(dl.headers.get('content-type'))); assert.ok(dl.text.startsWith('%PDF'));
     assert.strictEqual((await anon.req('GET', 'doc_file', { query: `&id=${doc.id}`, raw: true })).status, 401);
-    assert.ok([403, 404].includes((await other.req('GET', 'doc_file', { query: `&id=${doc.id}`, raw: true })).status), 'toisen baarin dokumentti');
     assert.ok((await emp.post('ack_document', { id: doc.id })).json.success);
     assert.deepStrictEqual((await admin.get('')).json.documents.find(x => x.id === doc.id).acked_by, [sariId]);
     assert.strictEqual((await emp.del('document', doc.id)).status, 403);
@@ -925,7 +877,6 @@ const future = (days) => { const d = new Date(Date.now() + days * 864e5); return
     assert.ok((await emp.post('kudos', { to_user_id: sariId, message: 'itselle' })).status >= 400);
     assert.ok((await emp.post('kudos', { to_user_id: mikkoId2, message: '' })).status >= 400);
     const k = (await emp.get('')).json.kudos.find(x => x.message === 'Kiitos vuoron vaihdosta!'); assert.ok(k);
-    assert.strictEqual((await other.get('')).json.kudos.length, 0, 'toisen baarin kiitokset näkyvät');
     const lc = new Client(); await lc.login('laura', 'demobaari'); assert.strictEqual((await lc.del('kudos', k.id)).status, 403);
     assert.strictEqual((await emp.del('kudos', k.id)).status, 200);
   });
@@ -955,45 +906,6 @@ const future = (days) => { const d = new Date(Date.now() + days * 864e5); return
     assert.strictEqual(mailbox.messages.filter(x => /JV-kortti/.test(x.subject)).length, n, 'muistutus toistui');
   });
 
-  console.log('Keikkalaiset');
-  await t('keikkalaisprofiili on opt-in ja näkyy muille baareille vain lyhennettynä', async () => {
-    assert.deepStrictEqual((await other.get('gig_pool')).json.pool, [], 'oletuksena ei näy');
-    const lc = new Client(); await lc.login('laura', 'demobaari');
-    assert.ok((await lc.post('gig_profile', { available: true, note: 'Baarimestari, viikonloput' })).json.success);
-    const pool = (await other.get('gig_pool')).json.pool; assert.strictEqual(pool.length, 1); assert.strictEqual(pool[0].name, 'Laura L.'); assert.strictEqual(pool[0].note, 'Baarimestari, viikonloput');
-    assert.ok(!JSON.stringify(pool).match(/laura@|phone|wage|demobaari/i), 'vuotaa tietoa');
-    assert.strictEqual((await emp.get('gig_pool')).status, 403);
-    assert.strictEqual((await admin.get('gig_pool')).json.pool.length, 0, 'oman baarin jäsen näkyy poolissa');
-    assert.strictEqual((await other.get('')).json.users.find(u => u.username === 'muutyontekija').gig_available, null);
-    assert.strictEqual((await lc.get('')).json.users.find(u => u.username === 'laura').gig_available, 1);
-  });
-  await t('keikkakutsu: lähetys, hylkäys ja hyväksyntä (jäsenyys + vuoro)', async () => {
-    const pool = (await other.get('gig_pool')).json.pool, tid = pool[0].id;
-    const d = future(270);
-    await other.post('shift', { userId: null, date: d, start: '18:00', end: '23:00', role: 'Ovi' });
-    const openShift = (await other.get('')).json.shifts.find(x => x.date === d && !x.userId);
-    assert.ok((await other.post('gig_invite', { userId: 999999 })).status >= 400);
-    assert.ok((await other.post('gig_invite', { userId: tid, message: 'Tarvitaan apua', shiftId: openShift.id })).json.success);
-    assert.strictEqual((await other.post('gig_invite', { userId: tid })).status, 409, 'kaksoiskutsu');
-    assert.strictEqual((await emp.post('gig_invite', { userId: tid })).status, 403);
-    const lc = new Client(); await lc.login('laura', 'demobaari');
-    const inc = (await lc.get('')).json.gig_incoming; assert.strictEqual(inc.length, 1); assert.strictEqual(inc[0].s_date, d);
-    assert.strictEqual((await emp.get('')).json.gig_incoming.length, 0, 'muiden kutsut näkyvät');
-    assert.strictEqual((await emp.post('gig_respond', { inviteId: inc[0].id, accept: true })).status, 404, 'toisen kutsu');
-    // hylkäys ja uusi kutsu
-    assert.ok((await lc.post('gig_respond', { inviteId: inc[0].id, accept: false })).json.success);
-    assert.ok((await other.post('gig_invite', { userId: tid, message: 'Uusi yritys', shiftId: openShift.id })).json.success);
-    const inc2 = (await lc.get('')).json.gig_incoming; const r = (await lc.post('gig_respond', { inviteId: inc2[0].id, accept: true })).json;
-    assert.ok(r.success && r.joined === 'toinenbaari', JSON.stringify(r));
-    const me = (await lc.get('me')).json.user; assert.strictEqual(me.memberships.length, 2, 'jäsenyys puuttuu');
-    const asg = (await other.get('')).json.shifts.find(x => x.id === openShift.id); assert.strictEqual(asg.userId, r.newUserId, 'vuoroa ei annettu');
-    const nu = (await other.get('')).json.users.find(u => u.id === r.newUserId); assert.ok(nu.employment_type === 'casual' && nu.name === 'Laura Laine');
-    assert.deepStrictEqual((await other.get('gig_pool')).json.pool, [], 'jäsen näkyy yhä poolissa');
-    assert.ok((await other.get('')).json.gig_outgoing.some(g => g.status === 'accepted' && g.worker === 'Laura L.'));
-    // vaihto uuteen baariin ja takaisin
-    assert.ok((await lc.post('switch_pub', { userId: r.newUserId })).json.success); assert.ok((await lc.post('switch_pub', { userId: me.id })).json.success);
-    const h = (await lc.get('my_history')).json.history; assert.strictEqual(h.length, 2);
-  });
 
   console.log('Ilmoittautuminen, liput ja pöytävaraukset (baarikohtaisesti aktivoitavat)');
   const pidDemo = (await admin.get('pub_profile')).json.public_id;
@@ -1041,7 +953,6 @@ const future = (days) => { const d = new Date(Date.now() + days * 864e5); return
     assert.ok((await admin.post('reg_update', { id: regs.find(x => x.name === 'Ville').id, arrived: 1 })).json.success);
     const csv = await admin.req('GET', 'event_registrations', { query: `&eventId=${regEvent.id}&format=csv`, raw: true }); assert.ok(csv.text.includes('Ville') && csv.text.includes('kyllä'));
     assert.strictEqual((await emp.get('event_registrations', `&eventId=${regEvent.id}`)).status, 403);
-    assert.ok((await other.get('event_registrations', `&eventId=${regEvent.id}`)).status >= 400, 'toisen baarin ilmoittautumiset');
   });
   const bkDate = future(30);
   const slotsOf = async (party) => (await anon.get('public_slots', `&pub=${pidDemo}&date=${bkDate}&party=${party}`)).json.slots;
@@ -1073,7 +984,6 @@ const future = (days) => { const d = new Date(Date.now() + days * 864e5); return
     const b = await anon.post('public_book', { pub: pidDemo, name: 'Odottaja', email: 'odottaja@example.test', party: 2, date: bkDate, time: '12:00' }); assert.strictEqual(b.json.status, 'pending');
     const id = (await admin.get('')).json.bookings.find(x => x.name === 'Odottaja').id;
     assert.strictEqual((await emp.post('booking_status', { id, status: 'confirmed' })).status, 403);
-    assert.ok((await other.post('booking_status', { id, status: 'confirmed' })).status >= 400, 'toisen baarin varaus');
     assert.ok((await admin.post('booking_status', { id, status: 'confirmed' })).json.success);
     assert.ok(await waitMail(mailbox, m => m.to === 'odottaja@example.test' && /vahvistettu/.test(m.subject)), 'vahvistusposti puuttuu');
     assert.ok((await admin.post('booking_status', { id, status: 'nonsense' })).status >= 400);
@@ -1097,8 +1007,6 @@ const future = (days) => { const d = new Date(Date.now() + days * 864e5); return
     const list = (await admin.get('guests', '&q=odottaja')).json.guests; assert.strictEqual(list.length, 1); assert.ok(list[0].visits >= 1);
     assert.strictEqual((await admin.get('guests', '&q=zzzzeiloydy')).json.guests.length, 0);
     const hist = (await admin.get('guest_history', `&id=${g.json.id}`)).json; assert.ok(hist.bookings.length >= 1);
-    assert.ok((await other.get('guests')).status >= 400 && (await other.get('guest_history', `&id=${g.json.id}`)).status >= 400, 'toisen baarin kortisto');
-    assert.ok((await other.del('guest', g.json.id)).status >= 400);
     assert.ok((await admin.post('guest', { id: g.json.id, name: 'Odottaja Testi', email: 'odottaja@example.test', vip: 0, allergies: '' })).json.success);
     assert.strictEqual((await admin.get('')).json.bookings.find(x => x.name === 'Odottaja').vip, 0);
     assert.ok((await admin.del('guest', g.json.id)).json.success); await admin.del('guest', fb.json.id);
@@ -1265,14 +1173,14 @@ const future = (days) => { const d = new Date(Date.now() + days * 864e5); return
     await admin.del('user', (await usersNow()).find(u => u.username === 'vahva').id);
   });
   await t('2FA-pakote: ylläpitäjä ilman 2FA:ta ohjataan käyttöönottoon; ensin oma 2FA', async () => {
-    const boss = new Client(); assert.ok((await boss.login('muuadmin', 'toinenbaari')).json.success);
-    assert.ok((await boss.post('save_pub_settings', { name: 'Toinen baari', timezone: 'Europe/Helsinki', roles: ['A'], bonuses: { evening: 1, night: 1, sat: 1, sun: 2 }, require_2fa: true })).status >= 400, 'pakotus ilman omaa 2FA:ta');
+    assert.ok((await admin.post('user', { name: 'Pakote Admin', username: 'pakoteadmin', password: 'Kuusi-Kalaa-Uimassa-7', role: 'admin' })).json.success);
+    const boss = new Client(); assert.ok((await boss.login('pakoteadmin', 'demobaari', 'Kuusi-Kalaa-Uimassa-7')).json.success);
+    assert.ok((await boss.post('save_pub_settings', { ...settings, require_2fa: true })).status >= 400, 'pakotus ilman omaa 2FA:ta');
     const b = (await boss.post('totp_begin')).json; const secret = b32decode(b.secret); const st = Math.floor(Date.now() / 30000);
     assert.ok((await boss.post('totp_enable', { code: totp(secret, st) })).json.success);
-    assert.ok((await boss.post('save_pub_settings', { name: 'Toinen baari', timezone: 'Europe/Helsinki', roles: ['A'], bonuses: { evening: 1, night: 1, sat: 1, sun: 2 }, require_2fa: true })).json.success);
-    // toinen ylläpitäjä samassa baarissa ilman 2FA:ta
-    assert.ok((await boss.post('user', { name: 'Toinen Admin', username: 'toinenadmin', password: 'Kuusi-Kalaa-Uimassa-7', role: 'admin' })).json.success);
-    const ta = new Client(); assert.ok((await ta.login('toinenadmin', 'toinenbaari', 'Kuusi-Kalaa-Uimassa-7')).json.success);
+    assert.ok((await boss.post('save_pub_settings', { ...settings, require_2fa: true })).json.success);
+    // toinen ylläpitäjä (demobaarin admin) ilman 2FA:ta
+    const ta = new Client(); assert.ok((await ta.login('admin', 'demobaari')).json.success);
     const blocked = await ta.get(''); assert.strictEqual(blocked.status, 403); assert.strictEqual(blocked.json.need_2fa, true);
     assert.strictEqual((await ta.get('payroll')).status, 403); assert.strictEqual((await ta.post('shift', { date: future(3), start: '10:00', end: '12:00' })).status, 403);
     assert.strictEqual((await ta.get('me')).status, 200);
@@ -1280,8 +1188,10 @@ const future = (days) => { const d = new Date(Date.now() + days * 864e5); return
     assert.ok((await ta.post('totp_enable', { code: totp(s2, Math.floor(Date.now() / 30000)) })).json.success);
     assert.strictEqual((await ta.get('')).status, 200, 'pääsy ei palannut 2FA:n jälkeen');
     // työntekijöitä pakote ei koske
-    assert.strictEqual((await other.get('')).status, 200);
-    await boss.post('save_pub_settings', { name: 'Toinen baari', timezone: 'Europe/Helsinki', roles: ['A'], bonuses: { evening: 1, night: 1, sat: 1, sun: 2 }, require_2fa: false });
+    assert.strictEqual((await emp.get('')).status, 200);
+    await boss.post('save_pub_settings', { ...settings, require_2fa: false });
+    assert.ok((await ta.post('totp_disable', { password: PW, code: '000000' })).status >= 400);
+    await execFileP('mysql', ['-h', process.env.DB_HOST, '-u', process.env.DB_USER, ...(process.env.DB_PASS ? ['-p' + process.env.DB_PASS] : []), process.env.DB_NAME, '-e', "UPDATE users SET totp_enabled = 0, totp_secret = NULL, recovery_codes = NULL WHERE username = 'admin'; DELETE FROM users WHERE username = 'pakoteadmin'"]);
   });
   await t('julkiset tiedostot: ei ulkoisia resursseja sovelluksen sivuilla', async () => {
     const fs = require('fs'), root = require('path').join(__dirname, '..');
@@ -1302,7 +1212,6 @@ const future = (days) => { const d = new Date(Date.now() + days * 864e5); return
     assert.ok(a.punctuality.length > 0 && a.punctuality.every(p => p.shifts >= p.late && 'avg_late' in p));
     assert.ok(a.sick_by_user.every(s => s.days >= s.episodes));
     assert.strictEqual((await admin.get('analytics', '&months=99')).json.months.length, 12);
-    assert.deepStrictEqual((await other.get('analytics')).json.hours.every(h => h === 0), true, 'toisen baarin tunnit vuotavat');
   });
 
   await t('järjestelmän tila: cron, varmuuskopio, health-päätepiste', async () => {

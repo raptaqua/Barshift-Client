@@ -30,7 +30,7 @@ async function postJson(action, body) {
 
 // ---- Kiitokset ----
 function teamKudos() {
-    const mates = (state.data.users || []).filter(u => u.id != state.user.id && u.role !== 'superadmin' && !u.anonymized_at);
+    const mates = (state.data.users || []).filter(u => u.id != state.user.id && !u.anonymized_at);
     const wall = state.data.kudos || [], isAdmin = state.user.role === 'admin';
     return `<div class="card card-sm" style="max-width:640px; margin-bottom:16px;">
         <div class="section-header"><span class="section-title"><i class="bi bi-emoji-smile"></i> Kiitä työkaveria</span><div class="section-line"></div></div>
@@ -49,7 +49,7 @@ async function sendKudos() {
 
 // ---- Dokumentit ----
 function teamDocs() {
-    const docs = state.data.documents || [], isAdmin = can('content.manage'), users = (state.data.users || []).filter(u => u.role !== 'superadmin' && !u.anonymized_at);
+    const docs = state.data.documents || [], isAdmin = can('content.manage'), users = (state.data.users || []).filter(u => !u.anonymized_at);
     const kb = n => n > 1048576 ? (n / 1048576).toFixed(1) + ' Mt' : Math.max(1, Math.round(n / 1024)) + ' kt';
     return `${isAdmin ? `<div class="card card-sm" style="max-width:640px; margin-bottom:16px;">
         <div class="section-header"><span class="section-title"><i class="bi bi-upload"></i> Lisää dokumentti</span><div class="section-line"></div></div>
@@ -87,7 +87,7 @@ function teamOnboarding() {
         ${p.items.map((t, i) => `<label style="display:flex; gap:8px; align-items:flex-start; padding:5px 0; font-size:14px; cursor:pointer;"><input type="checkbox" ${p.done.includes(i) ? 'checked' : ''} onchange="toggleChecklist(${p.id}, ${i})" style="margin-top:3px;"><span style="${p.done.includes(i) ? 'text-decoration:line-through; color:var(--text3);' : ''}">${esc(t)}</span></label>`).join('')}</div>`; }).join('')
         : `<div class="tool-empty">${isAdmin ? 'Sinulla ei ole tehtävälistoja.' : 'Ei tehtävälistoja sinulle. Kun ylläpito antaa sinulle perehdytyslistan, se näkyy tässä.'}</div>`;
     if (!isAdmin) return html;
-    const users = (state.data.users || []).filter(u => u.role !== 'superadmin' && !u.anonymized_at);
+    const users = (state.data.users || []).filter(u => !u.anonymized_at);
     html += `<div class="section-header" style="margin-top:24px;"><span class="section-title">Listojen hallinta</span><div class="section-line"></div></div>
     <div class="card card-sm" style="max-width:640px; margin-bottom:14px;">
         <div class="form-group" style="margin-bottom:8px;"><input id="cl-name" class="form-input" maxlength="100" placeholder="Listan nimi (esim. Uuden työntekijän perehdytys)"></div>

@@ -2,7 +2,7 @@
 // Osaamiset (esim. Ovi, Anniskelu, Kahvikone) voi sitoa vuoron rooliin: jos vuoroon asetetulta puuttuu osaaminen tai se on vanhentunut, vuoroon tulee varoitus (ei esto).
 function userSkill(uid, sid) { return (state.data.user_skills || []).find(x => x.user_id == uid && x.skill_id == sid) || null; }
 function adminTabSkills() {
-    const skills = state.data.skills || [], users = (state.data.users || []).filter(u => u.role !== 'superadmin' && !u.anonymized_at);
+    const skills = state.data.skills || [], users = (state.data.users || []).filter(u => !u.anonymized_at);
     const today = getLocalDateString();
     const cell = (u, s) => {
         const us = userSkill(u.id, s.id);

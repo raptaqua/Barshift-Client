@@ -156,18 +156,10 @@ function renderAttention(today, isAdmin) {
             + `<button class="btn btn-primary btn-sm att-cta" onclick="nav('team')">Avaa Tiimi →</button>`, n <= 2));
     }
 
-    if ((st.gig_incoming || []).length) groups.push(attGroup('gig', 'bi-briefcase', 'Keikkakutsut', st.gig_incoming.length, 'var(--teal)', gigInviteRows(), true));
-
     // vuoronvaihdot (olemassa oleva näkymä)
     const tradeCount = (st.trades || []).filter(t => (t.status === 'open' && t.offered_by_id != state.user.id) || (t.status === 'pending' && t.offered_by_id == state.user.id) || (t.status === 'open' && t.offered_by_id == state.user.id)).length;
     if (tradeCount) groups.push(attGroup('trade', 'bi-arrow-left-right', 'Vuoronvaihdot', tradeCount, 'var(--accent)', renderTradeAlerts(), true));
 
-    if (isAdmin) {   // toisten baarien työvoimapyynnöt hyväksyttäväksi
-        const pj = (st.job_listings || []).filter(j => j.pub_name !== state.user.pub_name && j.status === 'open' && (j.approvals || []).some(a => a.pub_name === state.user.pub_name && a.status === 'pending'));
-        if (pj.length) groups.push(attGroup('jobp', 'bi-shield-check', 'Työvoimapyynnöt hyväksyttävänä', pj.length, '#F59E0B',
-            pj.map(j => `<div class="att-row" style="flex-wrap:wrap; gap:8px;"><div style="flex:1; min-width:180px;"><b>🏢 ${esc(j.pub_name.toUpperCase())}</b> tarvitsee apua<br><small>“${esc(j.message)}” · ${esc(j.contact)}</small></div>
-                <div style="display:flex; gap:6px;"><button class="btn btn-primary btn-sm" style="background:var(--teal); border:none;" onclick="handleJobApproval(${j.id}, 'approved')">Salli</button><button class="btn btn-danger btn-sm" onclick="handleJobApproval(${j.id}, 'rejected')">Hylkää</button></div></div>`).join(''), true));
-    }
 
     // avoimet vuorot
     const open = (st.shifts || []).filter(s => (!s.userId || s.userId == 0) && s.date >= today).sort((a, b) => (a.date + a.start).localeCompare(b.date + b.start));
@@ -181,11 +173,6 @@ function renderAttention(today, isAdmin) {
         groups.push(attGroup('open', 'bi-unlock', 'Avoimet vuorot', open.length, '#F59E0B',
             rows + (open.length > 3 ? `<button class="btn btn-ghost btn-sm att-cta" onclick="goOpenShifts()">Näytä kaikki ${open.length} avointa vuoroa →</button>` : ''), open.length <= 3));
     }
-
-    // muiden baarien avoimet vuorot
-    const others = (st.job_listings || []).filter(j => j.status === 'open' && j.pub_name !== state.user.pub_name && (j.approvals || []).some(a => a.pub_name === state.user.pub_name && a.status === 'approved'));
-    if (others.length) groups.push(attGroup('jobo', 'bi-briefcase', 'Vuoroja muissa baareissa', others.length, 'var(--teal)',
-        others.map(j => `<div class="att-row"><div><b>📍 ${esc(j.pub_name.toUpperCase())}</b><br><small>${esc(j.message)}</small><br><small>📞 <b style="color:var(--accent)">${esc(j.contact)}</b></small></div></div>`).join('')));
 
     if (!groups.length) return `<div class="att-empty"><i class="bi bi-check2-circle"></i> Ei mitään huomioitavaa juuri nyt.</div>`;
     return `<div class="att-list">${groups.join('')}</div>`;
@@ -497,7 +484,7 @@ function renderProfile() {
 
     let saved = null; try { saved = localStorage.getItem('barshift_profile_tab'); } catch (e) {}
     const tabs = [
-        { id: 'info', label: 'Tiedot', icon: 'bi-person', html: secInfo + renderGigCard() },
+        { id: 'info', label: 'Tiedot', icon: 'bi-person', html: secInfo },
         { id: 'leave', label: 'Vuosiloma', icon: 'bi-airplane', html: secLeave },
         { id: 'avail', label: 'Saatavuus', icon: 'bi-calendar-x', html: renderAvailabilityRules() },
         { id: 'notif', label: 'Ilmoitukset', icon: 'bi-bell', html: secNotif },
@@ -538,7 +525,6 @@ function copyIcal() {
 
 // ===================== CLOCK IN/OUT CARD =====================
 function renderClockWidget() {
-    if(state.user.role === 'superadmin') return '';
     const myOpenEntry = state.data.time_entries.find(t => t.user_id == state.user.id && (!t.clock_out || t.clock_out === '0000-00-00 00:00:00' || t.clock_out === 'null'));
     
     if (myOpenEntry) {
@@ -574,40 +560,6 @@ async function clockOut() {
 }
 
 
-// ===================== SUPERADMIN PANEL =====================
-function renderSuperadmin() {
-    const stats = state.data.stats || {total_pubs: 0, total_users: 0, total_shifts: 0};
-    const pubs = state.data.pubs || [];
-    return `
-    <div class="page-header"><div class="page-title">Superadmin - Hallintapaneeli</div></div>
-    <div class="stat-row">
-        <div class="stat-card"><div class="stat-label">Baareja</div><div class="stat-value accent">${stats.total_pubs}</div></div>
-        <div class="stat-card"><div class="stat-label">Käyttäjiä</div><div class="stat-value teal">${stats.total_users}</div></div>
-        <div class="stat-card"><div class="stat-label">Vuoroja luotu</div><div class="stat-value">${stats.total_shifts}</div></div>
-    </div>
-    <div class="card card-sm">
-        <div class="section-header"><span class="section-title">Luo uusi baari ja pääkäyttäjä</span><div class="section-line"></div></div>
-        <div class="form-row">
-            <div class="form-group" style="flex:2;"><label class="form-label">Baarin tunniste</label><input id="sa-pub" class="form-input" placeholder="ilman välilyöntejä"></div>
-            <div class="form-group" style="flex:2;"><label class="form-label">Admin Nimi</label><input id="sa-name" class="form-input"></div>
-            <div class="form-group" style="flex:1.5;"><label class="form-label">Tunnus</label><input id="sa-user" class="form-input"></div>
-            <div class="form-group" style="flex:1.5;"><label class="form-label">Salasana</label><input id="sa-pass" type="password" class="form-input"></div>
-            <div class="form-group" style="flex:0; align-self:flex-end;"><button class="btn btn-primary" onclick="addPubAdmin()">Luo Baari</button></div>
-        </div>
-    </div>
-    <div class="card" style="padding:0; overflow-x:auto;">
-        <table class="bs-table">
-            <thead><tr><th>Baari</th><th>Admin</th><th>Käyttäjiä</th><th>Tila</th><th>Toiminnot</th></tr></thead>
-            <tbody>${pubs.map(p => `<tr>
-                <td><span class="badge badge-orange">${esc(p.pub_name)}</span></td>
-                <td><strong>${esc(p.admin_name || 'Tuntematon')}</strong></td>
-                <td>${p.user_count}</td>
-                <td><span class="badge" style="background:${p.status==='frozen'?'#E11D4822':'#0D948822'}; color:${p.status==='frozen'?'#E11D48':'#0D9488'}">${p.status==='frozen'?'JÄÄDYTETTY':'AKTIIVINEN'}</span></td>
-                <td style="text-align:right"><button class="btn btn-ghost btn-sm" onclick="togglePubStatus(${escJs(p.pub_name)}, '${p.status==='frozen'?'active':'frozen'}')">${p.status==='frozen'?'Aktivoi':'Jäädytä'}</button></td>
-            </tr>`).join('')}</tbody>
-        </table>
-    </div>`;
-}
 
 async function addPubAdmin() {
     const pub = document.getElementById('sa-pub').value.trim().toLowerCase().replace(/\s+/g, '');
@@ -616,11 +568,6 @@ async function addPubAdmin() {
     const sr = await (await fetch('api.php?action=user', { method:'POST', body: JSON.stringify(data) })).json();
     if (sr.error) return showToast(sr.error, 'error');
     showToast(`Baari ${pub} lisätty`); load();
-}
-async function togglePubStatus(pub_name, newStatus) {
-    if(!confirm(`Haluatko muuttaa baarin ${pub_name} tilaksi: ${newStatus}?`)) return;
-    await fetch('api.php?action=toggle_pub', { method:'POST', body: JSON.stringify({ pub_name, status: newStatus }) });
-    load();
 }
 
 // ===================== TRADE ALERTS =====================

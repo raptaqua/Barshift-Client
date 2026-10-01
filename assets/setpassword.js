@@ -14,41 +14,10 @@
   if (!/^[0-9a-f]{64}$/.test(token)) return fail('Linkistä puuttuu tunniste.');
   history.replaceState(null, '', location.pathname);   // poistetaan tunniste osoiteriviltä
 
-  function linkChoice(j) {
-    var pub = j.login.split('@')[1] || '';
-    var yes = el('button', { type: 'button' }, 'Kyllä, yhdistä tunnukseeni');
-    var no = el('button', { type: 'button', style: 'background:#fff; color:#0F172A; border:1px solid #CBD5E1; margin-top:8px' }, 'Ei, luo uusi salasana');
-    show(el('h1', {}, 'Tervetuloa baariin ' + pub), el('p', {}, 'Hei ' + j.name + '! Sinut on kutsuttu baarin ' + pub + ' työntekijäksi. Onko sinulla jo BarShift-tunnus toisessa baarissa? Voit liittää tämän baarin siihen ja vaihtaa baarien välillä yhdellä kirjautumisella.'), yes, no);
-    no.addEventListener('click', function () { window.__forceNew = true; load(); });
-    yes.addEventListener('click', function () {
-      var u = el('input', { id: 'lu', autocomplete: 'username', placeholder: 'tunnus@baari' }), pw = el('input', { id: 'lp', type: 'password', autocomplete: 'current-password' }), code = el('input', { id: 'lc', autocomplete: 'one-time-code', placeholder: '(vain jos 2FA käytössä)' });
-      var err = el('div', { 'class': 'err' }), btn = el('button', { type: 'button' }, 'Yhdistä');
-      var f = document.createElement('div');
-      [el('h1', {}, 'Yhdistä olemassa olevaan tunnukseen'), el('p', {}, 'Anna nykyisen tunnuksesi tiedot todistaaksesi, että se on sinun.'), el('label', { 'for': 'lu' }, 'Nykyinen tunnus'), u, el('label', { 'for': 'lp' }, 'Salasana'), pw, el('label', { 'for': 'lc' }, 'Kaksivaiheisen koodi'), code, err, btn].forEach(function (n) { f.appendChild(n); });
-      show(f);
-      function go() {
-        err.style.display = 'none'; var parts = u.value.trim().split('@');
-        if (parts.length !== 2 || !parts[0] || !parts[1]) { err.textContent = 'Anna tunnus muodossa tunnus@baari'; err.style.display = 'block'; return; }
-        btn.disabled = true;
-        fetch('api.php?action=accept_link', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token: token, username: parts[0], pub_name: parts[1], password: pw.value, code: code.value }) })
-          .then(function (r) { return r.json().then(function (x) { return { ok: r.ok, x: x }; }); })
-          .then(function (r) {
-            if (!r.ok) { btn.disabled = false; err.textContent = r.x.error || 'Yhdistäminen epäonnistui'; err.style.display = 'block'; return; }
-            var done = el('div', { 'class': 'ok' });
-            done.appendChild(el('h1', {}, 'Baari yhdistetty ✓'));
-            done.appendChild(el('p', {}, 'Kirjaudu tunnuksellasi ' + r.x.login + ' – baarien välillä vaihdat sivun ylälaidan valinnasta.'));
-            done.appendChild(el('a', { href: 'index.php' }, 'Kirjaudu sisään →'));
-            show(done);
-          }).catch(function () { btn.disabled = false; err.textContent = 'Yhteys palvelimeen epäonnistui'; err.style.display = 'block'; });
-      }
-      btn.addEventListener('click', go); pw.addEventListener('keydown', function (e) { if (e.key === 'Enter') go(); });
-    });
-  }
   function load() {
   return fetch('api.php?action=token_info&token=' + token).then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); }).then(function (res) {
     if (!res.ok) return fail(res.j.error || 'Linkki on virheellinen tai vanhentunut.');
     var j = res.j, invite = j.kind !== 'reset';
-    if (j.kind === 'link' && !window.__forceNew) return linkChoice(j);
     var err = el('div', { 'class': 'err' });
     var p1 = el('input', { type: 'password', id: 'p1', autocomplete: 'new-password', minlength: '8' });
     var p2 = el('input', { type: 'password', id: 'p2', autocomplete: 'new-password', minlength: '8' });

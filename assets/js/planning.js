@@ -12,7 +12,7 @@ function confirmWarnings(w, question) {
 }
 function offerShift(shiftId) {
     const s = state.data.shifts.find(x => x.id == shiftId); if (!s) return;
-    const mates = state.data.users.filter(u => u.id != state.user.id && u.role !== 'superadmin' && !u.anonymized_at);
+    const mates = state.data.users.filter(u => u.id != state.user.id && !u.anonymized_at);
     openModal('Tarjoa vuoro vaihtoon', 'bi-arrow-left-right', `
         <p style="font-size:14px; margin:0 0 12px;"><b>${formatDate(s.date)}</b> ${s.start.slice(0, 5)}–${s.end.slice(0, 5)} (${esc(s.role || '')})</p>
         <div class="form-group"><label class="form-label">Kenelle</label>

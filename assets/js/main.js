@@ -3,7 +3,7 @@ function renderLogin() {
     return `<div class="login-page"><div class="login-card">
         <div class="login-logo">Bar<span>Shift</span></div>
         <div class="card">
-            <div class="form-group" style="margin-bottom:16px;"><label class="form-label">Käyttäjätunnus</label><input id="li-u" class="form-input" placeholder="tunnus@baari" onkeydown="if(event.key==='Enter')login()"></div>
+            <div class="form-group" style="margin-bottom:16px;"><label class="form-label">Käyttäjätunnus</label><input id="li-u" class="form-input" placeholder="tunnus" onkeydown="if(event.key==='Enter')login()"></div>
             <div class="form-group" style="margin-bottom:24px;"><label class="form-label">Salasana</label><input id="li-p" type="password" class="form-input" placeholder="••••••••" onkeydown="if(event.key==='Enter')login()"></div>
             <button class="btn btn-primary" onclick="login()" style="width:100%; justify-content:center; padding:12px;">Kirjaudu sisään</button>
             <div style="text-align:center; margin-top:14px; font-size:13px;"><a href="#" onclick="openForgot(); return false;" style="color:var(--accent); font-weight:600;">Unohtuiko salasana?</a></div>
@@ -15,20 +15,18 @@ function renderLogin() {
 
 async function login() {
     const uInput = document.getElementById('li-u').value.trim(); const p = document.getElementById('li-p').value;
-    let username = uInput, pub_name = '';
-    if (uInput === 'superadmin') { username = 'superadmin'; pub_name = 'SYSTEM'; }
-    else if (uInput.includes('@')) { const parts = uInput.split('@'); username = parts[0]; pub_name = parts[1]; }
-    else { return showToast('Muoto: tunnus@baari', 'error'); }
+    const username = uInput.split('@')[0];   // yhden baarin asennus: baaria ei tarvitse kirjoittaa
+    if (!username) return showToast('Anna tunnus', 'error');
 
     try {
-        const res = await fetch('api.php?action=login', { method: 'POST', body: JSON.stringify({ username, password: p, pub_name }) });
+        const res = await fetch('api.php?action=login', { method: 'POST', body: JSON.stringify({ username, password: p }) });
         const text = await res.text(); const data = JSON.parse(text);
         if (data.error) return showToast(data.error, 'error');
         if (data.needs_2fa) return show2faStep();
         if (data.success) {
             state.user = data.user;
             localStorage.setItem('barshift_user', JSON.stringify(state.user));
-            state.view = state.user.role === 'superadmin' ? 'superadmin' : 'dashboard';
+            state.view = 'dashboard';
             load();
         } else { showToast('Väärä tunnus tai salasana', 'error'); }
     } catch(e) { showToast('Yhteys palvelimeen epäonnistui', 'error'); }
@@ -53,7 +51,7 @@ async function login2fa() {
         if (data.error) { if (res.status === 401 && /vanheni/.test(data.error)) { showToast(data.error, 'error'); return setTimeout(() => location.reload(), 1200); } return showToast(data.error, 'error'); }
         state.user = data.user;
         localStorage.setItem('barshift_user', JSON.stringify(state.user));
-        state.view = state.user.role === 'superadmin' ? 'superadmin' : 'dashboard';
+        state.view = 'dashboard';
         load();
     } catch (e) { showToast('Yhteys palvelimeen epäonnistui', 'error'); }
 }
@@ -62,15 +60,15 @@ async function login2fa() {
 function openForgot() {
     const cur = (document.getElementById('li-u') || {}).value || '';
     openModal('Unohtuiko salasana?', 'bi-key', `<p style="font-size:13px; color:var(--text2); margin:0 0 12px;">Anna käyttäjätunnuksesi. Jos tunnukselle on tallennettu sähköpostiosoite, lähetämme sinne linkin uuden salasanan asettamiseen. Jos osoitetta ei ole, pyydä linkki baarin ylläpitäjältä.</p>
-        <div class="form-group"><label class="form-label">Käyttäjätunnus</label><input id="fg-u" class="form-input" placeholder="tunnus@baari" value="${esc(cur.trim())}" onkeydown="if(event.key==='Enter')requestReset()"></div>`,
+        <div class="form-group"><label class="form-label">Käyttäjätunnus</label><input id="fg-u" class="form-input" placeholder="tunnus" value="${esc(cur.trim())}" onkeydown="if(event.key==='Enter')requestReset()"></div>`,
         `<button class="btn btn-ghost" onclick="closeModal()">Peruuta</button><button class="btn btn-primary" onclick="requestReset()"><i class="bi bi-envelope"></i> Lähetä linkki</button>`);
 }
 async function requestReset() {
     const v = document.getElementById('fg-u').value.trim();
-    if (!v.includes('@')) return showToast('Muoto: tunnus@baari', 'error');
-    const [username, pub_name] = v.split('@');
+    const username = v.split('@')[0];
+    if (!username) return showToast('Anna tunnus', 'error');
     try {
-        const r = await (await fetch('api.php?action=request_reset', { method: 'POST', body: JSON.stringify({ username, pub_name }) })).json();
+        const r = await (await fetch('api.php?action=request_reset', { method: 'POST', body: JSON.stringify({ username }) })).json();
         if (r.error) return showToast(r.error, 'error');
         closeModal(); showToast(r.message);
     } catch (e) { showToast('Yhteys palvelimeen epäonnistui', 'error'); }

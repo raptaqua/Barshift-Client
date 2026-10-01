@@ -31,12 +31,6 @@ export BARSHIFT_CONFIG="$TMP/config.php"
 
 php migrate.php > "$TMP/migrate.log" || { cat "$TMP/migrate.log"; exit 1; }
 "${MYSQL[@]}" "$DB_NAME" < db/seed_demo.sql
-# Toinen baari baarieristyksen testaamiseen (salasana sama kuin demobaarin)
-"${MYSQL[@]}" "$DB_NAME" -e "
-INSERT INTO users (name, username, password, role, pub_name) SELECT 'Muu Admin', 'muuadmin', password, 'admin', 'toinenbaari' FROM users WHERE username='admin' AND pub_name='demobaari';
-INSERT INTO users (name, username, password, role, pub_name) SELECT 'Muu Työntekijä', 'muutyontekija', password, 'employee', 'toinenbaari' FROM users WHERE username='admin' AND pub_name='demobaari';
-INSERT INTO shifts (userId, date, start, end, role, pub_name) SELECT id, CURDATE(), '10:00', '16:00', 'Ovi', 'toinenbaari' FROM users WHERE username='muutyontekija';"
-
 php -S "127.0.0.1:$PORT" > "$TMP/server.log" 2>&1 &
 PHP_PID=$!
 for i in $(seq 1 30); do curl -s -o /dev/null "http://127.0.0.1:$PORT/api.php" && break; sleep 0.2; done

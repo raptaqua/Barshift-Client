@@ -10,7 +10,7 @@ function bsFatalJson(string $msg, string $where): void {
     if (headers_sent()) return;
     while (ob_get_level() > 0) @ob_end_clean();
     http_response_code(500); header('Content-Type: application/json; charset=utf-8');
-    $admin = isset($GLOBALS['me']) && is_array($GLOBALS['me']) && in_array($GLOBALS['me']['role'] ?? '', ['admin', 'superadmin'], true);
+    $admin = isset($GLOBALS['me']) && is_array($GLOBALS['me']) && in_array($GLOBALS['me']['role'] ?? '', ['admin'], true);
     echo json_encode(['error' => 'Palvelinvirhe' . ($admin ? ': ' . $msg . ' (' . $where . ')' : '. Yritä hetken päästä uudelleen.')], JSON_UNESCAPED_UNICODE);
 }
 set_exception_handler(function (\Throwable $e) { bsFatalJson($e->getMessage(), basename($e->getFile()) . ':' . $e->getLine()); });
@@ -125,9 +125,7 @@ function requireLogin($conn) {
     return $u;
 }
 function isAdmin($u) { return $u['role'] === 'admin'; }
-function isSuper($u) { return $u['role'] === 'superadmin'; }
 function requireAdmin($u) { if (!isAdmin($u)) fail('Ei oikeuksia', 403); }
-function requireSuper($u) { if (!isSuper($u)) fail('Ei oikeuksia', 403); }
 
 // ===================== KÄYTTÖOIKEUSROOLIT =====================
 // Ylläpitäjä saa aina kaiken. Työntekijän oikeudet määräytyvät hänen käyttöoikeusroolistaan (baarin asetus pubs.access_roles).
@@ -193,9 +191,7 @@ function inPub($conn, string $kind, $id, string $pub): bool {
         'documents' => "SELECT 1 FROM documents WHERE id = ? AND pub_name = ?",
         'kudos' => "SELECT 1 FROM kudos WHERE id = ? AND pub_name = ?",
         'surveys' => "SELECT 1 FROM surveys WHERE id = ? AND pub_name = ?",
-        'gig_invites' => "SELECT 1 FROM gig_invites WHERE id = ? AND from_pub = ?",
         'availability_rules' => "SELECT 1 FROM availability_rules WHERE id = ? AND pub_name = ?",
-        'job_listings' => "SELECT 1 FROM job_listings WHERE id = ? AND from_pub = ?",
     ][$kind] ?? null;
     if (!$sql) return false;
     $id = (int)$id;
@@ -271,6 +267,8 @@ function decryptMessage($cfg, string $stored): string {
 const DEFAULT_ROLES = ['Baarimestari', 'Järjestyksenvalvoja', 'Tarjoilija', 'Vuoropäällikkö'];
 // Palauttaa baarin rivin (luo puuttuvan oletusarvoilla). $adminView lisää laskutustiedot.
 function getPub($conn, string $slug, bool $adminView = false): array {
+    $only = thePub($conn);
+    if ($only !== '' && $slug !== $only) fail('Tuntematon baari', 404);   // yhden baarin asennus: toisia baareja ei luoda
     $ins = prepareQuery($conn, "INSERT IGNORE INTO pubs (slug, name) VALUES (?, ?)");
     $ins->bind_param("ss", $slug, $slug); run($ins);
     $q = prepareQuery($conn, "SELECT * FROM pubs WHERE slug = ?");
@@ -379,7 +377,7 @@ function computePayroll($conn, string $slug, array $pub, string $month): array {
     $from = $month . '-01 00:00:00';
     $to = date('Y-m-d H:i:s', strtotime($from . ' +1 month'));
     $today = (new DateTime('now', $tz))->format('Y-m-d');
-    $us = prepareQuery($conn, "SELECT id, name, hourly_wage, employment_type FROM users WHERE pub_name = ? AND role != 'superadmin' ORDER BY name");
+    $us = prepareQuery($conn, "SELECT id, name, hourly_wage, employment_type FROM users WHERE pub_name = ? ORDER BY name");
     $us->bind_param("s", $slug); $users = fetchAllRows($us);
     $te = prepareQuery($conn, "SELECT user_id, clock_in, clock_out FROM time_entries WHERE pub_name = ? AND clock_out IS NOT NULL AND clock_in >= ? AND clock_in < ?");
     $te->bind_param("sss", $slug, $from, $to); $entries = fetchAllRows($te);
@@ -622,10 +620,17 @@ function storeDocumentUpload(string $key, string $pub, bool $imagesOnly = false)
 }
 
 
-function accountUserIds($conn, int $uid): array {
-    $st = prepareQuery($conn, "SELECT id FROM users WHERE id = ? OR (account_key IS NOT NULL AND account_key = (SELECT account_key FROM users WHERE id = ?))");
-    $st->bind_param("ii", $uid, $uid);
-    return array_map('intval', array_column(fetchAllRows($st), 'id'));
+function accountUserIds($conn, int $uid): array { return [$uid]; }
+// Tämä asennus palvelee täsmälleen yhtä baaria. Kanta, jossa on useampi baari, hylätään (tietoturva: ei baarien välistä dataa samassa kannassa)
+function thePub($conn): string {
+    static $slug = null;
+    if ($slug !== null) return $slug;
+    $r = $conn->query("SELECT slug FROM pubs ORDER BY id");
+    $rows = $r ? $r->fetch_all(MYSQLI_ASSOC) : [];
+    if (count($rows) > 1) fail('Asennusvirhe: tässä asennuksessa saa olla vain yksi baari', 500);
+    $v = (string)($rows[0]['slug'] ?? '');
+    if ($v !== '') $slug = $v;
+    return $v;
 }
 function maskName(string $n): string { $p = preg_split('/\s+/', trim($n)); return count($p) > 1 ? $p[0] . ' ' . mb_substr(end($p), 0, 1) . '.' : $p[0]; }
 
@@ -634,7 +639,7 @@ function maskName(string $n): string { $p = preg_split('/\s+/', trim($n)); retur
 function computeAnalytics($conn, string $slug, array $pub, int $months): array {
     $from = date('Y-m-01', strtotime('-' . ($months - 1) . ' months')); $today = date('Y-m-d'); $cur = date('Y-m');
     $list = []; for ($d = strtotime($from); date('Y-m', $d) <= $cur; $d = strtotime('+1 month', $d)) $list[] = date('Y-m', $d);
-    $users = []; foreach (fetchAllRows(prepareQuery2($conn, "SELECT id, name FROM users WHERE pub_name = ? AND role != 'superadmin' AND anonymized_at IS NULL", $slug)) as $u) $users[(int)$u['id']] = $u['name'];
+    $users = []; foreach (fetchAllRows(prepareQuery2($conn, "SELECT id, name FROM users WHERE pub_name = ? AND anonymized_at IS NULL", $slug)) as $u) $users[(int)$u['id']] = $u['name'];
     // --- leimaukset: tunnit/kk ja kuormituskartta ---
     $te = prepareQuery($conn, "SELECT user_id, clock_in, clock_out FROM time_entries WHERE pub_name = ? AND clock_out IS NOT NULL AND clock_in >= ? ORDER BY clock_in LIMIT 30000");
     $te->bind_param("ss", $slug, $from); $entries = fetchAllRows($te);
@@ -725,7 +730,7 @@ function shiftWarnings($conn, array $pub, int $userId, string $date, string $sta
 
 // ===================== AUDITLOKI & TIETOSUOJA =====================
 function audit($conn, array $me, string $action, ?string $target = null, ?string $detail = null): void {
-    $pub = ($me['role'] ?? '') === 'superadmin' ? 'SYSTEM' : $me['pub_name'];
+    $pub = $me['pub_name'];
     $st = $conn->prepare("INSERT INTO audit_log (pub_name, user_id, user_name, action, target, detail) VALUES (?, ?, ?, ?, ?, ?)");
     if (!$st) return;   // auditloki ei saa kaataa varsinaista toimintoa (esim. päivittämätön kanta)
     $uid = (int)$me['id']; $nm = mb_substr((string)$me['name'], 0, 100);
@@ -760,8 +765,6 @@ function collectUserData($conn, $cfg, int $uid): array {
         'shift_log_entries' => rowsWhere($conn, "SELECT message, created_at FROM shift_logs WHERE user_id = ? ORDER BY created_at", $uid),
         'shopping_list_entries' => rowsWhere($conn, "SELECT item_name, status, created_at FROM shopping_list WHERE added_by = ?", $uid),
         'private_messages' => $msgs,
-        'gig_profile' => rowsWhere($conn, "SELECT gig_available, gig_note FROM users WHERE id = ?", $uid),
-        'gig_invites' => rowsWhere($conn, "SELECT from_pub, message, status, created_at FROM gig_invites WHERE to_user_id = ?", $uid),
         'kudos_given' => rowsWhere($conn, "SELECT to_user, message, created_at FROM kudos WHERE from_user = ?", $uid),
         'kudos_received' => rowsWhere($conn, "SELECT from_user, message, created_at FROM kudos WHERE to_user = ?", $uid),
         'checklist_progress' => rowsWhere($conn, "SELECT checklist_id, done, assigned_at, completed_at FROM checklist_progress WHERE user_id = ?", $uid),
@@ -793,20 +796,11 @@ function findAuthToken($conn, string $tok): ?array {
     if (!preg_match('/^[0-9a-f]{64}$/', $tok)) return null;
     $h = hash('sha256', $tok);
     $st = prepareQuery($conn, "SELECT t.id, t.user_id, t.kind, u.name, u.username, u.pub_name FROM auth_tokens t JOIN users u ON u.id = t.user_id
-        WHERE t.token_hash = ? AND t.used_at IS NULL AND t.expires_at > NOW() AND u.anonymized_at IS NULL AND u.status != 'frozen' AND u.role != 'superadmin'");
+        WHERE t.token_hash = ? AND t.used_at IS NULL AND t.expires_at > NOW() AND u.anonymized_at IS NULL AND u.status != 'frozen'");
     $st->bind_param("s", $h);
     return fetchOne($st);
 }
 
-// Saman henkilön jäsenyydet muissa baareissa (yhdistetyt tunnukset): [{id, pub_name, name, role}]
-function membershipsFor($conn, int $uid): array {
-    $st = prepareQuery($conn, "SELECT u.id, u.pub_name, u.role, COALESCE(p.name, u.pub_name) AS name FROM users u LEFT JOIN pubs p ON p.slug = u.pub_name
-        WHERE u.account_key IS NOT NULL AND u.account_key = (SELECT account_key FROM users WHERE id = ?) AND u.status != 'frozen' AND u.anonymized_at IS NULL AND u.role != 'superadmin'
-        ORDER BY name");
-    $st->bind_param("i", $uid);
-    $rows = fetchAllRows($st);
-    return count($rows) > 1 ? $rows : [];   // yksi jäsenyys = ei vaihdettavaa
-}
 function authLink($cfg, string $tok): string { $b = bsBaseUrl($cfg); return ($b !== '' ? $b : '') . '/setpassword.html#t=' . $tok; }
 // Lähettää kutsun/palautuslinkin jonoon. Palauttaa [linkki, lähetettiinkö sähköpostilla].
 function issueAuthLink($conn, $cfg, array $u, string $kind): array {
@@ -1317,7 +1311,7 @@ if ($method === 'GET' && $action === 'token_info') {
     if (rateLimited($conn, "token:$ip", 20)) fail('Liian monta yritystä. Yritä myöhemmin uudelleen.', 429);
     $t = findAuthToken($conn, (string)($_GET['token'] ?? ''));
     if (!$t) { rateHit($conn, "token:$ip"); fail('Linkki on virheellinen tai vanhentunut. Pyydä uusi linkki ylläpitäjältä tai käytä "Unohtuiko salasana?" -toimintoa.', 404); }
-    jsonResponse(["success" => true, "kind" => $t['kind'], "name" => $t['name'], "login" => $t['username'] . '@' . $t['pub_name']]);
+    jsonResponse(["success" => true, "kind" => $t['kind'], "name" => $t['name'], "login" => $t['username']]);
 }
 if ($method === 'POST' && $action === 'set_password') {
     $d = json_decode(file_get_contents("php://input"), true);
@@ -1335,16 +1329,16 @@ if ($method === 'POST' && $action === 'set_password') {
     $conn->commit();
     $clr = prepareQuery($conn, "DELETE FROM login_attempts WHERE username = ?");
     $key = mb_strtolower($t['username'] . '@' . $t['pub_name']); $clr->bind_param("s", $key); $clr->execute();
-    jsonResponse(["success" => true, "login" => $t['username'] . '@' . $t['pub_name']]);
+    jsonResponse(["success" => true, "login" => $t['username']]);
 }
 if ($method === 'POST' && $action === 'request_reset') {
     $d = json_decode(file_get_contents("php://input"), true);
-    $username = limitStr($d['username'] ?? '', 100, 'username'); $pubIn = limitStr($d['pub_name'] ?? '', 100, 'pub_name');
+    $username = limitStr($d['username'] ?? '', 100, 'username'); $pubIn = thePub($conn);
     $ip = $_SERVER['REMOTE_ADDR'] ?? '';
     if (rateLimited($conn, "reset:$ip", 5)) fail('Liian monta pyyntöä. Yritä myöhemmin uudelleen.', 429);
     rateHit($conn, "reset:$ip");
     // Vastaus on aina sama, ettei sillä voi selvittää mitkä tunnukset ovat olemassa
-    $st = prepareQuery($conn, "SELECT id, name, username, pub_name, email FROM users WHERE username = ? AND pub_name = ? AND anonymized_at IS NULL AND status != 'frozen' AND role != 'superadmin' AND email IS NOT NULL AND email != ''");
+    $st = prepareQuery($conn, "SELECT id, name, username, pub_name, email FROM users WHERE username = ? AND pub_name = ? AND anonymized_at IS NULL AND status != 'frozen' AND email IS NOT NULL AND email != ''");
     $st->bind_param("ss", $username, $pubIn);
     $u = fetchOne($st);
     if ($u && bsMailConfigured($cfg)) {
@@ -1355,40 +1349,12 @@ if ($method === 'POST' && $action === 'request_reset') {
     jsonResponse(["success" => true, "message" => "Jos tunnukselle on tallennettu sähköpostiosoite, siihen on lähetetty salasanan vaihtolinkki."]);
 }
 
-if ($method === 'POST' && $action === 'accept_link') {
-    // Kutsuttu liittää uuden baarin olemassa olevaan tunnukseensa: todistaa tunnuksen omistajuuden salasanalla (+ 2FA-koodilla)
-    $d = json_decode(file_get_contents("php://input"), true);
-    $ip = $_SERVER['REMOTE_ADDR'] ?? '';
-    if (rateLimited($conn, "token:$ip", 20)) fail('Liian monta yritystä. Yritä myöhemmin uudelleen.', 429);
-    $t = findAuthToken($conn, (string)($d['token'] ?? ''));
-    if (!$t || $t['kind'] !== 'link') { rateHit($conn, "token:$ip"); fail('Linkki on virheellinen tai vanhentunut', 404); }
-    $username = limitStr($d['username'] ?? '', 100, 'username'); $pubIn = limitStr($d['pub_name'] ?? '', 100, 'pub_name');
-    $key = mb_strtolower($username . '@' . $pubIn);
-    if (rateLimited($conn, $key, 8)) fail('Liian monta yritystä. Yritä myöhemmin uudelleen.', 429);
-    $st = prepareQuery($conn, "SELECT id, password, status, anonymized_at, account_key, totp_enabled, role FROM users WHERE username = ? AND pub_name = ?");
-    $st->bind_param("ss", $username, $pubIn);
-    $ex = fetchOne($st);
-    $ok = $ex && empty($ex['anonymized_at']) && $ex['status'] !== 'frozen' && $ex['role'] !== 'superadmin' && (int)$ex['id'] !== (int)$t['user_id']
-        && is_string($d['password'] ?? null) && password_verify($d['password'], (string)$ex['password']);
-    if ($ok && (int)$ex['totp_enabled'] === 1) $ok = verifySecondFactor($conn, $cfg, (int)$ex['id'], (string)($d['code'] ?? ''));
-    if (!$ok) { rateHit($conn, $key); fail((int)($ex['totp_enabled'] ?? 0) === 1 && empty($d['code']) ? 'Anna myös kaksivaiheisen tunnistautumisen koodi' : 'Väärä tunnus tai salasana', 401); }
-    $groupKey = $ex['account_key'] ?: bin2hex(random_bytes(16));
-    $conn->begin_transaction();
-    foreach ([(int)$ex['id'], (int)$t['user_id']] as $uid) {
-        $up = prepareQuery($conn, "UPDATE users SET account_key = ? WHERE id = ?");
-        $up->bind_param("si", $groupKey, $uid); run($up);
-    }
-    $tu = prepareQuery($conn, "UPDATE auth_tokens SET used_at = NOW() WHERE user_id = ? AND used_at IS NULL");
-    $tu->bind_param("i", $t['user_id']); run($tu);
-    $conn->commit();
-    jsonResponse(["success" => true, "login" => $username . '@' . $pubIn, "linked" => $t['pub_name']]);
-}
 
 // ===================== KIRJAUTUMINEN =====================
 if ($method === 'POST' && $action === 'login') {
     $data = json_decode(file_get_contents("php://input"), true);
     $username = limitStr($data['username'] ?? '', 100, 'username');
-    $pubIn    = limitStr($data['pub_name'] ?? '', 100, 'pub_name');
+    $pubIn    = thePub($conn);   // yhden baarin asennus: baaria ei valita kirjautuessa
     $password = is_string($data['password'] ?? null) ? $data['password'] : '';
     $ip = $_SERVER['REMOTE_ADDR'] ?? '';
     $key = mb_strtolower($username . '@' . $pubIn);
@@ -1470,9 +1436,9 @@ function completeLogin($conn, int $uid, string $key, bool $mfa = false): void {
         $dh = hash('sha256', $dev); $ds->bind_param("isss", $uid, $dh, $ipd, $ua); run($ds);
     } catch (Throwable $e) { unset($_SESSION['dev']); }
     $me = currentUser($conn);
-    $full = prepareQuery($conn, "SELECT id, name, username, role, color, pub_name, phone, hourly_wage, ical_token, target_hours, has_hygiene, has_alcohol, expiry_jv, start_date, employment_type, email, notify_email, totp_enabled, gig_available, gig_note FROM users WHERE id = ?");
+    $full = prepareQuery($conn, "SELECT id, name, username, role, color, pub_name, phone, hourly_wage, ical_token, target_hours, has_hygiene, has_alcohol, expiry_jv, start_date, employment_type, email, notify_email, totp_enabled FROM users WHERE id = ?");
     $full->bind_param("i", $me['id']);
-    $user = fetchOne($full); $user['memberships'] = membershipsFor($conn, (int)$me['id']);
+    $user = fetchOne($full);
     jsonResponse(["success" => true, "user" => $user]);
 }
 
@@ -1488,12 +1454,13 @@ if ($method === 'POST' && $action === 'logout') {
 }
 
 // Kaikki alla vaatii kirjautumisen
+thePub($conn);
 $me = requireLogin($conn);
 $myPub = $me['pub_name'];
 $myId = (int)$me['id'];
 
 // Baarin aikavyöhyke: PHP:n ja tietokannan (NOW(), CURDATE()) aika vastaavat baarin paikallista aikaa (leimaukset, vuorot)
-if ($myPub !== 'SYSTEM') {
+if (true) {
     $tzRow = fetchOne(prepareQuery2($conn, "SELECT timezone, require_2fa FROM pubs WHERE slug = ?", $myPub));
     // Baari vaatii ylläpitäjiltä 2FA:n: ilman sitä sallitaan vain käyttöönotto, oma tietopyyntö ja perusasiat
     if (!empty($tzRow['require_2fa']) && isAdmin($me)) {
@@ -1513,7 +1480,7 @@ if ($method === 'GET') {
     if ($action === 'me') {
         $full = prepareQuery($conn, "SELECT id, name, username, role, color, pub_name, phone, hourly_wage, ical_token, target_hours, has_hygiene, has_alcohol, expiry_jv, start_date, employment_type, email, notify_email, totp_enabled FROM users WHERE id = ?");
         $full->bind_param("i", $myId);
-        $user = fetchOne($full); $user['memberships'] = membershipsFor($conn, $myId);
+        $user = fetchOne($full);
         jsonResponse(["success" => true, "user" => $user]);
     }
     if ($action === 'doc_file') {   // dokumentin lataus kirjautuneelle baarin jäsenelle
@@ -1544,29 +1511,11 @@ if ($method === 'GET') {
         }
         jsonResponse(["success" => true, "registrations" => $rows, "waitlist" => fetchAllRows(prepareQuery($conn, "SELECT name, email, qty, notified_at FROM event_waitlist WHERE event_id = " . $eid . " ORDER BY id"))]);
     }
-    if ($action === 'gig_pool') {   // avoimet keikkalaiset muista baareista (vain heidän oma suostumuksensa; nimi lyhennettynä, ei yhteystietoja)
-        requireAdmin($me);
-        $q = trim((string)($_GET['q'] ?? ''));
-        $rows = fetchAllRows(prepareQuery2($conn, "SELECT u.id, u.name, u.gig_note, u.account_key FROM users u
-            WHERE u.gig_available = 1 AND u.pub_name != ? AND u.role = 'employee' AND u.status != 'frozen' AND u.anonymized_at IS NULL
-            ORDER BY u.name LIMIT 400", $myPub));
-        $mine = fetchAllRows(prepareQuery2($conn, "SELECT account_key FROM users WHERE pub_name = ? AND account_key IS NOT NULL", $myPub)); $myKeys = array_column($mine, 'account_key');
-        $pend = array_column(fetchAllRows(prepareQuery2($conn, "SELECT to_user_id FROM gig_invites WHERE from_pub = ? AND status = 'pending'", $myPub)), 'to_user_id');
-        $seen = []; $out = [];
-        foreach ($rows as $r) {
-            if ($r['account_key'] && in_array($r['account_key'], $myKeys, true)) continue;   // jo tämän baarin jäsen
-            $k = $r['account_key'] ?: 'u' . $r['id']; if (isset($seen[$k])) continue; $seen[$k] = true;
-            if ($q !== '' && stripos($r['name'] . ' ' . $r['gig_note'], $q) === false) continue;
-            $out[] = ['id' => (int)$r['id'], 'name' => maskName($r['name']), 'note' => $r['gig_note'], 'invited' => in_array($r['id'], $pend)];
-            if (count($out) >= 100) break;
-        }
-        jsonResponse(["success" => true, "pool" => $out]);
-    }
     if ($action === 'my_history') {   // oma työhistoria kaikissa yhdistetyissä baareissa
         $ids = accountUserIds($conn, $myId); $rows = [];
         foreach ($ids as $uid) {
             $u = fetchOne(prepareQuery($conn, "SELECT u.pub_name, u.role, COALESCE(p.name, u.pub_name) AS pname FROM users u LEFT JOIN pubs p ON p.slug = u.pub_name WHERE u.id = " . $uid . ""));
-            if (!$u || $u['role'] === 'superadmin') continue;
+            if (!$u) continue;
             $h = fetchOne(prepareQuery($conn, "SELECT MIN(clock_in) first_in, COALESCE(SUM(TIMESTAMPDIFF(MINUTE, clock_in, clock_out)), 0) / 60 AS total,
                 COALESCE(SUM(CASE WHEN clock_in >= DATE_SUB(CURDATE(), INTERVAL 12 MONTH) THEN TIMESTAMPDIFF(MINUTE, clock_in, clock_out) ELSE 0 END), 0) / 60 AS last12
                 FROM time_entries WHERE user_id = " . $uid . " AND clock_out IS NOT NULL"));
@@ -1577,7 +1526,7 @@ if ($method === 'GET') {
     if ($action === 'hour_bank') {
         $months = max(1, min(24, (int)($_GET['months'] ?? 12)));
         $pub = getPub($conn, $myPub);
-        if (can($me, 'payroll.view')) $us = fetchAllRows(prepareQuery2($conn, "SELECT id, name, target_hours FROM users WHERE pub_name = ? AND role != 'superadmin' AND anonymized_at IS NULL ORDER BY name", $myPub));
+        if (can($me, 'payroll.view')) $us = fetchAllRows(prepareQuery2($conn, "SELECT id, name, target_hours FROM users WHERE pub_name = ? AND anonymized_at IS NULL ORDER BY name", $myPub));
         else $us = fetchAllRows(prepareQuery2($conn, "SELECT id, name, target_hours FROM users WHERE id = " . $myId . " AND pub_name = ?", $myPub));
         jsonResponse(["success" => true, "bank" => computeHourBank($conn, $myPub, $pub, $us, $months), "overtime_week_hours" => $pub['overtime_week_hours']]);
     }
@@ -1665,7 +1614,7 @@ if ($method === 'GET') {
         };
         if (!empty($_GET['all'])) {
             requirePerm($me, 'payroll.view');
-            $users = fetchAllRows(prepareQuery2($conn, "SELECT id, name FROM users WHERE pub_name = ? AND role != 'superadmin' AND anonymized_at IS NULL ORDER BY name", $myPub));
+            $users = fetchAllRows(prepareQuery2($conn, "SELECT id, name FROM users WHERE pub_name = ? AND anonymized_at IS NULL ORDER BY name", $myPub));
             $rows = array_values(array_filter(array_map(fn($u) => $mk((int)$u['id'], $u['name']), $users), fn($r) => $r['hours'] > 0 || $r['status'] !== 'none'));
             jsonResponse(["success" => true, "month" => $month, "rows" => $rows]);
         }
@@ -1706,7 +1655,7 @@ if ($method === 'GET') {
         $out = [];
         $add = function (string $type, string $label, string $sub, array $extra = []) use (&$out) { $out[] = ['type' => $type, 'label' => $label, 'sub' => $sub] + $extra; };
         $run5 = function (string $sql, string $types, array $params) use ($conn) { $st = prepareQuery($conn, $sql); $st->bind_param($types, ...$params); return fetchAllRows($st); };
-        foreach ($run5("SELECT id, name, username FROM users WHERE pub_name = ? AND role != 'superadmin' AND anonymized_at IS NULL AND (name LIKE ? OR username LIKE ?) ORDER BY name LIMIT 8", "sss", [$myPub, $like, $like]) as $r) $add('user', $r['name'], '@' . $r['username'], ['id' => (int)$r['id']]);
+        foreach ($run5("SELECT id, name, username FROM users WHERE pub_name = ? AND anonymized_at IS NULL AND (name LIKE ? OR username LIKE ?) ORDER BY name LIMIT 8", "sss", [$myPub, $like, $like]) as $r) $add('user', $r['name'], '@' . $r['username'], ['id' => (int)$r['id']]);
         foreach ($run5("SELECT id, title, date FROM events WHERE pub_name = ? AND (title LIKE ? OR description LIKE ?) ORDER BY ABS(DATEDIFF(date, CURDATE())) LIMIT 8", "sss", [$myPub, $like, $like]) as $r) $add('event', $r['title'], date('j.n.Y', strtotime($r['date'])), ['id' => (int)$r['id'], 'date' => $r['date']]);
         $draftCond = can($me, 'shifts.manage') ? '' : " AND s.status = 'published'";
         foreach ($run5("SELECT s.id, s.date, s.start, s.end, s.role, u.name FROM shifts s LEFT JOIN users u ON s.userId = u.id WHERE s.pub_name = ?$draftCond AND (u.name LIKE ? OR s.role LIKE ?) AND s.date >= CURDATE() - INTERVAL 30 DAY ORDER BY s.date LIMIT 8", "sss", [$myPub, $like, $like]) as $r) $add('shift', ($r['name'] ?: 'Avoin vuoro') . ' · ' . $r['role'], date('j.n.', strtotime($r['date'])) . ' ' . substr($r['start'], 0, 5) . '–' . substr($r['end'], 0, 5), ['id' => (int)$r['id'], 'date' => $r['date']]);
@@ -1908,26 +1857,15 @@ if ($method === 'GET') {
         jsonResponse(["success" => true, "profile" => $row, "public_id" => publicPubId($cfg, $myPub), "base_url" => publicBaseUrl($cfg)]);
     }
 
-    if (isSuper($me)) {
-        $pubs_query = "SELECT pub_name, MAX(status) as status, COUNT(id) as user_count, (SELECT name FROM users u2 WHERE u2.pub_name = u1.pub_name AND role='admin' LIMIT 1) as admin_name, (SELECT username FROM users u3 WHERE u3.pub_name = u1.pub_name AND role='admin' LIMIT 1) as admin_user FROM users u1 WHERE role != 'superadmin' GROUP BY pub_name";
-        $pubs = $conn->query($pubs_query)->fetch_all(MYSQLI_ASSOC);
-        $stats = [
-            'total_pubs' => count($pubs),
-            'total_users' => $conn->query("SELECT COUNT(*) as c FROM users WHERE role != 'superadmin'")->fetch_assoc()['c'],
-            'total_shifts' => $conn->query("SELECT COUNT(*) as c FROM shifts")->fetch_assoc()['c'],
-        ];
-        jsonResponse(["pubs" => $pubs, "stats" => $stats]);
-    }
 
     // Baari otetaan aina istunnosta, ei pyynnön parametreista
     $pub_name = $myPub;
     $admin = isAdmin($me);
     $canShifts = can($me, 'shifts.manage'); $canAbs = can($me, 'absences.approve'); $canContent = can($me, 'content.manage'); $canEvents = can($me, 'events.manage'); $canSales = can($me, 'sales.view'); $canPay = can($me, 'payroll.view');
 
-    $u_stmt = prepareQuery($conn, "SELECT id, name, username, role, access_role, color, pub_name, phone, hourly_wage, ical_token, target_hours, has_hygiene, has_alcohol, expiry_jv, start_date, employment_type, email, notify_email, totp_enabled, employee_number, gig_available, gig_note, anonymized_at FROM users WHERE pub_name = ?");
+    $u_stmt = prepareQuery($conn, "SELECT id, name, username, role, access_role, color, pub_name, phone, hourly_wage, ical_token, target_hours, has_hygiene, has_alcohol, expiry_jv, start_date, employment_type, email, notify_email, totp_enabled, employee_number, anonymized_at FROM users WHERE pub_name = ?");
     $u_stmt->bind_param("s", $pub_name);
     $users = fetchAllRows($u_stmt);
-    foreach ($users as &$usr0) { if ((int)$usr0['id'] !== $myId) { $usr0['gig_available'] = null; $usr0['gig_note'] = null; } } unset($usr0);   // keikkasuostumus näkyy vain omistajalle
     if (!$admin) { // työntekijä ei näe kollegoiden palkkaa, iCal-tokenia tai puhelinta
         foreach ($users as &$usr) {
             if ((int)$usr['id'] !== $myId) { if (!$canPay) { $usr['hourly_wage'] = null; $usr['target_hours'] = null; $usr['employment_type'] = null; } $usr['ical_token'] = null; $usr['phone'] = null; $usr['start_date'] = null; $usr['email'] = null; $usr['employee_number'] = null; $usr['notify_email'] = null; $usr['totp_enabled'] = null; }
@@ -1973,16 +1911,6 @@ if ($method === 'GET') {
     foreach ($private_messages as &$pm) { $pm['message'] = decryptMessage($cfg, (string)$pm['message']); }
     unset($pm);
 
-    // Työvoimapörssi: omat ilmoitukset + muiden avoimet ilmoitukset, joihin tällä baarilla on hyväksyntärivi
-    $jl_stmt = prepareQuery($conn, "SELECT DISTINCT j.id, j.from_pub AS pub_name, j.created_by, j.message, j.contact, j.status, j.created_at, j.expires_at FROM job_listings j LEFT JOIN job_listing_approvals a ON a.listing_id = j.id AND a.pub_name = ? WHERE j.from_pub = ? OR (j.status = 'open' AND a.id IS NOT NULL) ORDER BY j.created_at DESC LIMIT 100");
-    $jl_stmt->bind_param("ss", $pub_name, $pub_name);
-    $job_listings = fetchAllRows($jl_stmt);
-    foreach ($job_listings as &$jl) {
-        $ap = prepareQuery($conn, "SELECT pub_name, status FROM job_listing_approvals WHERE listing_id = ?" . ($jl['pub_name'] === $pub_name ? "" : " AND pub_name = ?"));
-        if ($jl['pub_name'] === $pub_name) $ap->bind_param("i", $jl['id']); else $ap->bind_param("is", $jl['id'], $pub_name);
-        $jl['approvals'] = fetchAllRows($ap);
-    }
-    unset($jl);
 
     // Tiimi: perehdytyslistat, dokumentit, kiitokset ja kyselyt
     $checklists = []; $checklist_progress = []; $documents = []; $kudos = []; $surveys = [];
@@ -2014,16 +1942,6 @@ if ($method === 'GET') {
             $surveys[] = $sv;
         }
     }
-    $gig_incoming = []; $gig_outgoing = [];
-    if (($chk2 = $conn->query("SHOW TABLES LIKE 'gig_invites'")) && $chk2->num_rows > 0) {
-        $ids = implode(',', accountUserIds($conn, $myId));
-        $gig_incoming = fetchAllRows(prepareQuery2($conn, "SELECT g.id, g.to_user_id, g.message, g.status, g.created_at, g.shift_id, COALESCE(p.name, g.from_pub) AS pub_display,
-                s.date AS s_date, s.start AS s_start, s.end AS s_end, s.role AS s_role
-            FROM gig_invites g LEFT JOIN pubs p ON p.slug = g.from_pub LEFT JOIN shifts s ON s.id = g.shift_id AND s.userId IS NULL
-            WHERE g.to_user_id IN ($ids) AND g.status = 'pending' AND g.from_pub != ? ORDER BY g.id DESC LIMIT 20", $pub_name));
-        if ($admin) $gig_outgoing = fetchAllRows(prepareQuery2($conn, "SELECT g.id, g.status, g.message, g.created_at, g.shift_id, u.name AS worker FROM gig_invites g JOIN users u ON u.id = g.to_user_id WHERE g.from_pub = ? ORDER BY g.id DESC LIMIT 30", $pub_name));
-        foreach ($gig_outgoing as &$go) $go['worker'] = maskName($go['worker']); unset($go);
-    }
     $bookings = [];
     if ($canEvents && ($chk3 = $conn->query("SHOW TABLES LIKE 'bookings'")) && $chk3->num_rows > 0) {
         $bookings = fetchAllRows(prepareQuery2($conn, "SELECT id, name, email, phone, party_size, starts_at, duration_min, note, status, code, created_at FROM bookings WHERE pub_name = ? AND starts_at >= DATE_SUB(CURDATE(), INTERVAL 1 DAY) AND starts_at < DATE_ADD(CURDATE(), INTERVAL 90 DAY) ORDER BY starts_at", $pub_name));
@@ -2052,7 +1970,7 @@ if ($method === 'GET') {
         if ($tr['status'] === 'open' && (int)$tr['offered_by_id'] !== $myId && !$canShifts) $tr['my_warnings'] = shiftWarnings($conn, $pubForTrades, $myId, $sh['date'], $sh['start'], $sh['end'], 0, $sh['role'] ?? null);
     }
     unset($tr);
-    jsonResponse(["users" => $users, "shifts" => $shifts, "events" => $events, "trades" => $trades, "absences" => $absences, "notices" => $notices, "time_entries" => $time_entries, "availability" => $availability, "tasks" => $tasks, "event_guests" => fetchAllRows(prepareQuery2($conn, "SELECT g.id, g.event_id, g.name, g.note, g.added_by FROM event_guests g JOIN events e ON g.event_id = e.id WHERE e.pub_name = ? AND e.date >= CURDATE() - INTERVAL 30 DAY ORDER BY g.id", $pub_name)), "system_alerts" => $admin ? systemStatus($conn, $cfg)['alerts'] : [], "skills" => fetchAllRows(prepareQuery2($conn, "SELECT id, name, for_role FROM skills WHERE pub_name = ? ORDER BY name", $pub_name)), "user_skills" => $canShifts ? fetchAllRows(prepareQuery2($conn, "SELECT us.user_id, us.skill_id, us.valid_until FROM user_skills us JOIN skills s ON us.skill_id = s.id WHERE s.pub_name = ?", $pub_name)) : fetchAllRows(prepareQuery($conn, "SELECT us.user_id, us.skill_id, us.valid_until FROM user_skills us WHERE us.user_id = " . $myId)), "hour_conf" => fetchAllRows(prepareQuery($conn, "SELECT month, hours, status, note, admin_note FROM hour_confirmations WHERE user_id = " . $myId . " AND month >= '" . date('Y-m', strtotime('-5 months')) . "' ORDER BY month DESC")), "shift_bids" => $canShifts ? fetchAllRows(prepareQuery2($conn, "SELECT b.shift_id, b.user_id FROM shift_bids b JOIN shifts s ON b.shift_id = s.id WHERE s.pub_name = ?", $pub_name)) : fetchAllRows(prepareQuery($conn, "SELECT shift_id, user_id FROM shift_bids WHERE user_id = " . $myId)), "perms" => $me['perms'], "access_roles" => $admin ? accessRolesOf(fetchOne(prepareQuery2($conn, "SELECT access_roles FROM pubs WHERE slug = ?", $pub_name))['access_roles'] ?? null) : [], "task_completions" => $task_completions, "cash_recent" => $cash_recent, "shift_logs" => $shift_logs, "shopping_list" => $shopping_list, "job_listings" => $job_listings, "private_messages" => $private_messages, "bookings" => $bookings, "event_regs" => (object)$eventRegs, "gig_incoming" => $gig_incoming, "gig_outgoing" => $gig_outgoing, "checklists" => $checklists, "checklist_progress" => $checklist_progress, "documents" => $documents, "kudos" => $kudos, "surveys" => $surveys, "staffing_rules" => $canShifts ? fetchAllRows(prepareQuery2($conn, "SELECT id, dow, start, end, role, min_staff FROM staffing_rules WHERE pub_name = ? ORDER BY dow, start", $pub_name)) : [], "coverage" => $canShifts ? computeCoverage($conn, $pub_name, date('Y-m-d'), date('Y-m-d', strtotime('+13 days'))) : [], "availability_rules" => $availability_rules, "memberships" => membershipsFor($conn, $myId), "pub" => getPub($conn, $pub_name, $admin), "week_templates" => $canShifts ? fetchAllRows(prepareQuery2($conn, "SELECT id, name, (LENGTH(data) - LENGTH(REPLACE(data, '\"dow\"', ''))) / 5 AS n FROM week_templates WHERE pub_name = ? ORDER BY name", $pub_name)) : [], "shift_templates" => $canShifts ? fetchAllRows(prepareQuery2($conn, "SELECT id, name, start, end, role FROM shift_templates WHERE pub_name = ? ORDER BY start, name", $pub_name)) : []]);
+    jsonResponse(["users" => $users, "shifts" => $shifts, "events" => $events, "trades" => $trades, "absences" => $absences, "notices" => $notices, "time_entries" => $time_entries, "availability" => $availability, "tasks" => $tasks, "event_guests" => fetchAllRows(prepareQuery2($conn, "SELECT g.id, g.event_id, g.name, g.note, g.added_by FROM event_guests g JOIN events e ON g.event_id = e.id WHERE e.pub_name = ? AND e.date >= CURDATE() - INTERVAL 30 DAY ORDER BY g.id", $pub_name)), "system_alerts" => $admin ? systemStatus($conn, $cfg)['alerts'] : [], "skills" => fetchAllRows(prepareQuery2($conn, "SELECT id, name, for_role FROM skills WHERE pub_name = ? ORDER BY name", $pub_name)), "user_skills" => $canShifts ? fetchAllRows(prepareQuery2($conn, "SELECT us.user_id, us.skill_id, us.valid_until FROM user_skills us JOIN skills s ON us.skill_id = s.id WHERE s.pub_name = ?", $pub_name)) : fetchAllRows(prepareQuery($conn, "SELECT us.user_id, us.skill_id, us.valid_until FROM user_skills us WHERE us.user_id = " . $myId)), "hour_conf" => fetchAllRows(prepareQuery($conn, "SELECT month, hours, status, note, admin_note FROM hour_confirmations WHERE user_id = " . $myId . " AND month >= '" . date('Y-m', strtotime('-5 months')) . "' ORDER BY month DESC")), "shift_bids" => $canShifts ? fetchAllRows(prepareQuery2($conn, "SELECT b.shift_id, b.user_id FROM shift_bids b JOIN shifts s ON b.shift_id = s.id WHERE s.pub_name = ?", $pub_name)) : fetchAllRows(prepareQuery($conn, "SELECT shift_id, user_id FROM shift_bids WHERE user_id = " . $myId)), "perms" => $me['perms'], "access_roles" => $admin ? accessRolesOf(fetchOne(prepareQuery2($conn, "SELECT access_roles FROM pubs WHERE slug = ?", $pub_name))['access_roles'] ?? null) : [], "task_completions" => $task_completions, "cash_recent" => $cash_recent, "shift_logs" => $shift_logs, "shopping_list" => $shopping_list, "private_messages" => $private_messages, "bookings" => $bookings, "event_regs" => (object)$eventRegs, "checklists" => $checklists, "checklist_progress" => $checklist_progress, "documents" => $documents, "kudos" => $kudos, "surveys" => $surveys, "staffing_rules" => $canShifts ? fetchAllRows(prepareQuery2($conn, "SELECT id, dow, start, end, role, min_staff FROM staffing_rules WHERE pub_name = ? ORDER BY dow, start", $pub_name)) : [], "coverage" => $canShifts ? computeCoverage($conn, $pub_name, date('Y-m-d'), date('Y-m-d', strtotime('+13 days'))) : [], "availability_rules" => $availability_rules, "pub" => getPub($conn, $pub_name, $admin), "week_templates" => $canShifts ? fetchAllRows(prepareQuery2($conn, "SELECT id, name, (LENGTH(data) - LENGTH(REPLACE(data, '\"dow\"', ''))) / 5 AS n FROM week_templates WHERE pub_name = ? ORDER BY name", $pub_name)) : [], "shift_templates" => $canShifts ? fetchAllRows(prepareQuery2($conn, "SELECT id, name, start, end, role FROM shift_templates WHERE pub_name = ? ORDER BY start, name", $pub_name)) : []]);
 }
 
 // ===================== KIRJOITUS =====================
@@ -2069,9 +1987,6 @@ if ($method === 'POST') {
     if ($id === '') $id = null;
     if ($id !== null) $id = (int)$id;
 
-    // Superadmin saa tehdä vain alustatason toimintoja
-    $superOnly = ['user', 'toggle_pub', 'reset_password', 'reset_2fa', 'totp_begin', 'totp_enable', 'totp_disable'];
-    if (isSuper($me) && !in_array($action, $superOnly, true)) fail('Ei oikeuksia', 403);
 
     // Admin-toimien auditloki (kirjataan vasta onnistuneen pyynnön jälkeen)
     $auditMap = [
@@ -2082,10 +1997,9 @@ if ($method === 'POST') {
         'publish_shifts' => ['Vuorot julkaistu', fn() => [null, null]],
         'handle_absence' => ['Poissaolo käsitelty', fn() => ['absence#' . (int)($data['id'] ?? 0), (string)($data['status'] ?? '')]],
         'time_entry' => ['Leimaus muokattu', fn() => ['time_entry#' . (int)($data['id'] ?? 0), ($data['clock_in'] ?? '') . ' – ' . ($data['clock_out'] ?? '')]],
-        'toggle_pub' => ['Baarin tila', fn() => [(string)($data['pub_name'] ?? ''), (string)($data['status'] ?? '')]],
         'anonymize_user' => ['Käyttäjä anonymisoitu', fn() => ['user#' . (int)($data['id'] ?? $data['userId'] ?? 0), null]],
     ];
-    if (isset($auditMap[$action]) && (isAdmin($me) || isSuper($me) || (in_array($action, ['publish_shifts', 'time_entry'], true) && can($me, 'shifts.manage')) || ($action === 'handle_absence' && can($me, 'absences.approve')))) {
+    if (isset($auditMap[$action]) && (isAdmin($me) || (in_array($action, ['publish_shifts', 'time_entry'], true) && can($me, 'shifts.manage')) || ($action === 'handle_absence' && can($me, 'absences.approve')))) {
         [$label, $fn] = $auditMap[$action]; [$tg, $dt] = $fn();
         auditOnSuccess($conn, $me, $label, $tg, $dt === '' ? null : $dt);
     }
@@ -2133,15 +2047,13 @@ if ($method === 'POST') {
         jsonResponse(["success" => true]);
 
     } elseif ($action === 'user') {
-        if (!isAdmin($me) && !isSuper($me)) fail('Ei oikeuksia', 403);
-        $pub = isSuper($me) ? limitStr($data['pub_name'] ?? '', 100, 'pub_name') : $myPub;
-        if ($pub === '' || $pub === 'SYSTEM') fail('Virheellinen baari');
+        if (!isAdmin($me)) fail('Ei oikeuksia', 403);
+        $pub = $myPub;
         $name = limitStr($data['name'] ?? '', 100, 'name');
         $username = limitStr($data['username'] ?? '', 100, 'username');
         if ($name === '' || $username === '' || strpbrk($username, '@ ') !== false) fail('Virheellinen nimi tai tunnus');
         $role = $data['role'] ?? 'employee';
         if (!in_array($role, ['admin', 'employee'], true)) fail('Virheellinen rooli');
-        if (isSuper($me)) $role = 'admin'; // superadmin luo vain baarin ylläpitäjiä
         $wage = is_numeric($data['hourly_wage'] ?? 0) ? (float)($data['hourly_wage'] ?? 0) : 0.0;
         $target_hours = (int)($data['target_hours'] ?? 0);
         $has_hygiene = !empty($data['has_hygiene']) ? 1 : 0;
@@ -2170,7 +2082,7 @@ if ($method === 'POST') {
             $tgt = prepareQuery($conn, "SELECT role FROM users WHERE id = ?");
             $tgt->bind_param("i", $id);
             $tr = fetchOne($tgt);
-            if (!$tr || $tr['role'] === 'superadmin') fail('Ei oikeuksia', 403);
+            if (!$tr) fail('Ei oikeuksia', 403);
             $stmt = prepareQuery($conn, "UPDATE users SET name = ?, username = ?, role = ?, hourly_wage = ?, target_hours = ?, has_hygiene = ?, has_alcohol = ?, expiry_jv = ?, start_date = ?, employment_type = ?, email = ?, employee_number = ? WHERE id = ?");
             $stmt->bind_param("sssdiiisssssi", $name, $username, $role, $wage, $target_hours, $has_hygiene, $has_alcohol, $ex_jv, $start_date, $emp_type, $emailDb, $empNo, $id);
             run($stmt);
@@ -2182,7 +2094,7 @@ if ($method === 'POST') {
             }
         } else {
             // Kutsu: työntekijä asettaa salasanan itse linkistä; kantaan laitetaan väliaikaisesti arvaamaton salasana
-            $link = !empty($data['link']);   // henkilöllä on jo tunnus toisessa baarissa: pyydetään yhdistämään
+            $link = false;
             if ($link && $emailDb === null) fail('Tunnusten yhdistäminen vaatii henkilön sähköpostiosoitteen');
             $invite = !empty($data['invite']) || $link;
             $hashed_password = $invite ? password_hash(bin2hex(random_bytes(24)), PASSWORD_DEFAULT) : password_hash(validPassword($data['password'] ?? ''), PASSWORD_DEFAULT);
@@ -2193,29 +2105,10 @@ if ($method === 'POST') {
             $newUid = $conn->insert_id; $st9 = prepareQuery($conn, "UPDATE users SET access_role = ? WHERE id = ?"); $st9->bind_param("si", $accessDb, $newUid); run($st9);
             if ($invite) {
                 [$lnk, $emailed] = issueAuthLink($conn, $cfg, ['id' => $newUid, 'name' => $name, 'username' => $username, 'pub_name' => $pub, 'email' => $emailDb], $link ? 'link' : 'invite');
-                jsonResponse(["success" => true, "invite" => ["link" => $lnk, "emailed" => $emailed, "kind" => $link ? 'link' : 'invite']]);
+                jsonResponse(["success" => true, "invite" => ["link" => $lnk, "emailed" => $emailed, "kind" => 'invite']]);
             }
         }
         jsonResponse(["success" => true]);
-
-    } elseif ($action === 'switch_pub') {   // vaihto saman henkilön toiseen baariin
-        $target = (int)($data['userId'] ?? 0);
-        if ($target === $myId) jsonResponse(["success" => true, "user" => null]);
-        $ms = membershipsFor($conn, $myId);
-        if (!in_array($target, array_map('intval', array_column($ms, 'id')), true)) fail('Ei oikeuksia', 403);
-        $st = prepareQuery($conn, "SELECT totp_enabled FROM users WHERE id = ?");
-        $st->bind_param("i", $target);
-        if ((int)(fetchOne($st)['totp_enabled'] ?? 0) === 1 && empty($_SESSION['mfa'])) fail('Tällä tunnuksella on kaksivaiheinen tunnistautuminen: kirjaudu siihen erikseen', 403);
-        session_regenerate_id(true);
-        $_SESSION['uid'] = $target;
-        if (!empty($_SESSION['dev'])) { try { $conn->query("UPDATE user_sessions SET user_id = " . (int)$target . " WHERE dev_hash = '" . hash('sha256', (string)$_SESSION['dev']) . "'"); } catch (Throwable $e) {} }
-        $new = currentUser($conn);
-        if (!$new) fail('Baari ei ole käytettävissä', 403);
-        $full = prepareQuery($conn, "SELECT id, name, username, role, color, pub_name, phone, hourly_wage, ical_token, target_hours, has_hygiene, has_alcohol, expiry_jv, start_date, employment_type, email, notify_email, totp_enabled FROM users WHERE id = ?");
-        $full->bind_param("i", $target);
-        $user = fetchOne($full); $user['memberships'] = membershipsFor($conn, $target);
-        audit($conn, $new, 'Baarin vaihto', $new['pub_name']);
-        jsonResponse(["success" => true, "user" => $user]);
 
     } elseif ($action === 'send_invite') {   // uusi kutsu-/palautuslinkki olemassa olevalle työntekijälle
         requireAdmin($me);
@@ -2224,7 +2117,7 @@ if ($method === 'POST') {
         $st = prepareQuery($conn, "SELECT id, name, username, pub_name, email, role FROM users WHERE id = ? AND anonymized_at IS NULL");
         $st->bind_param("i", $uid);
         $u = fetchOne($st);
-        if (!$u || $u['role'] === 'superadmin') fail('Ei löydy', 404);
+        if (!$u) fail('Ei löydy', 404);
         [$link, $emailed] = issueAuthLink($conn, $cfg, $u, 'invite');
         audit($conn, $me, 'Kutsulinkki luotu', $u['username'], $emailed ? 'lähetetty sähköpostilla' : 'linkki annettu adminille');
         jsonResponse(["success" => true, "invite" => ["link" => $link, "emailed" => $emailed]]);
@@ -2294,14 +2187,14 @@ if ($method === 'POST') {
         audit($conn, $me, '2FA poistettu käytöstä', $me['username']);
         jsonResponse(["success" => true]);
 
-    } elseif ($action === 'reset_2fa') {   // kadonnut laite: admin nollaa työntekijän, superadmin adminin
-        if (!isAdmin($me) && !isSuper($me)) fail('Ei oikeuksia', 403);
+    } elseif ($action === 'reset_2fa') {   // kadonnut laite: admin nollaa työntekijän (adminin oma nollaus: bin/admin.php palvelimelta)
+        if (!isAdmin($me)) fail('Ei oikeuksia', 403);
         $uid = (int)($data['userId'] ?? 0);
         $st = prepareQuery($conn, "SELECT pub_name, role FROM users WHERE id = ?");
         $st->bind_param("i", $uid);
         $t = fetchOne($st);
-        if (!$t || $t['role'] === 'superadmin') fail('Ei löydy', 404);
-        if (!isSuper($me) && ($t['pub_name'] !== $myPub || $t['role'] === 'admin')) fail('Adminin kaksivaiheisen tunnistautumisen voi nollata vain ylläpito', 403);
+        if (!$t) fail('Ei löydy', 404);
+        if ($t['pub_name'] !== $myPub || $t['role'] === 'admin') fail('Adminin kaksivaiheisen tunnistautumisen voi nollata vain palvelimelta (bin/admin.php)', 403);
         $up = prepareQuery($conn, "UPDATE users SET totp_enabled = 0, totp_secret = NULL, recovery_codes = NULL, totp_last_step = 0 WHERE id = ?");
         $up->bind_param("i", $uid); run($up);
         revokeUserSessions($conn, $uid);
@@ -2457,7 +2350,7 @@ if ($method === 'POST') {
         $chk = prepareQuery($conn, "SELECT role FROM users WHERE id = ?");
         $chk->bind_param("i", $uid);
         $tr = fetchOne($chk);
-        if (!$tr || $tr['role'] === 'superadmin') fail('Ei oikeuksia', 403);
+        if (!$tr) fail('Ei oikeuksia', 403);
         // Työaika- ja vuorotiedot jäävät (kirjanpito, työaikalaki) ilman henkilötietoja; muu henkilödata poistetaan
         $conn->begin_transaction();
         $rnd = password_hash(bin2hex(random_bytes(24)), PASSWORD_DEFAULT);
@@ -2465,7 +2358,7 @@ if ($method === 'POST') {
         $st = prepareQuery($conn, "UPDATE users SET name = ?, username = ?, password = ?, phone = '', color = NULL, initials = NULL, ical_token = NULL, expiry_jv = NULL, has_hygiene = 0, has_alcohol = 0, anonymized_at = NOW() WHERE id = ?");
         $st->bind_param("sssi", $nm, $un, $rnd, $uid);
         run($st);
-        foreach (["DELETE FROM push_subscriptions WHERE user_id = ?", "DELETE FROM private_messages WHERE sender_id = ? OR receiver_id = ?", "DELETE FROM availability WHERE user_id = ?", "UPDATE absences SET description = NULL WHERE user_id = ?", "DELETE FROM availability_rules WHERE user_id = ?", "DELETE FROM kudos WHERE from_user = ? OR to_user = ?", "UPDATE users SET email = NULL, employee_number = NULL, gig_available = 0, gig_note = NULL WHERE id = ?", "DELETE FROM gig_invites WHERE to_user_id = ?", "UPDATE shift_logs SET message = '[poistettu]' WHERE user_id = ?"] as $sql) {
+        foreach (["DELETE FROM push_subscriptions WHERE user_id = ?", "DELETE FROM private_messages WHERE sender_id = ? OR receiver_id = ?", "DELETE FROM availability WHERE user_id = ?", "UPDATE absences SET description = NULL WHERE user_id = ?", "DELETE FROM availability_rules WHERE user_id = ?", "DELETE FROM kudos WHERE from_user = ? OR to_user = ?", "UPDATE users SET email = NULL, employee_number = NULL WHERE id = ?", "UPDATE shift_logs SET message = '[poistettu]' WHERE user_id = ?"] as $sql) {
             $st = prepareQuery($conn, $sql);
             if (substr_count($sql, '?') === 2) $st->bind_param("ii", $uid, $uid); else $st->bind_param("i", $uid);
             run($st);
@@ -2506,7 +2399,7 @@ if ($method === 'POST') {
         $status = ($data['status'] ?? 'published') === 'draft' ? 'draft' : 'published';
         $asOpen = ($data['mode'] ?? '') === 'open';   // kaikki avoimiksi vuoroiksi
         $valid = [];   // baarin voimassa olevat käyttäjät
-        foreach (fetchAllRows(prepareQuery2($conn, "SELECT id FROM users WHERE pub_name = ? AND anonymized_at IS NULL AND role != 'superadmin'", $myPub)) as $u) $valid[(int)$u['id']] = true;
+        foreach (fetchAllRows(prepareQuery2($conn, "SELECT id FROM users WHERE pub_name = ? AND anonymized_at IS NULL", $myPub)) as $u) $valid[(int)$u['id']] = true;
         $exists = prepareQuery($conn, "SELECT 1 FROM shifts WHERE pub_name = ? AND date = ? AND start = ? AND end = ? AND ((userId IS NULL AND ? IS NULL) OR userId = ?) LIMIT 1");
         $ins = prepareQuery($conn, "INSERT INTO shifts (userId, date, start, end, role, pub_name, status) VALUES (?, ?, ?, ?, ?, ?, ?)");
         $created = 0; $skipped = 0; $opened = 0;
@@ -2719,61 +2612,6 @@ if ($method === 'POST') {
         if (($data['status'] ?? '') === 'cancelled') { $st = prepareQuery($conn, "UPDATE event_registrations SET status = 'cancelled' WHERE id = ?"); $st->bind_param("i", $rid); run($st); $eq = fetchOne(prepareQuery($conn, "SELECT event_id FROM event_registrations WHERE id = " . (int)$rid)); if ($eq) bsWaitlistPromote($conn, $cfg, (int)$eq['event_id']); }
         jsonResponse(["success" => true]);
 
-    } elseif ($action === 'gig_profile') {   // keikkalaisen oma suostumus näkyä muiden baarien ylläpidolle
-        $avail = !empty($data['available']) ? 1 : 0; $note = limitStr($data['note'] ?? '', 300, 'note'); $note = $note === '' ? null : $note;
-        $st = prepareQuery($conn, "UPDATE users SET gig_available = ?, gig_note = ? WHERE id = ?"); $st->bind_param("isi", $avail, $note, $myId); run($st);
-        jsonResponse(["success" => true]);
-
-    } elseif ($action === 'gig_invite') {
-        requireAdmin($me);
-        $tid = (int)($data['userId'] ?? 0);
-        $t = fetchOne(prepareQuery2($conn, "SELECT id, name, pub_name, account_key FROM users WHERE id = " . $tid . " AND gig_available = 1 AND role = 'employee' AND status != 'frozen' AND anonymized_at IS NULL AND pub_name != ?", $myPub));
-        if (!$t) fail('Keikkalaista ei löydy tai hän ei ole enää haettavissa', 404);
-        if ($t['account_key']) { $dup = fetchOne(prepareQuery2($conn, "SELECT id FROM users WHERE pub_name = ? AND account_key = '" . $conn->real_escape_string($t['account_key']) . "'", $myPub)); if ($dup) fail('Henkilö on jo tämän baarin jäsen'); }
-        $pend = fetchOne(prepareQuery2($conn, "SELECT id FROM gig_invites WHERE from_pub = ? AND status = 'pending' AND to_user_id = " . $tid, $myPub)); if ($pend) fail('Kutsu on jo lähetetty', 409);
-        if (rateLimited($conn, 'gig:' . $myPub, 20)) fail('Liian monta kutsua lyhyessä ajassa', 429);
-        rateHit($conn, 'gig:' . $myPub);
-        $shiftId = !empty($data['shiftId']) ? (int)$data['shiftId'] : null;
-        if ($shiftId !== null) { requireInPub($conn, 'shifts', $shiftId, $myPub); $o = fetchOne(prepareQuery($conn, "SELECT id FROM shifts WHERE id = " . $shiftId . " AND userId IS NULL")); if (!$o) fail('Vuoro ei ole avoin'); }
-        $msg = limitStr($data['message'] ?? '', 300, 'message'); $msg = $msg === '' ? null : $msg;
-        $st = prepareQuery($conn, "INSERT INTO gig_invites (from_pub, to_user_id, shift_id, message, created_by) VALUES (?, ?, ?, ?, ?)");
-        $st->bind_param("siisi", $myPub, $tid, $shiftId, $msg, $myId); run($st);
-        $pd = getPub($conn, $myPub)['name'];
-        sendPushToUser($conn, $tid, "Keikkakutsu: $pd", ($msg ?: 'Baari kutsuu sinut keikkatöihin.') . ' Vastaa etusivulla.', $vapid_auth);
-        audit($conn, $me, 'Keikkakutsu', maskName($t['name']), $shiftId ? "vuoro #$shiftId" : null);
-        jsonResponse(["success" => true]);
-
-    } elseif ($action === 'gig_cancel') {
-        requireAdmin($me); $gid = (int)($data['id'] ?? 0); requireInPub($conn, 'gig_invites', $gid, $myPub);
-        $st = prepareQuery($conn, "UPDATE gig_invites SET status = 'cancelled', decided_at = NOW() WHERE id = ? AND status = 'pending'"); $st->bind_param("i", $gid); run($st);
-        jsonResponse(["success" => true]);
-
-    } elseif ($action === 'gig_respond') {
-        $gid = (int)($data['inviteId'] ?? 0); $accept = !empty($data['accept']);
-        $g = fetchOne(prepareQuery($conn, "SELECT id, from_pub, to_user_id, shift_id FROM gig_invites WHERE id = " . $gid . " AND status = 'pending'"));
-        if (!$g || !in_array((int)$g['to_user_id'], accountUserIds($conn, $myId), true)) fail('Kutsua ei löydy', 404);
-        $pubName = $g['from_pub'];
-        if (!$accept) {
-            $st = prepareQuery($conn, "UPDATE gig_invites SET status = 'declined', decided_at = NOW() WHERE id = ?"); $st->bind_param("i", $gid); run($st);
-            pushToPub($conn, $pubName, 0, "Keikkakutsu hylätty", maskName($me['name']) . " ei ottanut kutsua vastaan.", $vapid_auth, true);
-            jsonResponse(["success" => true]);
-        }
-        $src = fetchOne(prepareQuery($conn, "SELECT id, name, username, color, email, account_key FROM users WHERE id = " . $myId . ""));
-        $key = $src['account_key'] ?: bin2hex(random_bytes(16));
-        $base = $src['username']; $uname = $base; $n = 1;
-        while (fetchOne(prepareQuery2($conn, "SELECT id FROM users WHERE pub_name = ? AND username = '" . $conn->real_escape_string($uname) . "'", $pubName))) $uname = $base . (++$n);
-        getPub($conn, $pubName);
-        $conn->begin_transaction();
-        $pw = password_hash(bin2hex(random_bytes(24)), PASSWORD_DEFAULT); $color = $src['color'] ?: '#E14D2A'; $email = $src['email'];
-        $ins = prepareQuery($conn, "INSERT INTO users (name, username, password, role, color, pub_name, employment_type, email, account_key) VALUES (?, ?, ?, 'employee', ?, ?, 'casual', ?, ?)");
-        $ins->bind_param("sssssss", $src['name'], $uname, $pw, $color, $pubName, $email, $key); run($ins); $newId = $conn->insert_id;
-        $up = prepareQuery($conn, "UPDATE users SET account_key = ? WHERE id = ?"); $up->bind_param("si", $key, $myId); run($up);
-        if ($g['shift_id']) { $sh = prepareQuery($conn, "UPDATE shifts SET userId = ? WHERE id = ? AND pub_name = ? AND userId IS NULL"); $sid = (int)$g['shift_id']; $sh->bind_param("iis", $newId, $sid, $pubName); run($sh); }
-        $st = prepareQuery($conn, "UPDATE gig_invites SET status = 'accepted', decided_at = NOW() WHERE id = ?"); $st->bind_param("i", $gid); run($st);
-        $conn->commit();
-        pushToPub($conn, $pubName, 0, "Keikkakutsu hyväksytty", $src['name'] . " liittyi baariin keikkalaisena. Aseta tuntipalkka työntekijän tiedoissa.", $vapid_auth, true);
-        jsonResponse(["success" => true, "joined" => $pubName, "newUserId" => (int)$newId]);
-
     } elseif ($action === 'staffing_rule') {
         requirePerm($me, 'shifts.manage');
         $dow = ($data['dow'] ?? '') === '' || $data['dow'] === null ? null : (int)$data['dow'];
@@ -2889,16 +2727,6 @@ if ($method === 'POST') {
         $conn->commit();
         jsonResponse(["success" => true]);
 
-    } elseif ($action === 'toggle_pub') {
-        requireSuper($me);
-        $status = ($data['status'] ?? '') === 'frozen' ? 'frozen' : 'active';
-        $target = limitStr($data['pub_name'] ?? '', 100, 'pub_name');
-        if ($target === '' || $target === 'SYSTEM') fail('Virheellinen baari');
-        $stmt = prepareQuery($conn, "UPDATE users SET status = ? WHERE pub_name = ? AND role != 'superadmin'");
-        $stmt->bind_param("ss", $status, $target);
-        run($stmt);
-        jsonResponse(["success" => true]);
-
     } elseif ($action === 'update_profile') {
         $phone = limitStr($data['phone'] ?? '', 30, 'phone');
         $email = limitStr($data['email'] ?? '', 150, 'email');
@@ -2934,13 +2762,13 @@ if ($method === 'POST') {
         jsonResponse(["success" => true]);
 
     } elseif ($action === 'reset_password') {
-        if (!isAdmin($me) && !isSuper($me)) fail('Ei oikeuksia', 403);
+        if (!isAdmin($me)) fail('Ei oikeuksia', 403);
         $target = (int)($data['userId'] ?? 0);
         $tgt = prepareQuery($conn, "SELECT pub_name, role FROM users WHERE id = ?");
         $tgt->bind_param("i", $target);
         $tr = fetchOne($tgt);
-        if (!$tr || $tr['role'] === 'superadmin') fail('Ei löydy', 404);
-        if (!isSuper($me) && $tr['pub_name'] !== $myPub) fail('Ei oikeuksia', 403);
+        if (!$tr) fail('Ei löydy', 404);
+        if ($tr['pub_name'] !== $myPub) fail('Ei oikeuksia', 403);
         $hashed_password = password_hash(validPassword($data['new_password'] ?? ''), PASSWORD_DEFAULT);
         $stmt = prepareQuery($conn, "UPDATE users SET password = ? WHERE id = ?");
         $stmt->bind_param("si", $hashed_password, $target);
@@ -3462,53 +3290,6 @@ if ($method === 'POST') {
         run($stmt);
         jsonResponse(["success" => true]);
 
-    } elseif ($action === 'create_job_listing') {
-        requireAdmin($me);
-        $msg = limitStr($data['message'] ?? '', 1000, 'message');
-        $contact = limitStr($data['contact'] ?? '', 200, 'contact');
-        if ($msg === '' || $contact === '') fail('Täytä kaikki tiedot');
-        if ($id) {
-            requireInPub($conn, 'job_listings', $id, $myPub);
-            $stmt = prepareQuery($conn, "UPDATE job_listings SET message = ?, contact = ? WHERE id = ?");
-            $stmt->bind_param("ssi", $msg, $contact, $id);
-            run($stmt);
-            jsonResponse(["success" => true]);
-        }
-        $stmt = prepareQuery($conn, "INSERT INTO job_listings (from_pub, created_by, message, contact) VALUES (?, ?, ?, ?)");
-        $stmt->bind_param("siss", $myPub, $myId, $msg, $contact);
-        run($stmt);
-        $listingId = $conn->insert_id;
-        // Hyväksyntäpyyntö kaikille muille aktiivisille baareille
-        $pubs = fetchAllRows(prepareQuery($conn, "SELECT pub_name FROM users WHERE role != 'superadmin' GROUP BY pub_name HAVING MAX(status) != 'frozen' OR MAX(status) IS NULL"));
-        $ins = prepareQuery($conn, "INSERT INTO job_listing_approvals (listing_id, pub_name, approved_by) VALUES (?, ?, 0)");
-        foreach ($pubs as $p) {
-            if ($p['pub_name'] === $myPub) continue;
-            $ins->bind_param("is", $listingId, $p['pub_name']);
-            run($ins);
-            pushToPub($conn, $p['pub_name'], 0, "Työvoimapyyntö", "Toinen baari pyytää apua. Katso etusivu.", $vapid_auth, true);
-        }
-        jsonResponse(["success" => true]);
-
-    } elseif ($action === 'approve_job_listing') {
-        requireAdmin($me);
-        $jobId = (int)($data['jobId'] ?? 0);
-        $status = $data['status'] ?? '';
-        if (!in_array($status, ['approved', 'rejected'], true)) fail('Virheellinen tila');
-        $stmt = prepareQuery($conn, "UPDATE job_listing_approvals SET status = ?, approved_by = ?, decided_at = NOW() WHERE listing_id = ? AND pub_name = ?");
-        $stmt->bind_param("siis", $status, $myId, $jobId, $myPub);
-        run($stmt);
-        if ($stmt->affected_rows < 1) fail('Ei löydy tai ei oikeuksia', 404);
-        jsonResponse(["success" => true]);
-
-    } elseif ($action === 'close_job_listing') {
-        requireAdmin($me);
-        $jobId = (int)($data['jobId'] ?? 0);
-        requireInPub($conn, 'job_listings', $jobId, $myPub);
-        $stmt = prepareQuery($conn, "UPDATE job_listings SET status = 'closed' WHERE id = ?");
-        $stmt->bind_param("i", $jobId);
-        run($stmt);
-        jsonResponse(["success" => true]);
-
     } elseif ($action === 'test_push') {   // testi-ilmoitus itselle
         $n = sendPushToUser($conn, $myId, 'Testi-ilmoitus', 'Ilmoitukset toimivat tällä laitteella 🎉', $vapid_auth);
         jsonResponse(["success" => true, "delivered" => $n]);
@@ -3544,13 +3325,7 @@ if ($method === 'DELETE') {
     if (!isset($tables[$type])) fail('Tuntematon tyyppi poistolle');
     [$table, $kind] = $tables[$type];
 
-    if (isSuper($me)) {
-        if ($type !== 'user') fail('Ei oikeuksia', 403);
-        $tgt = prepareQuery($conn, "SELECT role FROM users WHERE id = ?");
-        $tgt->bind_param("i", $id);
-        $tr = fetchOne($tgt);
-        if (!$tr || $tr['role'] === 'superadmin') fail('Ei oikeuksia', 403);
-    } else {
+    {
         requireInPub($conn, $kind, $id, $myPub);
         if ($type === 'shopping') {
             // kuka tahansa baarin jäsen

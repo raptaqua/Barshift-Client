@@ -105,7 +105,7 @@ foreach ($pubRows as $p) {
 // ===================== LUPIEN (JV-kortti) VANHENEMISMUISTUTUKSET =====================
 // 30 pv ja 7 pv ennen vanhenemista sekä vanhenemispäivän jälkeen; kukin kerran (cert_alert_level), uusi vanhenemispäivä nollaa tilan
 foreach (fetchRows($conn, "SELECT u.id, u.name, u.pub_name, u.expiry_jv, u.cert_alert_level, u.cert_alert_for, p.timezone FROM users u LEFT JOIN pubs p ON p.slug = u.pub_name
-        WHERE u.expiry_jv IS NOT NULL AND u.anonymized_at IS NULL AND u.role != 'superadmin'") as $u) {
+        WHERE u.expiry_jv IS NOT NULL AND u.anonymized_at IS NULL") as $u) {
     $tz = new DateTimeZone($u['timezone'] ?: 'Europe/Helsinki'); $today = new DateTime('today', $tz); $exp = new DateTime($u['expiry_jv'], $tz);
     $days = (int)$today->diff($exp)->format('%r%a'); $level = (int)$u['cert_alert_level'];
     if ($u['cert_alert_for'] !== $u['expiry_jv']) $level = 0;

@@ -9,7 +9,7 @@ CREATE TABLE IF NOT EXISTS `users` (
   `name` varchar(100) NOT NULL,
   `username` varchar(50) NOT NULL,
   `password` varchar(255) NOT NULL,                 -- vain password_hash()-arvo
-  `role` enum('admin','employee','superadmin') NOT NULL DEFAULT 'employee',
+  `role` enum('admin','employee') NOT NULL DEFAULT 'employee',
   `color` varchar(7) DEFAULT NULL,
   `initials` varchar(5) DEFAULT NULL,
   `pub_name` varchar(100) NOT NULL,
@@ -30,18 +30,14 @@ CREATE TABLE IF NOT EXISTS `users` (
   `totp_secret` varchar(300) DEFAULT NULL,           -- salattu (message_key)
   `totp_last_step` bigint(20) NOT NULL DEFAULT 0,    -- viimeksi käytetty aika-askel (koodin uudelleenkäytön esto)
   `recovery_codes` text DEFAULT NULL,                -- JSON: palautuskoodien sha256-tiivisteet
-  `account_key` varchar(32) DEFAULT NULL,            -- sama arvo = sama henkilö usean baarin jäsenenä (yhdistetyt tunnukset)
   `employee_number` varchar(20) DEFAULT NULL,
   `cert_alert_level` tinyint(4) NOT NULL DEFAULT 0,
   `cert_alert_for` date DEFAULT NULL,
-  `gig_available` tinyint(1) NOT NULL DEFAULT 0,
-  `gig_note` varchar(300) DEFAULT NULL,
   `access_role` varchar(40) DEFAULT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `unique_user_per_pub` (`username`,`pub_name`),
   UNIQUE KEY `ical_token` (`ical_token`),
-  KEY `pub_name` (`pub_name`),
-  KEY `account_key` (`account_key`)
+  KEY `pub_name` (`pub_name`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 CREATE TABLE IF NOT EXISTS `shifts` (
@@ -206,7 +202,6 @@ CREATE TABLE IF NOT EXISTS `pubs` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `slug` (`slug`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-INSERT IGNORE INTO `pubs` (`slug`,`name`) SELECT DISTINCT `pub_name`,`pub_name` FROM `users` WHERE `pub_name` IS NOT NULL AND `pub_name` <> 'SYSTEM';
 
 -- Auditloki admin-toimista (ei sisällä salasanoja eikä viestien sisältöä)
 CREATE TABLE IF NOT EXISTS `audit_log` (
@@ -334,30 +329,7 @@ CREATE TABLE IF NOT EXISTS `shopping_list` (
   KEY `pub_status` (`pub_name`,`status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
-CREATE TABLE IF NOT EXISTS `job_listings` (
-  `id` int(11) NOT NULL AUTO_INCREMENT,
-  `from_pub` varchar(100) NOT NULL,
-  `created_by` int(11) NOT NULL,
-  `message` text NOT NULL,
-  `contact` varchar(200) NOT NULL,
-  `status` enum('open','closed') NOT NULL DEFAULT 'open',
-  `created_at` timestamp NULL DEFAULT current_timestamp(),
-  `expires_at` date DEFAULT NULL,
-  PRIMARY KEY (`id`),
-  KEY `from_pub` (`from_pub`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
-CREATE TABLE IF NOT EXISTS `job_listing_approvals` (
-  `id` int(11) NOT NULL AUTO_INCREMENT,
-  `listing_id` int(11) NOT NULL,
-  `pub_name` varchar(100) NOT NULL,
-  `approved_by` int(11) NOT NULL,
-  `status` enum('pending','approved','rejected') NOT NULL DEFAULT 'pending',
-  `decided_at` timestamp NULL DEFAULT NULL,
-  PRIMARY KEY (`id`),
-  KEY `listing_id` (`listing_id`),
-  CONSTRAINT `approvals_listing` FOREIGN KEY (`listing_id`) REFERENCES `job_listings` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- Viestit tallennetaan salattuna (sovelluskerroksessa), ei selkotekstinä.
 CREATE TABLE IF NOT EXISTS `private_messages` (
@@ -516,21 +488,6 @@ CREATE TABLE IF NOT EXISTS `survey_done` (
   CONSTRAINT `sd_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
-CREATE TABLE IF NOT EXISTS `gig_invites` (
-  `id` int(11) NOT NULL AUTO_INCREMENT,
-  `from_pub` varchar(100) NOT NULL,
-  `to_user_id` int(11) NOT NULL,
-  `shift_id` int(11) DEFAULT NULL,
-  `message` varchar(300) DEFAULT NULL,
-  `status` enum('pending','accepted','declined','cancelled') NOT NULL DEFAULT 'pending',
-  `created_by` int(11) NOT NULL,
-  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
-  `decided_at` datetime DEFAULT NULL,
-  PRIMARY KEY (`id`),
-  KEY `to_user_id` (`to_user_id`),
-  KEY `from_pub` (`from_pub`,`status`),
-  CONSTRAINT `gig_user` FOREIGN KEY (`to_user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 CREATE TABLE IF NOT EXISTS `event_registrations` (
   `id` int(11) NOT NULL AUTO_INCREMENT,

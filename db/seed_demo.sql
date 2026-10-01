@@ -6,8 +6,6 @@
 -- Tuo schema.sql ensin:  mysql TIETOKANTA < db/schema.sql && mysql TIETOKANTA < db/seed_demo.sql
 SET NAMES utf8mb4;
 SET FOREIGN_KEY_CHECKS = 0;
-DELETE FROM `job_listing_approvals` WHERE `pub_name` = 'demobaari';
-DELETE FROM `job_listings` WHERE `from_pub` = 'demobaari';
 DELETE FROM `task_completions` WHERE `pub_name` = 'demobaari';
 DELETE FROM `tasks` WHERE `pub_name` = 'demobaari';
 DELETE FROM `user_skills` WHERE `skill_id` IN (SELECT id FROM `skills` WHERE `pub_name` = 'demobaari');
@@ -21,9 +19,9 @@ DELETE FROM `shifts` WHERE `pub_name` = 'demobaari';
 DELETE FROM `absences` WHERE `user_id` IN (SELECT id FROM users WHERE pub_name = 'demobaari');
 DELETE FROM `time_entries` WHERE `pub_name` = 'demobaari';
 DELETE FROM `availability` WHERE `pub_name` = 'demobaari';
-DELETE FROM `events` WHERE `pub_name` IN ('demobaari','demo-satama','demo-kellari');
-DELETE FROM `pubs` WHERE `slug` IN ('demobaari','demo-satama','demo-kellari');
-DELETE FROM `pub_profiles` WHERE `pub_name` IN ('demobaari','demo-satama','demo-kellari');
+DELETE FROM `events` WHERE `pub_name` IN ('demobaari');
+DELETE FROM `pubs` WHERE `slug` IN ('demobaari');
+DELETE FROM `pub_profiles` WHERE `pub_name` IN ('demobaari');
 DELETE FROM `notices` WHERE `pub_name` = 'demobaari';
 DELETE FROM `shift_logs` WHERE `pub_name` = 'demobaari';
 DELETE FROM `shopping_list` WHERE `pub_name` = 'demobaari';
@@ -231,29 +229,12 @@ INSERT INTO `events` (`title`,`date`,`type`,`time`,`time_start`,`time_end`,`pub_
 
 -- Baarit omina entiteetteinään (asetukset, palkkalisät)
 INSERT INTO `pubs` (`slug`,`name`,`roles`,`billing_name`,`billing_email`) VALUES
-('demobaari','Demobaari','["Baarimestari","Järjestyksenvalvoja","Tarjoilija","Vuoropäällikkö"]','Demobaari Oy','laskutus@demobaari.example'),
-('demo-satama','Satamabaari (demo)',NULL,NULL,NULL),
-('demo-kellari','Kellari (demo)',NULL,NULL,NULL);
+('demobaari','Demobaari','["Baarimestari","Järjestyksenvalvoja","Tarjoilija","Vuoropäällikkö"]','Demobaari Oy','laskutus@demobaari.example');
 
--- Julkiset profiilit: demobaari + kaksi kuvitteellista esimerkkibaaria julkista tapahtumakalenteria varten
+-- Julkiset profiilit: demobaari
 INSERT INTO `pub_profiles` (`pub_name`,`display_name`,`description`,`address`,`city`,`lat`,`lng`,`website`,`color`,`is_public`) VALUES
-('demobaari','Demobaari','Tunnelmallinen esimerkkibaari keskustassa. Elävää musiikkia ja visoja viikoittain.','Esimerkkikatu 1','Helsinki',60.169900,24.938400,'https://example.com/demobaari','#E14D2A',1),
-('demo-satama','Satamabaari (demo)','Kuvitteellinen satamabaari jokivarressa. Terassi ja live-musiikkia.','Satamakatu 12','Turku',60.449700,22.274000,'https://example.com/satama','#0D9488',1),
-('demo-kellari','Kellari (demo)','Kuvitteellinen kellaribaari: pubivisat ja urheilut isolta ruudulta.','Kellarikatu 5','Tampere',61.497800,23.761000,NULL,'#3B82F6',1);
+('demobaari','Demobaari','Tunnelmallinen esimerkkibaari keskustassa. Elävää musiikkia ja visoja viikoittain.','Esimerkkikatu 1','Helsinki',60.169900,24.938400,'https://example.com/demobaari','#E14D2A',1);
 
-INSERT INTO `events` (`title`,`date`,`type`,`time`,`time_start`,`time_end`,`pub_name`,`description`,`is_public`) VALUES
-('🎵 Jazz-ilta jokivarressa',DATE_ADD(CURDATE(), INTERVAL 1 DAY),'music','19:00:00','19:00:00','23:00:00','demo-satama','Kolmen hengen jazz-yhtye terassilla.',1),
-('🍻 Oktoberfest',DATE_ADD(CURDATE(), INTERVAL 4 DAY),'theme','17:00:00','17:00:00','01:00:00','demo-satama','Olutta ja makkaraa, saksalaista tunnelmaa.',1),
-('🎸 Rockiltama',DATE_ADD(CURDATE(), INTERVAL 8 DAY),'music','21:00:00','21:00:00','02:00:00','demo-satama','Kolme paikallista bändiä samalla lipulla.',1),
-('🧠 Pubivisa',DATE_ADD(CURDATE(), INTERVAL 15 DAY),'quiz','19:00:00','19:00:00','21:30:00','demo-satama','Kysymyksiä musiikista, elokuvista ja urheilusta.',1),
-('🎤 Karaokekilpailu',DATE_ADD(CURDATE(), INTERVAL 22 DAY),'music','20:00:00','20:00:00','01:00:00','demo-satama','Voittaja saa 100 euron lahjakortin.',1),
-('🎵 Kesän päätösjuhla',DATE_ADD(CURDATE(), INTERVAL -10 DAY),'music','20:00:00','20:00:00','02:00:00','demo-satama','Kiitos kesästä!',1),
-('⚽ Liigaottelu isolta ruudulta',DATE_ADD(CURDATE(), INTERVAL 0 DAY),'sports','18:00:00','18:00:00','22:00:00','demo-kellari','Ottelun ajan tuoppitarjous.',1),
-('🧠 Suuri tietovisa',DATE_ADD(CURDATE(), INTERVAL 3 DAY),'quiz','19:30:00','19:30:00','22:30:00','demo-kellari','Joukkueille, max 5 hlö. Ilmoittautuminen ovella.',1),
-('🎯 Darts-turnaus',DATE_ADD(CURDATE(), INTERVAL 6 DAY),'sports','17:00:00','17:00:00','22:00:00','demo-kellari','Avoin turnaus kaikkien tasojen pelaajille.',1),
-('🎵 DJ-ilta',DATE_ADD(CURDATE(), INTERVAL 10 DAY),'music','22:00:00','22:00:00','04:00:00','demo-kellari','Tanssittava setti aamuun.',1),
-('🎉 Bilebingo',DATE_ADD(CURDATE(), INTERVAL 17 DAY),'theme','20:00:00','20:00:00','23:00:00','demo-kellari','Palkintoina lahjakortteja.',1),
-('⚽ Derby-ilta',DATE_ADD(CURDATE(), INTERVAL 26 DAY),'sports','19:00:00','19:00:00','22:00:00','demo-kellari','Suuren ottelun tunnelmaa.',1);
 
 INSERT INTO `absences` (`user_id`,`type`,`start_date`,`end_date`,`description`,`status`) VALUES
 (9003,'sick',DATE_ADD(CURDATE(), INTERVAL -12 DAY),DATE_ADD(CURDATE(), INTERVAL -10 DAY),'Kuumetta ja flunssaa','approved'),
@@ -504,8 +485,6 @@ INSERT IGNORE INTO `availability` (`user_id`,`pub_name`,`date`,`status`) VALUES
 (9006,'demobaari',DATE_ADD(CURDATE(), INTERVAL 19 DAY),'available'),
 (9006,'demobaari',DATE_ADD(CURDATE(), INTERVAL 2 DAY),'available');
 
-INSERT INTO `job_listings` (`id`,`from_pub`,`created_by`,`message`,`contact`,`status`,`created_at`,`expires_at`) VALUES
-(9000,'demobaari',9001,'Tarvitaan lisäkäsiä perjantaille, baarimestari tai tarjoilija.','demo@example.com','open',TIMESTAMP(DATE_ADD(CURDATE(), INTERVAL -3 DAY), '15:00:00'),DATE_ADD(CURDATE(), INTERVAL 10 DAY));
 
 -- Kassatilitykset ~14 kuukaudelta (ma suljettu): myynti kasvaa, pe-la vahvimmat, kesä ja joulu nousevat; kassaerot harvinaisia
 INSERT INTO `cash_reports` (`pub_name`,`date`,`sales_total`,`card_total`,`counted_cash`,`float_amount`,`note`,`user_id`)

@@ -326,7 +326,7 @@ function renderShiftList(isAdmin, today) {
         <div class="sl-row"><span class="sl-lbl">Näytä</span><div class="abs-pills" style="margin:0;">
             ${chip('shiftWho', 'all', isAdmin ? 'Kaikki' : 'Omat ja avoimet')}${chip('shiftWho', 'mine', 'Vain omat')}${chip('shiftWho', 'open', 'Avoimet')}
             ${isAdmin ? `<select class="form-input" style="width:auto; padding:6px 10px; font-size:13px;" onchange="setShiftFilter('shiftWho', this.value)">
-                <option value="all">Työntekijä…</option>${state.data.users.filter(u => u.role !== 'superadmin').map(u => `<option value="${u.id}" ${who == u.id ? 'selected' : ''}>${esc(u.name)}</option>`).join('')}</select>` : ''}
+                <option value="all">Työntekijä…</option>${state.data.users.map(u => `<option value="${u.id}" ${who == u.id ? 'selected' : ''}>${esc(u.name)}</option>`).join('')}</select>` : ''}
         </div></div>
     </div>
     <div class="sl-stats"><span><b>${list.length}</b> vuoroa</span>${openN ? `<span class="warn"><b>${openN}</b> avointa</span>` : ''}${mineN ? `<span><b>${mineN}</b> omaa</span>` : ''}<span><b>${BSNum(totalHours)}</b> h</span></div>`;
@@ -766,7 +766,7 @@ function openClearShifts(from, to) {
             <div class="form-group"><label class="form-label">Päättyen</label><input id="cl-to" type="date" class="form-input" value="${to}" oninput="updateClearCount()"></div>
         </div>
         <div class="form-group" style="margin-bottom:12px;"><label class="form-label">Kenen vuorot</label>
-            <select id="cl-user" class="form-input" onchange="updateClearCount()"><option value="">Kaikki</option><option value="0">Vain avoimet vuorot</option>${state.data.users.filter(u => u.role !== 'superadmin').map(u => `<option value="${u.id}">${esc(u.name)}</option>`).join('')}</select></div>
+            <select id="cl-user" class="form-input" onchange="updateClearCount()"><option value="">Kaikki</option><option value="0">Vain avoimet vuorot</option>${state.data.users.map(u => `<option value="${u.id}">${esc(u.name)}</option>`).join('')}</select></div>
         <label class="abs-choice" style="margin-bottom:12px;"><input id="cl-draft" type="checkbox" onchange="updateClearCount()"><span><b>Vain luonnokset</b> – julkaistut vuorot jäävät</span></label>
         <div id="cl-count" class="warn-box" style="margin:0;"></div>`;
     openModal('Tyhjennä vuorot', 'bi-eraser', body, `<button class="btn btn-ghost" onclick="closeModal()">Peruuta</button><button class="btn btn-danger" id="cl-go" onclick="confirmClearShifts()"><i class="bi bi-trash"></i> Tyhjennä</button>`);

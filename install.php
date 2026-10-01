@@ -2,7 +2,7 @@
 // BarShift Pro: asennusohjelma.
 //
 // Tekee: vaatimustarkistuksen, tietokannan (schema.sql), config.php:n, VAPID-avaimet,
-// viestien salausavaimen ja superadmin-tunnuksen. Demodata on valinnainen.
+// viestien salausavaimen ja ylläpitäjän tunnuksen. Demodata on valinnainen.
 //
 // TURVALLISUUS
 //  - Toimii vain kun config.php ja install.lock puuttuvat.
@@ -123,7 +123,9 @@ $in = [
     'db_user' => trim((string)($_POST['db_user'] ?? '')),
     'db_pass' => (string)($_POST['db_pass'] ?? ''),
     'email'   => trim((string)($_POST['email'] ?? '')),
-    'su_user' => trim((string)($_POST['su_user'] ?? 'superadmin')),
+    'pub_name'=> trim((string)($_POST['pub_name'] ?? '')),
+    'admin_name' => trim((string)($_POST['admin_name'] ?? '')),
+    'su_user' => trim((string)($_POST['su_user'] ?? 'admin')),
     'su_pass' => (string)($_POST['su_pass'] ?? ''),
     'su_pass2'=> (string)($_POST['su_pass2'] ?? ''),
     'demo'    => !empty($_POST['demo']),
@@ -174,8 +176,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         if ($act === 'install') {
             if (!filter_var($in['email'], FILTER_VALIDATE_EMAIL) || strlen($in['email']) > 120) $errors[] = 'Anna kelvollinen sähköpostiosoite (käytetään push-ilmoitusten lähettäjätietona).';
-            if (!preg_match('/^[A-Za-z0-9._-]{3,50}$/', $in['su_user'])) $errors[] = 'Superadminin tunnus: 3–50 merkkiä (kirjaimet, numerot, . _ -).';
-            if (strlen($in['su_pass']) < 12) $errors[] = 'Superadminin salasanan on oltava vähintään 12 merkkiä.';
+            if ($in['pub_name'] === '' || mb_strlen($in['pub_name']) > 100) $errors[] = 'Anna baarin nimi (enintään 100 merkkiä).';
+            if ($in['admin_name'] === '' || mb_strlen($in['admin_name']) > 100) $errors[] = 'Anna ylläpitäjän nimi.';
+            if (!preg_match('/^[A-Za-z0-9._-]{3,50}$/', $in['su_user'])) $errors[] = 'Ylläpitäjän tunnus: 3–50 merkkiä (kirjaimet, numerot, . _ -).';
+            if (strlen($in['su_pass']) < 12) $errors[] = 'Ylläpitäjän salasanan on oltava vähintään 12 merkkiä.';
             if ($in['su_pass'] !== $in['su_pass2']) $errors[] = 'Salasanat eivät täsmää.';
 
             if (!$errors && $conn) {
@@ -190,14 +194,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 foreach ((is_file($root . '/db/legacy_upgrade.php') ? require $root . '/db/legacy_upgrade.php' : []) as $sql) { @$conn->query($sql); }
                 [, $migErr] = bsRunMigrations($conn, $root . '/db/migrations', $freshDb);
                 if ($migErr) $errors[] = h($migErr);
-                // 3) Superadmin
-                $hash = password_hash($in['su_pass'], PASSWORD_DEFAULT);
-                $st = $conn->prepare("INSERT INTO users (name, username, password, role, pub_name) VALUES (?, ?, ?, 'superadmin', 'SYSTEM')
-                                      ON DUPLICATE KEY UPDATE password = VALUES(password), role = 'superadmin'");
-                if (!$st) { $errors[] = 'Superadminin luonti epäonnistui.'; }
+                // 3) Baari (täsmälleen yksi) ja sen ylläpitäjä
+                $slug = trim(preg_replace('/[^a-z0-9]+/', '-', strtolower(strtr($in['pub_name'], ['ä' => 'a', 'ö' => 'o', 'å' => 'a', 'Ä' => 'a', 'Ö' => 'o', 'Å' => 'a']))), '-') ?: 'baari';
+                $exist = $conn->query("SELECT slug FROM pubs ORDER BY id LIMIT 1");
+                $row = $exist ? $exist->fetch_assoc() : null;
+                if ($row) { $slug = $row['slug']; }
                 else {
-                    $st->bind_param('sss', $in['su_user'], $in['su_user'], $hash);
-                    if (!$st->execute()) $errors[] = 'Superadminin luonti epäonnistui.';
+                    $ps = $conn->prepare("INSERT INTO pubs (slug, name) VALUES (?, ?)");
+                    $ps->bind_param('ss', $slug, $in['pub_name']);
+                    if (!$ps->execute()) $errors[] = 'Baarin luonti epäonnistui.';
+                }
+                $hash = password_hash($in['su_pass'], PASSWORD_DEFAULT);
+                $st = $conn->prepare("INSERT INTO users (name, username, password, role, pub_name) VALUES (?, ?, ?, 'admin', ?)
+                                      ON DUPLICATE KEY UPDATE password = VALUES(password), role = 'admin'");
+                if (!$st) { $errors[] = 'Ylläpitäjän luonti epäonnistui.'; }
+                else {
+                    $st->bind_param('ssss', $in['admin_name'], $in['su_user'], $hash, $slug);
+                    if (!$st->execute()) $errors[] = 'Ylläpitäjän luonti epäonnistui.';
                 }
             }
             if (!$errors && $conn && $in['demo']) {
@@ -237,13 +250,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 // ---------- Valmis ----------
 if ($done) {
-    $login = $done['user'] === 'superadmin' ? 'superadmin' : $done['user'] . '@SYSTEM';
+    $login = $done['user'];
     $body = '<div class="card"><div class="msg good"><b>Asennus valmis.</b></div>'
         . '<p>Kirjaudu sovellukseen tunnuksella <code>' . h($login) . '</code> ja valitsemallasi salasanalla.</p>'
         . ($done['demo'] ? '<div class="msg note">Demodata on tuotu. Demobaarin käyttäjien salasana on julkinen (ks. README), joten <b>älä käytä demodataa tuotannossa</b>.</div>' : '')
         . ($done['deleted'] ? '<p class="ok">✓ install.php ja asennustunniste poistettiin palvelimelta.</p>'
                             : '<div class="msg err"><b>Poista nyt käsin</b> tiedostot <code>install.php</code> ja <code>install_token.php</code> palvelimelta. (Asennusohjelma on lukittu, mutta poisto on silti suositeltavaa.)</div>')
-        . '<p>Seuraavat askeleet: luo ensimmäinen baari ja sen admin superadmin-näkymästä.</p>'
+        . '<p>Seuraavat askeleet: tarkista Baarin asetukset ja lisää työntekijät.</p>'
         . '<div class="actions"><a href="index.php"><button type="button">Avaa BarShift</button></a></div></div>';
     page('Asennus valmis', $body);
 }
@@ -277,8 +290,10 @@ $body .= '<div class="card"><h2>3. Tietokanta</h2>'
        . '<div><label for="db_pass">Salasana</label><input type="password" id="db_pass" name="db_pass" autocomplete="new-password"' . ($matchesSaved($in) ? ' placeholder="•••••••• (tallennettu, jätä tyhjäksi)"' : '') . '></div></div>'
        . '<div class="actions"><button type="submit" name="act" value="test" class="ghost" formnovalidate>Testaa yhteys</button></div></div>';
 
-$body .= '<div class="card"><h2>4. Ylläpitäjä (superadmin)</h2>'
-       . '<label for="su_user">Tunnus</label><input type="text" id="su_user" name="su_user" value="' . h($in['su_user']) . '" required>'
+$body .= '<div class="card"><h2>4. Baari ja ylläpitäjä</h2>'
+       . '<label for="pub_name">Baarin nimi</label><input type="text" id="pub_name" name="pub_name" value="' . h($in['pub_name']) . '" required maxlength="100"><small>Tämä asennus palvelee vain tätä yhtä baaria.</small>'
+       . '<label for="admin_name">Ylläpitäjän nimi</label><input type="text" id="admin_name" name="admin_name" value="' . h($in['admin_name']) . '" required maxlength="100">'
+       . '<label for="su_user">Ylläpitäjän tunnus</label><input type="text" id="su_user" name="su_user" value="' . h($in['su_user']) . '" required>'
        . '<label for="email">Sähköposti</label><input type="email" id="email" name="email" value="' . h($in['email']) . '" required><small>Käytetään push-ilmoitusten lähettäjätietona. Ei lähetetä mihinkään muualle.</small>'
        . '<div class="row"><div><label for="su_pass">Salasana (väh. 12 merkkiä)</label><input type="password" id="su_pass" name="su_pass" minlength="12" autocomplete="new-password"></div>'
        . '<div><label for="su_pass2">Salasana uudelleen</label><input type="password" id="su_pass2" name="su_pass2" minlength="12" autocomplete="new-password"></div></div></div>';

@@ -234,7 +234,7 @@ function openAbsenceModal(absenceId = null) {
     const body = `
         ${can('absences.approve') && !eb ? `<div class="form-group" style="margin-bottom:16px;">
             <label class="form-label">Työntekijä</label>
-            <select id="abs-user" class="form-input">${(state.data.users || []).filter(x => x.role !== 'superadmin').map(x => `<option value="${x.id}" ${x.id == state.user.id ? 'selected' : ''}>${esc(x.name)}${x.id == state.user.id ? ' (minä)' : ''}</option>`).join('')}</select>
+            <select id="abs-user" class="form-input">${(state.data.users || []).map(x => `<option value="${x.id}" ${x.id == state.user.id ? 'selected' : ''}>${esc(x.name)}${x.id == state.user.id ? ' (minä)' : ''}</option>`).join('')}</select>
             <small style="color:var(--text3)">Kun valitset toisen työntekijän, poissaolo kirjataan suoraan hyväksyttynä (esim. jo pidetty loma).</small>
         </div>` : ''}
         <div class="form-group" style="margin-bottom:16px;">
@@ -386,7 +386,7 @@ function renderAbsenceCalendar(isAdmin) {
     const days = new Date(y, m, 0).getDate(), today = getLocalDateString();
     const title = new Date(y, m - 1, 1).toLocaleString('fi-FI', { month: 'long', year: 'numeric' });
     const abs = (state.data.absences || []).filter(a => a.status !== 'rejected' && a.end_date >= `${month}-01` && a.start_date <= `${month}-${String(days).padStart(2, '0')}`);
-    const users = (state.data.users || []).filter(u => u.role !== 'superadmin' && !u.anonymized_at)
+    const users = (state.data.users || []).filter(u => !u.anonymized_at)
         .filter(u => abs.some(a => a.user_id == u.id) || isAdmin || u.id == state.user.id);
     const color = a => a.type === 'vacation' ? '#F59E0B' : (a.type === 'sick' && isAdmin ? '#E11D48' : '#94A3B8');
     const label = a => (a.type === 'sick' && !isAdmin) ? 'Poissa' : (ABS_TYPES[a.type] || ABS_TYPES.other).label;

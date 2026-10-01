@@ -65,7 +65,6 @@ CREATE TABLE IF NOT EXISTS `pubs` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `slug` (`slug`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-INSERT IGNORE INTO `pubs` (`slug`,`name`) SELECT DISTINCT `pub_name`,`pub_name` FROM `users` WHERE `pub_name` IS NOT NULL AND `pub_name` <> 'SYSTEM';
 
 -- Vuorosuunnittelu: luonnos/julkaistu ja vuoropohjat
 ALTER TABLE `shifts` ADD COLUMN IF NOT EXISTS `status` enum('draft','published') NOT NULL DEFAULT 'published';
@@ -148,8 +147,6 @@ ALTER TABLE `shifts` ADD COLUMN IF NOT EXISTS `missed_alerted_at` datetime DEFAU
 ALTER TABLE `time_entries` ADD COLUMN IF NOT EXISTS `alerted_at` datetime DEFAULT NULL;
 
 -- Yksi tunnus, monta baaria
-ALTER TABLE `users` ADD COLUMN IF NOT EXISTS `account_key` varchar(32) DEFAULT NULL;
-ALTER TABLE `users` ADD KEY IF NOT EXISTS `account_key` (`account_key`);
 ALTER TABLE `auth_tokens` MODIFY `kind` enum('invite','reset','link') NOT NULL;
 
 -- Viikkopohjat
@@ -294,24 +291,7 @@ CREATE TABLE IF NOT EXISTS `survey_done` (
   CONSTRAINT `sd_survey` FOREIGN KEY (`survey_id`) REFERENCES `surveys` (`id`) ON DELETE CASCADE,
   CONSTRAINT `sd_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-ALTER TABLE `users` ADD COLUMN IF NOT EXISTS `gig_available` tinyint(1) NOT NULL DEFAULT 0;
-ALTER TABLE `users` ADD COLUMN IF NOT EXISTS `gig_note` varchar(300) DEFAULT NULL;
 
-CREATE TABLE IF NOT EXISTS `gig_invites` (
-  `id` int(11) NOT NULL AUTO_INCREMENT,
-  `from_pub` varchar(100) NOT NULL,
-  `to_user_id` int(11) NOT NULL,
-  `shift_id` int(11) DEFAULT NULL,
-  `message` varchar(300) DEFAULT NULL,
-  `status` enum('pending','accepted','declined','cancelled') NOT NULL DEFAULT 'pending',
-  `created_by` int(11) NOT NULL,
-  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
-  `decided_at` datetime DEFAULT NULL,
-  PRIMARY KEY (`id`),
-  KEY `to_user_id` (`to_user_id`),
-  KEY `from_pub` (`from_pub`,`status`),
-  CONSTRAINT `gig_user` FOREIGN KEY (`to_user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 ALTER TABLE `pubs` ADD COLUMN IF NOT EXISTS `feature_tickets` tinyint(1) NOT NULL DEFAULT 0;
 ALTER TABLE `pubs` ADD COLUMN IF NOT EXISTS `feature_bookings` tinyint(1) NOT NULL DEFAULT 0;
 ALTER TABLE `pubs` ADD COLUMN IF NOT EXISTS `booking_capacity` int(11) NOT NULL DEFAULT 30;

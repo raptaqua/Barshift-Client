@@ -130,20 +130,14 @@ async function loadSilent() {
 
         let dataChanged = false;
 
-        if (state.user.role === 'superadmin') {
-            if (JSON.stringify(state.data.pubs) !== JSON.stringify(data.pubs) || JSON.stringify(state.data.stats) !== JSON.stringify(data.stats)) {
-                state.data.pubs = data.pubs || [];
-                state.data.stats = data.stats || {total_pubs: 0, total_users: 0, total_shifts: 0};
-                dataChanged = true;
-            }
-        } else {
+        {
             const newData = {
                 users: data.users || [], shifts: data.shifts || [], events: data.events || [],
-                pub: data.pub || null, memberships: data.memberships || [], shift_templates: data.shift_templates || [], week_templates: data.week_templates || [], staffing_rules: data.staffing_rules || [], bookings: data.bookings || [], event_regs: data.event_regs || {}, gig_incoming: data.gig_incoming || [], gig_outgoing: data.gig_outgoing || [], checklists: data.checklists || [], checklist_progress: data.checklist_progress || [], documents: data.documents || [], kudos: data.kudos || [], surveys: data.surveys || [], coverage: data.coverage || [], availability_rules: data.availability_rules || [], trades: data.trades || [], absences: data.absences || [], notices: data.notices || [],
+                pub: data.pub || null, shift_templates: data.shift_templates || [], week_templates: data.week_templates || [], staffing_rules: data.staffing_rules || [], bookings: data.bookings || [], event_regs: data.event_regs || {}, checklists: data.checklists || [], checklist_progress: data.checklist_progress || [], documents: data.documents || [], kudos: data.kudos || [], surveys: data.surveys || [], coverage: data.coverage || [], availability_rules: data.availability_rules || [], trades: data.trades || [], absences: data.absences || [], notices: data.notices || [],
                 time_entries: data.time_entries || [], availability: data.availability || [],
                 tasks: data.tasks || [], task_completions: data.task_completions || [], cash_recent: data.cash_recent || [], perms: data.perms || [], shift_bids: data.shift_bids || [], hour_conf: data.hour_conf || [], skills: data.skills || [], user_skills: data.user_skills || [], system_alerts: data.system_alerts || [], event_guests: data.event_guests || [], access_roles: data.access_roles || [],
                 shift_logs: data.shift_logs || [], shopping_list: data.shopping_list || [],
-                job_listings: data.job_listings || [], private_messages: data.private_messages || []
+                private_messages: data.private_messages || []
             };
             if (JSON.stringify(state.data) !== JSON.stringify(newData)) {
                 state.data = newData;
@@ -182,17 +176,14 @@ async function load() {
             if (data.need_2fa) { state.need2fa = true; render(); return; }
             if (state.need2fa) state.need2fa = false;
             if (data.error) return showToast(data.error, 'error');
-            if (state.user.role === 'superadmin') {
-                state.data.pubs = data.pubs || [];
-                state.data.stats = data.stats || {total_pubs: 0, total_users: 0, total_shifts: 0};
-            } else {
+            {
                 state.data = {
                     users: data.users || [], shifts: data.shifts || [], events: data.events || [],
-                    pub: data.pub || null, memberships: data.memberships || [], shift_templates: data.shift_templates || [], week_templates: data.week_templates || [], staffing_rules: data.staffing_rules || [], bookings: data.bookings || [], event_regs: data.event_regs || {}, gig_incoming: data.gig_incoming || [], gig_outgoing: data.gig_outgoing || [], checklists: data.checklists || [], checklist_progress: data.checklist_progress || [], documents: data.documents || [], kudos: data.kudos || [], surveys: data.surveys || [], coverage: data.coverage || [], availability_rules: data.availability_rules || [], trades: data.trades || [], absences: data.absences || [], notices: data.notices || [],
+                    pub: data.pub || null, shift_templates: data.shift_templates || [], week_templates: data.week_templates || [], staffing_rules: data.staffing_rules || [], bookings: data.bookings || [], event_regs: data.event_regs || {}, checklists: data.checklists || [], checklist_progress: data.checklist_progress || [], documents: data.documents || [], kudos: data.kudos || [], surveys: data.surveys || [], coverage: data.coverage || [], availability_rules: data.availability_rules || [], trades: data.trades || [], absences: data.absences || [], notices: data.notices || [],
                     time_entries: data.time_entries || [], availability: data.availability || [],
                     tasks: data.tasks || [], task_completions: data.task_completions || [], cash_recent: data.cash_recent || [], perms: data.perms || [], shift_bids: data.shift_bids || [], hour_conf: data.hour_conf || [], skills: data.skills || [], user_skills: data.user_skills || [], system_alerts: data.system_alerts || [], event_guests: data.event_guests || [], access_roles: data.access_roles || [],
                     shift_logs: data.shift_logs || [], shopping_list: data.shopping_list || [],
-                    job_listings: data.job_listings || [], private_messages: data.private_messages || []
+                    private_messages: data.private_messages || []
                 };
             }
             render();
@@ -218,7 +209,6 @@ function render() {
     if (state.need2fa) { root.innerHTML = renderForced2fa(); return; }
     
     const isAdmin = state.user.role === 'admin';
-    const isSuperadmin = state.user.role === 'superadmin';
     const themeIcon = document.body.getAttribute('data-theme') === 'dark' ? 'bi-sun' : 'bi-moon';
     
     const logoHtml = `<div class="nav-logo-text">Bar<span>Shift</span></div>`;
@@ -227,9 +217,7 @@ function render() {
     const msgBadge = unreadMsgCount > 0 ? `<div style="position:absolute; top:4px; right:10%; background:#E11D48; color:white; font-size:9px; border-radius:50%; width:16px; height:16px; display:flex; align-items:center; justify-content:center; font-weight:bold; box-shadow:0 2px 4px rgba(225,29,72,0.3); pointer-events:none;">${unreadMsgCount}</div>` : '';
     
     let navHtml = '';
-    if (isSuperadmin) {
-        navHtml = `<button class="nav-btn active" onclick="nav('superadmin')"><i class="bi bi-building-gear"></i><span>Baarit</span></button>`;
-    } else {
+    {
         navHtml = `
             <button class="nav-btn ${state.view==='dashboard'?'active':''}" onclick="nav('dashboard')"><i class="bi bi-house-door"></i><span>Koti</span></button>
             <button class="nav-btn ${state.view==='calendar'?'active':''}" onclick="nav('calendar')"><i class="bi bi-calendar-week"></i><span>Kalenteri</span></button>
@@ -245,9 +233,9 @@ function render() {
 
     const topBtns = `
         <button class="btn btn-ghost btn-icon btn-sm" onclick="openLanguageMenu()" title="Kieli / Language" aria-label="Kieli / Language" data-no-i18n style="font-size:11px; font-weight:700;">${bsLang().toUpperCase()}</button>
-        ${!isSuperadmin ? '<button class="btn btn-ghost btn-icon btn-sm" onclick="openSearch()" title="Haku (Ctrl+K)" aria-label="Haku"><i class="bi bi-search"></i></button>' : ''}
+        ${'<button class="btn btn-ghost btn-icon btn-sm" onclick="openSearch()" title="Haku (Ctrl+K)" aria-label="Haku"><i class="bi bi-search"></i></button>'}
         <a class="btn btn-ghost btn-icon btn-sm" href="barshift_ohjeet.html" target="_blank" rel="noopener" title="Ohjeet" aria-label="Ohjeet"><i class="bi bi-question-circle"></i></a>
-        ${!isSuperadmin ? `<button class="btn btn-ghost btn-icon btn-sm ${state.view==='profile'?'top-active':''}" onclick="nav('profile')" title="Profiili" aria-label="Profiili"><i class="bi bi-person-badge"></i></button>` : ''}
+        ${`<button class="btn btn-ghost btn-icon btn-sm ${state.view==='profile'?'top-active':''}" onclick="nav('profile')" title="Profiili" aria-label="Profiili"><i class="bi bi-person-badge"></i></button>`}
         <button class="btn btn-ghost btn-icon btn-sm" onclick="toggleTheme()" title="Vaihda teema" aria-label="Vaihda teema"><i class="bi ${themeIcon}"></i></button>
         <button class="btn btn-ghost btn-icon btn-sm top-logout" onclick="logout()" title="Kirjaudu ulos" aria-label="Kirjaudu ulos"><i class="bi bi-box-arrow-right"></i></button>`;
 
@@ -259,7 +247,7 @@ function render() {
                     <div class="user-info-badge" style="margin-top: 12px; display: inline-block;">
                         ${esc(state.user.username)}@${esc(state.user.pub_name)}
                     </div>
-                    ${pubSwitchHtml()}
+                    
                 </div>
                 ${navHtml}
             </nav>
@@ -267,7 +255,7 @@ function render() {
                 <header class="top-bar">
                     <div class="top-logo">${logoHtml}</div>
                     <div class="top-actions">
-                        ${pubSwitchHtml('top')}
+                        
                         <div class="user-info-badge top-badge">${esc(state.user.username)}@${esc(state.user.pub_name)}</div>
                         ${topBtns}
                     </div>
@@ -304,7 +292,6 @@ function logout() {
 
 function renderView() {
     switch(state.view) {
-        case 'superadmin': return renderSuperadmin();
         case 'dashboard': return renderDashboard();
         case 'calendar': return renderCalendar();
         case 'list': return renderShifts();
@@ -319,25 +306,6 @@ function renderView() {
     }
 }
 
-// ===================== USEAN BAARIN JÄSENYYS (yksi tunnus) =====================
-function pubSwitchHtml(where) {
-    const ms = (state.data && state.data.memberships) || [];
-    if (ms.length < 2) return '';
-    return `<select class="pub-switch ${where === 'top' ? 'top' : ''}" onchange="switchPub(this.value)" aria-label="Vaihda baaria" title="Vaihda baaria">${ms.map(m => `<option value="${m.id}" ${m.id == state.user.id ? 'selected' : ''}>${esc(m.name)}</option>`).join('')}</select>`;
-}
-async function switchPub(userId) {
-    if (userId == state.user.id) return;
-    try {
-        const r = await (await fetch('api.php?action=switch_pub', { method: 'POST', body: JSON.stringify({ userId: parseInt(userId, 10) }) })).json();
-        if (r.error) { showToast(r.error, 'error'); return render(); }
-        state.user = r.user; localStorage.setItem('barshift_user', JSON.stringify(state.user));
-        // Edellisen baarin tiedot pois muistista
-        state.pubProfile = null; state.pubShare = null; state.report = null; state.auditLog = null; state.selectedUserId = 'all'; state.statsUserId = 'all';
-        state.data = { users: [], shifts: [], events: [], trades: [], absences: [], notices: [], pubs: [], stats: {}, time_entries: [], availability: [], tasks: [], task_completions: [], cash_recent: [], perms: [], shift_bids: [], hour_conf: [], skills: [], user_skills: [], system_alerts: [], event_guests: [], access_roles: [], shift_logs: [], shopping_list: [], job_listings: [], private_messages: [], memberships: [] };
-        state.view = state.user.role === 'superadmin' ? 'superadmin' : 'dashboard';
-        closeModal(); showToast('Baari vaihdettu: ' + state.user.pub_name); await load();
-    } catch (e) { showToast('Baarin vaihto epäonnistui', 'error'); }
-}
 
 // Pakotettu 2FA: baari vaatii ylläpitäjiltä kaksivaiheisen tunnistautumisen; ennen käyttöönottoa näytetään vain tämä
 function renderForced2fa() {

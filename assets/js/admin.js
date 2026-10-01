@@ -16,14 +16,14 @@ function adminTabUsers() {
                     <span style="color:${u.has_alcohol==1?'#0D9488':'var(--border2)'}; margin:0 6px;" title="Anniskelupassi"><i class="bi bi-cup-straw"></i></span>
                 </td>
                 <td>${u.target_hours ? u.target_hours + ' h' : '-'}</td>
-                <td>${(() => { const l = u.role === 'superadmin' ? null : userLeave(u.id); return l && l.hasStart ? `<b>${fnum(l.remaining)} pv</b><br><span style="font-size:11px; color:var(--text3);">kertynyt ${fnum(l.entitled)}, käytetty ${fnum(l.used)}${l.next.earned > 0 ? `<br>ensi vuodelle ${l.next.earned} pv` : ''}</span>` : '<span style="color:var(--text3);">–</span>'; })()}</td>
+                <td>${(() => { const l = userLeave(u.id); return l && l.hasStart ? `<b>${fnum(l.remaining)} pv</b><br><span style="font-size:11px; color:var(--text3);">kertynyt ${fnum(l.entitled)}, käytetty ${fnum(l.used)}${l.next.earned > 0 ? `<br>ensi vuodelle ${l.next.earned} pv` : ''}</span>` : '<span style="color:var(--text3);">–</span>'; })()}</td>
                 <td><span class="badge ${u.role=='admin'?'badge-orange':'badge-blue'}">${esc(u.role)}</span></td>
                 <td style="text-align:right">
                     <button class="btn btn-ghost btn-sm btn-icon" title="Muokkaa" aria-label="Muokkaa" onclick="openUserModal(${u.id})"><i class="bi bi-pencil"></i></button>
-                    ${u.role !== 'superadmin' && !u.anonymized_at ? `<a class="btn btn-ghost btn-sm btn-icon" title="Lataa työntekijän tiedot (GDPR)" aria-label="Lataa työntekijän tiedot" href="api.php?action=export_user_data&id=${u.id}"><i class="bi bi-download"></i></a>` : ''}
-                    ${u.role !== 'superadmin' && !u.anonymized_at ? `<button class="btn btn-ghost btn-sm btn-icon" title="Lähetä kutsu- tai salasananvaihtolinkki" aria-label="Lähetä kutsulinkki" onclick="sendInvite(${u.id})"><i class="bi bi-envelope"></i></button>` : ''}
+                    ${!u.anonymized_at ? `<a class="btn btn-ghost btn-sm btn-icon" title="Lataa työntekijän tiedot (GDPR)" aria-label="Lataa työntekijän tiedot" href="api.php?action=export_user_data&id=${u.id}"><i class="bi bi-download"></i></a>` : ''}
+                    ${!u.anonymized_at ? `<button class="btn btn-ghost btn-sm btn-icon" title="Lähetä kutsu- tai salasananvaihtolinkki" aria-label="Lähetä kutsulinkki" onclick="sendInvite(${u.id})"><i class="bi bi-envelope"></i></button>` : ''}
                     ${u.totp_enabled == 1 && u.role !== 'admin' ? `<button class="btn btn-ghost btn-sm btn-icon" title="Nollaa kaksivaiheinen tunnistautuminen" aria-label="Nollaa 2FA" onclick="resetTwoFactor(${u.id})"><i class="bi bi-shield-x"></i></button>` : ''}
-                    ${u.role !== 'superadmin' && !u.anonymized_at && u.id != state.user.id ? `<button class="btn btn-ghost btn-sm btn-icon" title="Anonymisoi (poistaa henkilötiedot, säilyttää työtunnit)" aria-label="Anonymisoi" onclick="anonymizeUser(${u.id})"><i class="bi bi-person-x"></i></button>` : ''}
+                    ${!u.anonymized_at && u.id != state.user.id ? `<button class="btn btn-ghost btn-sm btn-icon" title="Anonymisoi (poistaa henkilötiedot, säilyttää työtunnit)" aria-label="Anonymisoi" onclick="anonymizeUser(${u.id})"><i class="bi bi-person-x"></i></button>` : ''}
                     <button class="btn btn-danger btn-sm btn-icon" title="Poista" aria-label="Poista" onclick="deleteItem(${u.id},'user')"><i class="bi bi-trash"></i></button>
                 </td>
             </tr>`).join('')}</tbody></table></div>`;
@@ -104,52 +104,6 @@ function adminTabTasks() {
     return html;
 }
 
-function adminTabJobs() {
-    let html = '';
-    html += `
-        <div style="display:flex; gap:12px; margin-bottom:16px; flex-wrap:wrap;">
-            <button class="btn btn-primary" style="background:var(--accent2); box-shadow: 0 4px 12px rgba(245, 158, 11, 0.2);" onclick="openJobModal()"><i class="bi bi-megaphone"></i> Uusi hätähuuto muille baareille</button>
-        </div>`;
-
-    // ===================== OMAT TYÖVOIMAPYUNNÖT JA SIVUTUS =====================
-    const myJobs = (state.data.job_listings || []).filter(j => j.pub_name === state.user.pub_name);
-    html += `
-        <div class="card card-sm">
-            <div class="section-header"><span class="section-title"><i class="bi bi-megaphone"></i> Lähettämäsi työvoimapyynnöt muille</span><div class="section-line"></div></div>
-            <div style="display: flex; flex-direction: column; gap: 8px; margin-bottom:12px;">`;
-    
-    if (myJobs.length === 0) {
-        html += `<div style="font-size:13px; color:var(--text3); padding:10px; text-align:center;">Ei lähetettyjä työvoimapyynnöistä.</div>`;
-    } else {
-        const jobsToRender = state.showAllAdminJobs ? myJobs : myJobs.slice(0, 5);
-        jobsToRender.forEach(job => {
-            html += `
-                <div style="display:flex; justify-content:space-between; align-items:center; background:var(--surface2); padding:10px 14px; border-radius:8px; border:1px solid var(--border);">
-                    <div>
-                        <div style="font-size:14px; font-weight:600; color:var(--text);">${esc(job.message)}</div>
-                        <div style="font-size:12px; color:var(--text3); margin-top:2px;">Yhteys: ${esc(job.contact)} | Tila: <b>${esc(job.status==='open'?'Auki':'Suljettu')}</b></div>
-                    </div>
-                    <div style="display:flex; gap:6px;">
-                        <button class="btn btn-ghost btn-sm btn-icon" onclick="openJobModal(${job.id})"><i class="bi bi-pencil"></i></button>
-                        ${job.status === 'open' ? `<button class="btn btn-ghost btn-sm" style="color:var(--accent2); border-color:var(--accent2);" onclick="closeJobListing(${job.id})">Kuittaa valmiiksi</button>` : ''}
-                        <button class="btn btn-danger btn-sm btn-icon" onclick="closeJobListing(${job.id})"><i class="bi bi-trash"></i></button>
-                    </div>
-                </div>
-            `;
-        });
-        
-        if (myJobs.length > 5) {
-            if (!state.showAllAdminJobs) {
-                html += `<button class="btn btn-ghost btn-sm" style="width:100%;" onclick="state.showAllAdminJobs=true; render();">Näytä kaikki (${myJobs.length})</button>`;
-            } else {
-                html += `<button class="btn btn-ghost btn-sm" style="width:100%;" onclick="state.showAllAdminJobs=false; render();">Näytä vähemmän</button>`;
-            }
-        }
-    }
-    html += `</div></div>`;
-
-    return html;
-}
 
 // ---------- Julkinen profiili (tapahtumakalenteri + kartta) ----------
 async function loadPubProfile() {
@@ -378,7 +332,6 @@ const ADMIN_TABS = [
     { id: 'guests', perm: 'events.manage', feature: 'guests', label: 'Vieraat', icon: 'bi-person-heart', render: () => adminTabGuests(), count: () => 0 },
     { id: 'skills', perm: 'shifts.manage', label: 'Osaaminen',  icon: 'bi-award', render: () => adminTabSkills(), count: () => 0 },
     { id: 'coverage', perm: 'shifts.manage', label: 'Miehitys',         icon: 'bi-people',        render: () => adminTabCoverage(), count: () => (state.data.coverage || []).filter(c => c.shortage > 0).length },
-    { id: 'gigs',    label: 'Keikkalaiset',     icon: 'bi-person-lines-fill', render: () => adminTabGigs(), count: () => (state.data.gig_outgoing || []).filter(g => g.status === 'pending').length },
     { id: 'bookings', perm: 'events.manage', label: 'Varaukset',        icon: 'bi-calendar2-check', render: () => adminTabBookings(), count: () => (state.data.bookings || []).filter(b => b.status === 'pending').length },
     { id: 'pub',     label: 'Baari',            icon: 'bi-shop',          render: adminTabPub,     count: () => 0 },
     { id: 'profile', label: 'Julkinen profiili', icon: 'bi-globe', render: adminTabProfile, count: () => (state.pubProfile && state.pubProfile.is_public == 1) ? '✓' : 0 },
@@ -386,7 +339,6 @@ const ADMIN_TABS = [
     { id: 'access', label: 'Oikeudet',      icon: 'bi-shield-lock',   render: () => adminTabAccess(), count: () => 0 },
     { id: 'system', label: 'Järjestelmä',   icon: 'bi-heart-pulse',   render: () => adminTabSystem(), count: () => (state.data.system_alerts || []).length },
     { id: 'audit',   label: 'Auditloki',        icon: 'bi-journal-text',  render: adminTabAudit,   count: () => 0 },
-    { id: 'jobs',    label: 'Työvoimapyynnöt',  icon: 'bi-briefcase',     render: adminTabJobs,    count: () => (state.data.job_listings || []).filter(j => j.pub_name === state.user.pub_name && j.status === 'open').length }
 ];
 
 function setAdminTab(id) {
@@ -427,8 +379,7 @@ function openUserModal(userId = null) {
         <div class="form-group" style="margin-bottom:14px;"><label class="form-label">Työntekijänumero (palkkajärjestelmää varten, valinn.)</label><input id="u-empno" class="form-input" maxlength="20" value="${esc(eu && eu.employee_number ? eu.employee_number : '')}"></div>
         <div class="form-group" style="margin-bottom:14px;"><label class="form-label">Sähköposti (valinnainen)</label><input id="u-email" type="email" class="form-input" maxlength="150" placeholder="nimi@example.fi" value="${esc(eu && eu.email ? eu.email : '')}">
             <small style="color:var(--text3)">Kutsulinkkiä, salasanan palautusta ja ilmoitusten varakanavaa varten.</small></div>
-        ${eu ? '' : `<label class="abs-choice" style="margin-bottom:8px;"><input id="u-invite" type="checkbox" onchange="document.getElementById('u-pass').disabled = this.checked || document.getElementById('u-link').checked; if (this.checked) { document.getElementById('u-pass').value = ''; document.getElementById('u-link').checked = false; }"><span><b>Lähetä kutsulinkki</b> – työntekijä asettaa salasanansa itse<br><small>Linkki lähetetään sähköpostilla, jos osoite on annettu ja sähköposti on käytössä; muuten saat linkin jaettavaksi itse.</small></span></label>
-        <label class="abs-choice" style="margin-bottom:14px;"><input id="u-link" type="checkbox" onchange="document.getElementById('u-pass').disabled = this.checked || document.getElementById('u-invite').checked; if (this.checked) { document.getElementById('u-pass').value = ''; document.getElementById('u-invite').checked = false; }"><span><b>Henkilöllä on jo tunnus toisessa baarissa</b> – pyydä yhdistämään<br><small>Henkilö liittää tämän baarin olemassa olevaan tunnukseensa linkistä (vaatii sähköpostiosoitteen) ja voi sen jälkeen vaihtaa baarien välillä yhdellä kirjautumisella. Sinä hallitset vain oman baarisi tietoja.</small></span></label>`}
+        ${eu ? '' : `<label class="abs-choice" style="margin-bottom:8px;"><input id="u-invite" type="checkbox" onchange="document.getElementById('u-pass').disabled = this.checked; if (this.checked) { document.getElementById('u-pass').value = ''; }"><span><b>Lähetä kutsulinkki</b> – työntekijä asettaa salasanansa itse<br><small>Linkki lähetetään sähköpostilla, jos osoite on annettu ja sähköposti on käytössä; muuten saat linkin jaettavaksi itse.</small></span></label>`}
         <div class="form-row" style="margin-bottom:14px;">
             <div class="form-group"><label class="form-label">Tuntipalkka (€/h)</label><input id="u-wage" type="number" step="0.01" class="form-input" value="${eu ? eu.hourly_wage : ''}"></div>
             <div class="form-group"><label class="form-label">Tavoitetunnit / kk</label><input id="u-target" type="number" class="form-input" value="${eu ? (eu.target_hours || '') : ''}"></div>
@@ -491,7 +442,6 @@ async function addUser() {
         email: document.getElementById('u-email').value.trim(),
         employee_number: document.getElementById('u-empno').value.trim(),
         invite: invite,
-        link: !!(document.getElementById('u-link') && document.getElementById('u-link').checked),
         role: document.getElementById('u-role').value, access_role: (document.getElementById('u-arole') || {}).value || '', 
         hourly_wage: document.getElementById('u-wage').value, 
         target_hours: document.getElementById('u-target').value,
@@ -510,13 +460,6 @@ async function addUser() {
     if (ur.invite) showInviteResult(data.name, ur.invite);
 }
 
-async function saveJobListing() {
-    const msg = document.getElementById('jl-msg').value.trim(); const contact = document.getElementById('jl-contact').value.trim();
-    if (!msg || !contact) return alert("Täytä kaikki tiedot!");
-    const id = state.editingJob ? state.editingJob.id : null;
-    await fetch('api.php?action=create_job_listing', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: id, pub_name: state.user.pub_name, userId: state.user.id, message: msg, contact: contact }) });
-    closeModal(); showToast("Hätähuuto tallennettu!"); load();
-}
 
 async function saveShopItem() {
     const item = document.getElementById('m-shop-item').value.trim(); if(!item) return;
@@ -529,33 +472,6 @@ async function saveShopItem() {
 }
 async function shopStatus(itemId, status) { const r = await postJson('shop_status', { itemId, status }); if (r) load(); }
 
-// ===================== TYÖVOIMAPÖRSSI (JOB LISTING MODAL) =====================
-function openJobModal(jobId = null) {
-    const job = jobId ? state.data.job_listings.find(j => j.id == jobId) : null;
-    state.editingJob = job;
-    const title = job ? 'Muokkaa työvoimapyyntöä' : 'Uusi hätähuuto työvoimaringille';
-    
-    const body = `
-        <div class="notice-card" style="margin-bottom:16px;">
-            <i class="bi bi-info-circle-fill" style="color:var(--accent2); font-size:20px;"></i>
-            <div style="font-size:13px; color:var(--text2);">Tämä hätähuuto lähetetään rinkiin kuuluville muille baareille. Heidän pääkäyttäjiensä täytyy hyväksyä ilmoitus, ennen kuin se näkyy heidän työntekijöidensä etusivulla.</div>
-        </div>
-        <div class="form-group" style="margin-bottom:16px;">
-            <label class="form-label">Ilmoituksen kuvaus ja tiedot vuorosta</label>
-            <textarea id="jl-msg" class="form-input" rows="3" placeholder="Esim: Tarjotaan työvuoro perjantaille klo 16-24. Tarve tarjoilijalle!">${esc(job ? job.message : '')}</textarea>
-        </div>
-        <div class="form-group" style="margin-bottom:8px;">
-            <label class="form-label">Yhteystiedot (Keneen otetaan yhteyttä?)</label>
-            <input id="jl-contact" class="form-input" placeholder="Esim: Ota yhteyttä Matti Meikäläiseen, puh 040123456" value="${esc(job ? job.contact : '')}">
-        </div>
-    `;
-    
-    const footer = `
-        <button class="btn btn-ghost" onclick="closeModal()">Peruuta</button>
-        <button class="btn btn-primary" style="background:var(--accent2);" onclick="saveJobListing()"><i class="bi bi-send-check"></i> Lähetä pyyntö verkostoon</button>
-    `;
-    openModal(title, 'bi-megaphone-fill', body, footer);
-}
 
 // ===================== UUTISET / ILMOITUSTAULU MODAL =====================
 function openNoticeModal(noticeId = null) {
@@ -608,7 +524,7 @@ function openShoppingModal(itemId = null) {
             <input id="m-shop-item" class="form-input" placeholder="Esim. WC-paperi, Pillit" value="${esc(s ? s.item_name : '')}">
         </div>
         <div class="form-group" style="margin-top:12px;"><label class="form-label">Vastuuhenkilö (valinn.)</label>
-            <select id="m-shop-assignee" class="form-input"><option value="">Ei vielä</option>${(state.data.users || []).filter(u => u.role !== 'superadmin' && !u.anonymized_at).map(u => `<option value="${u.id}" ${s && s.assigned_to == u.id ? 'selected' : ''}>${esc(u.name)}</option>`).join('')}</select></div>
+            <select id="m-shop-assignee" class="form-input"><option value="">Ei vielä</option>${(state.data.users || []).filter(u => !u.anonymized_at).map(u => `<option value="${u.id}" ${s && s.assigned_to == u.id ? 'selected' : ''}>${esc(u.name)}</option>`).join('')}</select></div>
         <div class="form-group" style="margin-top:12px;"><label class="form-label">Kuva (valinn., esim. rikkinäinen laite)</label><input id="m-shop-img" type="file" accept="image/*" class="form-input"></div>
     `;
     const footer = `
@@ -707,16 +623,7 @@ async function saveShiftLog() {
     closeModal(); showToast('Vuorokirja päivitetty!'); load();
 }
 
-async function handleJobApproval(jobId, status) {
-    await fetch('api.php?action=approve_job_listing', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ jobId, pub_name: state.user.pub_name, userId: state.user.id, status }) });
-    showToast("Päätös tallennettu!"); load();
-}
 
-async function closeJobListing(jobId) {
-    if(!confirm("Kuitataanko ilmoitus valmiiksi/suljetuksi?")) return;
-    await fetch('api.php?action=close_job_listing', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ jobId }) });
-    showToast("Ilmoitus kuitattu!"); load();
-}
 
 
 async function deleteItem(id, type) { 
@@ -741,7 +648,7 @@ function showInviteResult(name, inv) {
     const body = `<p style="font-size:14px; margin:0 0 12px;">${inv.emailed ? `Linkki lähetettiin henkilön <b>${esc(name)}</b> sähköpostiin.` : `Sähköpostia ei lähetetty (osoite puuttuu tai sähköposti ei ole käytössä). Jaa linkki henkilölle <b>${esc(name)}</b> itse, esim. viestillä.`}</p>
         <label class="form-label">Salasanan asetuslinkki</label>
         <div style="display:flex; gap:6px;"><input id="inv-link" class="form-input" readonly value="${esc(inv.link)}" onclick="this.select()"><button class="btn btn-ghost btn-sm" onclick="copyField('inv-link')" title="Kopioi"><i class="bi bi-clipboard"></i></button></div>
-        <small style="color:var(--text3)">Linkki on kertakäyttöinen ja voimassa ${inv.kind === 'link' ? '14' : '7'} päivää. Älä jaa sitä muille.</small>`;
+        <small style="color:var(--text3)">Linkki on kertakäyttöinen ja voimassa 7 päivää. Älä jaa sitä muille.</small>`;
     openModal('Kutsulinkki', 'bi-envelope-check', body, `<button class="btn btn-primary" onclick="closeModal()">Valmis</button>`);
 }
 async function resetTwoFactor(id) {
