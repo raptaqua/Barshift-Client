@@ -261,6 +261,7 @@ function renderShifts() {
         </div>
         <div class="admin-tabs" role="tablist" aria-label="Vuorojen näkymä">${SHIFT_TABS.map(t =>
             `<button class="admin-tab ${t.id === tab ? 'active' : ''}" role="tab" aria-selected="${t.id === tab}" onclick="setShiftTab('${t.id}')"><i class="bi ${t.icon}"></i><span>${t.label}</span>${t.id === 'list' && upcomingCount > 0 ? `<span class="admin-tab-count">${upcomingCount}</span>` : ''}</button>`).join('')}</div>`;
+    html += renderOutsideGigs();
     html += `<div role="tabpanel">${tab === 'list' ? renderShiftList(isAdmin, today) : renderShiftWeek(isAdmin, today)}</div>`;
     return html;
 }

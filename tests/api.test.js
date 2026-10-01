@@ -1283,6 +1283,8 @@ const future = (days) => { const d = new Date(Date.now() + days * 864e5); return
       await admin.post('hub_sync_now', {});
       const acc = await waitMail(mailbox, m => m.to === 'sari@example.test' && /hyväksytty/.test(m.subject)); assert.ok(acc, 'päätösilmoitus puuttuu');
       f = (await emp.post('hub_feed', {})).json; assert.strictEqual(f.applications[0].status, 'accepted'); assert.strictEqual(f.applications[0].address, 'Naapurikatu 5');
+      const og = (await emp.get('')).json.my_outside_gigs; assert.strictEqual(og.length, 1, 'hyväksytty keikka ei näy omissa tiedoissa'); assert.strictEqual(og[0].bar_name, 'Naapuribaari'); assert.strictEqual(og[0].address, 'Naapurikatu 5'); assert.strictEqual(og[0].role, 'Baarimestari');
+      assert.deepStrictEqual((await mik.get('')).json.my_outside_gigs, [], 'toisen käyttäjän keikat vuotivat'); assert.deepStrictEqual((await admin.get('')).json.my_outside_gigs, []);
       assert.strictEqual((await emp.post('hub_withdraw', { id: f.applications[0].id })).status, 409, 'hyväksytyn voi perua');
       // peruminen: vuoro 501
       assert.ok((await emp.post('hub_apply', { shiftId: 501, phone: '1' })).json.success);

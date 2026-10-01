@@ -139,7 +139,7 @@ async function loadSilent() {
                 time_entries: data.time_entries || [], availability: data.availability || [],
                 tasks: data.tasks || [], task_completions: data.task_completions || [], cash_recent: data.cash_recent || [], perms: data.perms || [], shift_bids: data.shift_bids || [], hour_conf: data.hour_conf || [], skills: data.skills || [], user_skills: data.user_skills || [], system_alerts: data.system_alerts || [], event_guests: data.event_guests || [], access_roles: data.access_roles || [],
                 shift_logs: data.shift_logs || [], shopping_list: data.shopping_list || [],
-                private_messages: data.private_messages || [], hub_pending_apps: data.hub_pending_apps || []
+                private_messages: data.private_messages || [], hub_pending_apps: data.hub_pending_apps || [], my_outside_gigs: data.my_outside_gigs || []
             };
             if (JSON.stringify(state.data) !== JSON.stringify(newData)) {
                 state.data = newData;
@@ -185,7 +185,7 @@ async function load() {
                     time_entries: data.time_entries || [], availability: data.availability || [],
                     tasks: data.tasks || [], task_completions: data.task_completions || [], cash_recent: data.cash_recent || [], perms: data.perms || [], shift_bids: data.shift_bids || [], hour_conf: data.hour_conf || [], skills: data.skills || [], user_skills: data.user_skills || [], system_alerts: data.system_alerts || [], event_guests: data.event_guests || [], access_roles: data.access_roles || [],
                     shift_logs: data.shift_logs || [], shopping_list: data.shopping_list || [],
-                    private_messages: data.private_messages || [], hub_pending_apps: data.hub_pending_apps || []
+                    private_messages: data.private_messages || [], hub_pending_apps: data.hub_pending_apps || [], my_outside_gigs: data.my_outside_gigs || []
                 };
             }
             render();
